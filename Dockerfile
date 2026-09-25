@@ -48,6 +48,18 @@ ENV PORT=5000
 # /data is where a deployment mounts its volumes (run folders, the browser profile); Docker gives a fresh named
 # volume the ownership of the image's directory, so it must exist and belong to pwuser or the server cannot write.
 RUN mkdir -p /data/artifacts /data/chromium && chown -R pwuser:pwuser /app /data
+# Chromium runs as its own user (packages/server/chromium-user.sh), so a renderer exploit cannot read the server's
+# environment or the run folders. pwuser steps down through a copy of setpriv that is setuid chrome, setgid render.
+RUN groupadd --system render \
+  && useradd --system --gid render --home-dir /home/chrome --create-home --shell /usr/sbin/nologin chrome \
+  && usermod -aG render pwuser \
+  && mkdir -p /usr/local/lib/chromium \
+  && install -o chrome -g render -m 6750 /usr/bin/setpriv /usr/local/lib/chromium/setpriv \
+  && ln -s "$(node -p "require('playwright-core').chromium.executablePath()")" /usr/local/lib/chromium/chrome \
+  && chmod 700 /home/chrome /data/artifacts \
+  && chgrp render /data/chromium && chmod 2770 /data/chromium
+ENV CHROMIUM_EXECUTABLE=/app/packages/server/chromium-user.sh
 USER pwuser
 EXPOSE 5000
-CMD ["npm", "start", "-w", "wearable-validator-server"]
+# umask 077: run folders stay the server's own, Chromium's user cannot read them
+CMD ["sh", "-c", "umask 077 && exec npm start -w wearable-validator-server"]

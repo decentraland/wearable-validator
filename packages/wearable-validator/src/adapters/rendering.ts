@@ -397,12 +397,14 @@ export function browserEnv(source: NodeJS.ProcessEnv = process.env): Record<stri
   return env;
 }
 
+// CHROMIUM_EXECUTABLE: an operator's launcher in place of Playwright's own Chromium (the Docker image runs it as its own user)
 function launchOptions(gpu: Gpu) {
-  return { channel: "chromium", args: chromiumArgs(gpu), env: browserEnv(), chromiumSandbox: chromiumSandbox() };
+  return { channel: "chromium", args: chromiumArgs(gpu), env: browserEnv(), chromiumSandbox: chromiumSandbox(), executablePath: process.env.CHROMIUM_EXECUTABLE || undefined };
 }
 
 export function launchChromium(options: { gpu: Gpu; headed?: boolean; executablePath?: string }): Promise<Browser> {
-  return chromium.launch({ ...launchOptions(options.gpu), headless: !options.headed, executablePath: options.executablePath });
+  const launch = launchOptions(options.gpu);
+  return chromium.launch({ ...launch, headless: !options.headed, executablePath: options.executablePath ?? launch.executablePath });
 }
 
 /** What a host can actually do: an engine that never draws looks exactly like a slow one in the run log. */
@@ -559,7 +561,7 @@ export function openPreview(options: { assets?: LocalBuild; gpu: Gpu; headed?: b
     signal.throwIfAborted();
     const started = Date.now();
     const seat = await openBrowserSeat({ ...options, size: settings.imageSizePx });
-    log("browser launched", { version: seat.version, gpu: options.gpu, extraArgs: process.env.CHROMIUM_ARGS ?? "", sandbox: chromiumSandbox(), profile: options.profileDirectory ? "persistent" : "fresh", ms: Date.now() - started });
+    log("browser launched", { version: seat.version, gpu: options.gpu, extraArgs: process.env.CHROMIUM_ARGS ?? "", sandbox: chromiumSandbox(), executable: process.env.CHROMIUM_EXECUTABLE || "playwright", profile: options.profileDirectory ? "persistent" : "fresh", ms: Date.now() - started });
     let closing: Promise<void> | undefined;
     // the log shows launched/closed pairs: an unclosed browser keeps a Unity engine spinning on the host
     const close = () => (closing ??= seat.close().then(() => log("browser closed", { ms: Date.now() - started })));
