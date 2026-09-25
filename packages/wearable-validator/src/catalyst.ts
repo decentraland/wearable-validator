@@ -28,7 +28,7 @@ export interface CatalystOptions {
   maxBytes?: number;
 }
 
-/** Shop item URLs (decentraland.org/shop/item/0x…/0) and urn:decentraland:… references; null when it is neither. */
+/** Marketplace and shop item URLs (decentraland.org/marketplace/contracts/0x…/items/0, decentraland.org/shop/item/0x…/0) and urn:decentraland:… references; null when it is none of them. */
 export function parseItemReference(raw: string): string[] | null {
   const input = raw.trim();
   if (/^urn:decentraland:[a-z]+:collections-v[12]:[a-z0-9:_-]+$/i.test(input)) return [input.toLowerCase()];

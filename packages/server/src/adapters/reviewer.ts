@@ -1,42 +1,13 @@
-/** Reviewer wrappers around the library's Reviewer contract: the setup-token credential store, recording, dry run, replay and live. */
+/** Reviewer wrappers around the library's Reviewer contract: recording, dry run, replay and live. */
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Credential, CredentialStore } from "@earendil-works/pi-ai";
 import type { IConfigComponent, ILoggerComponent } from "@well-known-components/interfaces";
 import { manifest, type Reviewer, type ReviewResult } from "@dcl-regenesislabs/wearable-validator";
-import { createPiReviewer } from "@dcl-regenesislabs/wearable-validator/ai";
+import { createPiReviewer, setupTokenCredentials } from "@dcl-regenesislabs/wearable-validator/ai";
 import { contextJson, promptMarkdown, readEvidenceFile } from "../logic/run-store.js";
 import type { RunSink } from "../types.js";
 
-// a `claude setup-token` (sk-ant-oat…) lives about a year and is itself the bearer, not a refresh token
-const SETUP_TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
-
 export const DRY_RUN_REASON = "The model was not called: the run server has no ANTHROPIC_OAUTH_SETUP_TOKEN.";
-
-/** The only credential: a `claude setup-token` from the environment, seeded in memory as the access token so the SDK never tries to refresh it. */
-export function tokenCredentials(token: string): CredentialStore {
-  if (!token.startsWith("sk-ant-oat")) throw new Error("ANTHROPIC_OAUTH_SETUP_TOKEN must be a `claude setup-token` (sk-ant-oat…), not an API key.");
-  let current: Credential | undefined = { type: "oauth", access: token, refresh: token, expires: Date.now() + SETUP_TOKEN_TTL_MS };
-  return {
-    async read(provider, options) {
-      options?.signal?.throwIfAborted();
-      return provider === "anthropic" ? current : undefined;
-    },
-    async list() {
-      return current ? [{ providerId: "anthropic", type: "oauth" }] : [];
-    },
-    async modify(provider, fn) {
-      if (provider !== "anthropic") throw new Error("This credential store supports Anthropic OAuth only.");
-      const next = await fn(current);
-      if (next && next.type !== "oauth") throw new Error("Only OAuth credentials can be stored here.");
-      if (next) current = next;
-      return next ?? current;
-    },
-    async delete(provider) {
-      if (provider === "anthropic") current = undefined;
-    }
-  };
-}
 
 /** Writes <check>/1-prompt.md and 2-context.json BEFORE forwarding, 3-answer.json after — so a dry run still leaves the prompt on disk. */
 export function recordingReviewer(reviewer: Reviewer, dir: string): Reviewer {
@@ -116,7 +87,7 @@ export async function createReviewerComponent(components: { config: IConfigCompo
   const { config, logs } = components;
   // the only credential is the year-long `claude setup-token` from the environment: no session file, nothing to refresh or persist
   const setupToken = await config.getString("ANTHROPIC_OAUTH_SETUP_TOKEN");
-  const credentials = setupToken ? tokenCredentials(setupToken) : undefined;
+  const credentials = setupToken ? setupTokenCredentials(setupToken) : undefined;
   if (!credentials) logs.getLogger("reviewer").warn("no OAuth session: reviews render and write the prompt without calling the model (set ANTHROPIC_OAUTH_SETUP_TOKEN to a claude setup-token)");
   return {
     kind: credentials ? "pi" : "dry-run",

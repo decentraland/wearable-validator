@@ -7,7 +7,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { digest, type CaptureRecord, type Result, type ReviewRequest, type ReviewResult } from "@dcl-regenesislabs/wearable-validator";
 import { pngBytes, syntheticGlb, syntheticZip } from "../../wearable-validator/test/helpers/synthetic.js";
-import { dryRunReviewer, recordingReviewer, replayReviewer, tokenCredentials } from "../src/adapters/reviewer.js";
+import { setupTokenCredentials } from "@dcl-regenesislabs/wearable-validator/ai";
+import { dryRunReviewer, recordingReviewer, replayReviewer } from "../src/adapters/reviewer.js";
 import { readRun, writeRun } from "../src/logic/run-store.js";
 
 function reviewRequest(): ReviewRequest {
@@ -200,9 +201,9 @@ describe("run folder edge cases", () => {
   });
 });
 
-describe("tokenCredentials", () => {
+describe("setupTokenCredentials", () => {
   it("seeds a setup token as a year-long OAuth access credential and keeps edits in memory", async () => {
-    const store = tokenCredentials("sk-ant-oat01-test");
+    const store = setupTokenCredentials("sk-ant-oat01-test");
     const credential = await store.read("anthropic");
     assert.equal(credential?.type, "oauth");
     assert.equal(credential?.type === "oauth" && credential.access, "sk-ant-oat01-test");
@@ -214,6 +215,6 @@ describe("tokenCredentials", () => {
   });
 
   it("refuses anything that is not a setup token", () => {
-    assert.throws(() => tokenCredentials("sk-ant-api03-key"), /setup-token/);
+    assert.throws(() => setupTokenCredentials("sk-ant-api03-key"), /setup-token/);
   });
 });
