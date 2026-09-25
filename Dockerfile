@@ -1,9 +1,9 @@
 # Run server image: Playwright's Chromium (full headless, SwiftShader WebGPU) + the Unity build + the server.
 # Build from the repo root:  docker build -t wearable-validator-server .
-# Lives at the root so DigitalOcean App Platform detects it; the build context is the whole repo.
-# Run:  docker run --rm --shm-size=1g --memory=4g --security-opt seccomp=deploy/chromium-seccomp.json -p 4180:4180 \
-#         -e ANTHROPIC_OAUTH_SETUP_TOKEN=... -e CF_ACCESS_TEAM_DOMAIN=... -e CF_ACCESS_AUD=... wearable-validator-server
-# Chromium's sandbox needs that seccomp profile; without it set CHROMIUM_SANDBOX=0 (a renderer exploit then reaches the container).
+# The build context is the whole repo. Run:  docker run --rm --shm-size=1g --memory=4g -p 4180:4180 \
+#   -e ANTHROPIC_OAUTH_SETUP_TOKEN=... -e CF_ACCESS_TEAM_DOMAIN=... -e CF_ACCESS_AUD=... wearable-validator-server
+# Chromium's sandbox needs user namespaces, which Docker's default seccomp profile refuses: add Playwright's profile
+# (--security-opt seccomp=<utils/docker/seccomp_profile.json>); the startup self-test says when the sandbox cannot start.
 # stage 1: the commit this image was built from, read from the checkout's .git (HEAD, refs and packed-refs are the
 # only .git files in the build context); the server shows it in /api/health so operators know what is running
 FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc AS gitinfo
@@ -37,7 +37,7 @@ COPY packages/server ./packages/server
 COPY --from=gitinfo /build-info.json ./packages/server/build-info.json
 ENV RENDERER_BUILD=/app/packages/server/renderer-build
 # Linux Chromium reaches SwiftShader WebGPU only through Vulkan; without those two flags pipeline creation fails.
-# Hosted containers (App Platform) give /dev/shm 64 MB, far too small for this page: --disable-dev-shm-usage moves
+# Hosted containers often give /dev/shm 64 MB, far too small for this page: --disable-dev-shm-usage moves
 # Chromium's shared memory to /tmp. CHROMIUM_ARGS is an operator-trusted knob spliced straight into the launch arguments.
 ENV CHROMIUM_ARGS="--enable-features=Vulkan --use-vulkan=swiftshader --disable-dev-shm-usage"
 ENV LOG_FORMAT=json

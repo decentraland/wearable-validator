@@ -380,7 +380,7 @@ export function chromiumArgs(gpu: Gpu): string[] {
 // a renderer exploit reads its own environment first: the host's tokens stay out of it
 const BROWSER_ENV = ["PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TZ", "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "FONTCONFIG_PATH", "SYSTEMROOT", "WINDIR", "LOCALAPPDATA", "APPDATA", "USERPROFILE", "PROGRAMFILES"];
 
-/** Chromium's own sandbox stays on unless the operator sets CHROMIUM_SANDBOX=0: in a container it needs a seccomp profile that allows user namespaces (deploy/chromium-seccomp.json). */
+/** Chromium's own sandbox stays on unless the operator sets CHROMIUM_SANDBOX=0: in a container it needs a seccomp profile that allows user namespaces (Playwright ships one). */
 export function chromiumSandbox(): boolean {
   return process.env.CHROMIUM_SANDBOX !== "0";
 }
