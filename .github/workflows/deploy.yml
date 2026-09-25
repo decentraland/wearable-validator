@@ -14,6 +14,8 @@ concurrency:
 
 jobs:
   deploy:
+    # the droplet deploys from the dcl-regenesislabs repo only; this repo has no droplet secrets
+    if: github.repository == 'dcl-regenesislabs/wearable-validator'
     runs-on: ubuntu-latest
     steps:
       - name: Authorize the droplet

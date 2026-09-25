@@ -1,0 +1,15 @@
+name: Publish 'latest' image
+
+# A GitHub release deploys the run server to prd.
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  cd:
+    uses: decentraland/platform-actions/.github/workflows/apps-docker-release.yml@main
+    with:
+      service-name: wearable-validator
+      deployment-environment: prd
+    secrets: inherit
