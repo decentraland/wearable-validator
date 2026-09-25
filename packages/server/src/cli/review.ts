@@ -5,10 +5,10 @@ import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { fetchCatalystItem, loadInput, parseItemReference, validate, type Input, type Result, type Services } from "@dcl-regenesislabs/wearable-validator";
-import { createPiReviewer } from "@dcl-regenesislabs/wearable-validator/ai";
+import { createPiReviewer, setupTokenCredentials } from "@dcl-regenesislabs/wearable-validator/ai";
 import { createRenderer } from "@dcl-regenesislabs/wearable-validator/rendering";
 import { resolveBuildDirectory } from "../adapters/renderer.js";
-import { dryRunReviewer, recordingReviewer, replayReviewer, tokenCredentials } from "../adapters/reviewer.js";
+import { dryRunReviewer, recordingReviewer, replayReviewer } from "../adapters/reviewer.js";
 import { readEvidenceFile, readRun, resolveArtifactsDir, usageLine, writeRun } from "../logic/run-store.js";
 import { referenceName, VISUAL_CHECKS } from "../logic/runs.js";
 
@@ -148,7 +148,7 @@ async function main(): Promise<void> {
   const renderer = args.buildDirectory ? await createRenderer({ buildDirectory: args.buildDirectory }) : undefined;
   const reviewer = args.noAi ? dryRunReviewer(NO_AI_REASON)
     : args.answer ? replayReviewer(args.from!)
-    : createPiReviewer({ credentials: tokenCredentials(process.env.ANTHROPIC_OAUTH_SETUP_TOKEN ?? ""), cache: args.cache });
+    : createPiReviewer({ credentials: setupTokenCredentials(process.env.ANTHROPIC_OAUTH_SETUP_TOKEN ?? ""), cache: args.cache });
   const services: Services = { renderer, reviewer: recordingReviewer(reviewer, runDir) };
   const controller = new AbortController();
   const abort = () => controller.abort();

@@ -5,13 +5,41 @@
  * records reviewMessages() as 2-context.json and the result as 3-answer.json.
  * Reads top to bottom in call order: gate → budget → build → send → parse → fail soft.
  */
-import { createModels, hasApi, type AssistantMessage, type Context, type CredentialStore, type ImageContent, type TextContent } from "@earendil-works/pi-ai";
+import { createModels, hasApi, type AssistantMessage, type Context, type Credential, type CredentialStore, type ImageContent, type TextContent } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { imageSize } from "image-size";
 import { digest } from "../logic/captures.js";
 import { isJpegBytes, isPngBytes } from "../logic/images.js";
 import { manifest } from "../manifest/index.js";
 import type { ReviewImage, ReviewMetadata, ReviewRequest, ReviewResult, Reviewer } from "../types.js";
+
+// a `claude setup-token` (sk-ant-oat…) lives about a year and is itself the bearer, not a refresh token
+const SETUP_TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+
+/** The credentials for createPiReviewer from a `claude setup-token`, held in memory so pi-ai never tries to refresh it. API keys are refused. */
+export function setupTokenCredentials(token: string): CredentialStore {
+  if (!token.startsWith("sk-ant-oat")) throw new Error("The token must be a `claude setup-token` (sk-ant-oat…), not an API key. Run `claude setup-token` to create one.");
+  let current: Credential | undefined = { type: "oauth", access: token, refresh: token, expires: Date.now() + SETUP_TOKEN_TTL_MS };
+  return {
+    async read(provider, options) {
+      options?.signal?.throwIfAborted();
+      return provider === "anthropic" ? current : undefined;
+    },
+    async list() {
+      return current ? [{ providerId: "anthropic", type: "oauth" }] : [];
+    },
+    async modify(provider, fn) {
+      if (provider !== "anthropic") throw new Error("This credential store supports Anthropic OAuth only.");
+      const next = await fn(current);
+      if (next && next.type !== "oauth") throw new Error("Only OAuth credentials can be stored here.");
+      if (next) current = next;
+      return next ?? current;
+    },
+    async delete(provider) {
+      if (provider === "anthropic") current = undefined;
+    }
+  };
+}
 
 export interface PiReviewerOptions {
   credentials: CredentialStore;
