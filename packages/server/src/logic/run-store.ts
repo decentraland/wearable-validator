@@ -1,5 +1,5 @@
 /** Run folders on disk (docs/visual-validation.md §3) and the index of every run this server has seen. */
-import { mkdir, readdir, readFile, stat, writeFile, appendFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, stat, writeFile, appendFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import type { Context } from "@earendil-works/pi-ai";
 import { START_COMPONENT, type IBaseComponent, type IConfigComponent, type ILoggerComponent } from "@well-known-components/interfaces";
@@ -384,6 +384,8 @@ export async function createRunStoreComponent(components: { config: IConfigCompo
   const { config, logs } = components;
   const log = appLogger(logs, "run-store");
   const root = resolveArtifactsDir(await config.getString("ARTIFACTS_DIR"));
+  // the server's alone, Chromium runs as another user; best effort: a root that cannot be used fails its first run
+  await chmod(root, 0o700).catch(() => {});
   const index = new Map<string, StoredRun>();
   const previous = new Map<InputKey, string>();
   const indexed = indexRunFolders(root, previous, index).catch((error) => log.warn("could not index earlier runs", { error: error instanceof Error ? error.message : String(error) }));

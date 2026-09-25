@@ -57,8 +57,8 @@ export async function createRendererComponent(components: { config: IConfigCompo
   const { config, logs } = components;
   const log = appLogger(logs, "renderer");
   const buildDirectory = await resolveBuildDirectory(await config.getString("RENDERER_BUILD"));
-  // the library reads CHROMIUM_ARGS and CHROMIUM_SANDBOX from the process environment at launch; a value that only the config knows (a test map) is handed over here
-  for (const key of ["CHROMIUM_ARGS", "CHROMIUM_SANDBOX"]) {
+  // the library reads these from the process environment at launch; a value that only the config knows (a test map) is handed over here
+  for (const key of ["CHROMIUM_ARGS", "CHROMIUM_SANDBOX", "CHROMIUM_EXECUTABLE"]) {
     const value = await config.getString(key);
     if (value !== undefined && process.env[key] === undefined) process.env[key] = value;
   }
