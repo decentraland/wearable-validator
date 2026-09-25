@@ -92,12 +92,11 @@ content hash matches, and altered bytes produce a mismatch instead of a crashed
 check. This scene reproduced the browser hashing failure before the fix.
 
 Content hashes support both legacy Decentraland `Qm…` whole-file hashes and
-UnixFS CIDv1 hashes, using `@dcl/hashing` and the format declared for each file.
-`@dcl/hashing` is pinned to keep the verified hash outputs and module format stable.
-The website supplies Node crypto and its supporting browser polyfills through
-Vite. Other browser integrations must provide equivalent polyfills; Node needs
-no extra configuration. Regression fixtures cover empty files, chunk boundaries,
-and multi-chunk files in Node and the production browser bundle.
+UnixFS CIDv1 hashes, in the format declared for each file. They are computed with
+Web Crypto (`crypto.subtle`), built into browsers and Node, so no bundler needs
+polyfills. Tests compare them with `@dcl/hashing` (a dev dependency only) across
+empty files, chunk boundaries and a two-level tree, in Node and the production
+browser bundle.
 
 ## Emote playback regression
 
