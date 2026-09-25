@@ -1,6 +1,6 @@
 # Run server image: Playwright's Chromium (full headless, SwiftShader WebGPU) + the Unity build + the server.
 # Build from the repo root:  docker build -t wearable-validator-server .
-# The build context is the whole repo. Run:  docker run --rm --shm-size=1g --memory=4g -p 4180:4180 \
+# The build context is the whole repo. Run:  docker run --rm --shm-size=1g --memory=4g -p 5000:5000 \
 #   -e ANTHROPIC_OAUTH_SETUP_TOKEN=... -e CF_ACCESS_TEAM_DOMAIN=... -e CF_ACCESS_AUD=... wearable-validator-server
 # Chromium's sandbox needs user namespaces, which Docker's default seccomp profile refuses: add Playwright's profile
 # (--security-opt seccomp=<utils/docker/seccomp_profile.json>); the startup self-test says when the sandbox cannot start.
@@ -42,10 +42,12 @@ ENV RENDERER_BUILD=/app/packages/server/renderer-build
 ENV CHROMIUM_ARGS="--enable-features=Vulkan --use-vulkan=swiftshader --disable-dev-shm-usage"
 ENV LOG_FORMAT=json
 ENV HOST=0.0.0.0
+# 5000: the port every well-known-components server listens on in a container (local runs keep 4180)
+ENV PORT=5000
 # Chromium loads creator-supplied models: never as root. pwuser ships with the Playwright image.
 # /data is where a deployment mounts its volumes (run folders, the browser profile); Docker gives a fresh named
 # volume the ownership of the image's directory, so it must exist and belong to pwuser or the server cannot write.
 RUN mkdir -p /data/artifacts /data/chromium && chown -R pwuser:pwuser /app /data
 USER pwuser
-EXPOSE 4180
+EXPOSE 5000
 CMD ["npm", "start", "-w", "wearable-validator-server"]

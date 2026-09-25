@@ -40,9 +40,10 @@ A merge to `main` builds the image and deploys it to dev; publishing a GitHub re
 
 The first start pulls a large image (Chromium plus the Unity build); the log then shows the self-test: the dependencies it reached and whether WebGPU draws. The run server's environment needs:
 
+The image listens on port 5000 on every interface and answers `/health/live`, like every well-known-components server.
+
 | Variable | Value |
 | --- | --- |
-| `HTTP_SERVER_HOST`, `HTTP_SERVER_PORT` | `0.0.0.0` and the port the load balancer targets (4180 in the image) |
 | `PUBLIC_HOSTS` | the hostname the server answers on |
 | `ANTHROPIC_OAUTH_SETUP_TOKEN` | a `claude setup-token`; without it the server renders and writes the prompt but calls no model |
 | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | the Access application (§2) whose JWT the Worker forwards |
@@ -112,7 +113,7 @@ ANTHROPIC_OAUTH_SETUP_TOKEN=<claude setup-token> npm run serve
 docker build -t wearable-validator-server .
 docker build --build-arg RENDERER_BUILD_URL=<url> --build-arg RENDERER_BUILD_SHA256=<sha256 of that tarball> -t wearable-validator-server .
 # Chromium's sandbox needs Playwright's seccomp profile (utils/docker/seccomp_profile.json in the Playwright repo)
-docker run --rm --shm-size=1g --memory=4g --security-opt seccomp=seccomp_profile.json -p 4180:4180 -e INSECURE_ANONYMOUS=1 wearable-validator-server
+docker run --rm --shm-size=1g --memory=4g --security-opt seccomp=seccomp_profile.json -p 5000:5000 -e INSECURE_ANONYMOUS=1 wearable-validator-server
 ```
 
 Leave the token out and the server renders and writes the prompt without calling the model.
