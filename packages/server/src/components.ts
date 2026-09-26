@@ -21,7 +21,7 @@ import { createRunsComponent } from "./logic/runs.js";
 import { metricDeclarations } from "./metrics.js";
 import type { AppComponents, BaseComponents, GlobalContext } from "./types.js";
 
-/** The Dockerfile and App Platform still say PORT and HOST; they win over .env.default, the WKC names win over them. */
+/** The Dockerfile still says PORT and HOST; they win over .env.default, the WKC names win over them. */
 export function legacyNames(env: NodeJS.ProcessEnv): Partial<Record<string, string>> {
   return { HTTP_SERVER_PORT: env.HTTP_SERVER_PORT ?? env.PORT, HTTP_SERVER_HOST: env.HTTP_SERVER_HOST ?? env.HOST };
 }

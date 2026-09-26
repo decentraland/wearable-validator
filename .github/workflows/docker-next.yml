@@ -1,0 +1,15 @@
+name: CI/CD on main branch
+
+# Builds the run server image and deploys it to dev.
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  cd:
+    uses: decentraland/platform-actions/.github/workflows/apps-docker-next.yml@main
+    with:
+      service-name: wearable-validator
+      deployment-environment: dev
+    secrets: inherit
