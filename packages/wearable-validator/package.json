@@ -20,6 +20,10 @@
     "./ai": {
       "types": "./dist/adapters/ai.d.ts",
       "import": "./dist/adapters/ai.js"
+    },
+    "./native": {
+      "types": "./dist/adapters/native.d.ts",
+      "import": "./dist/adapters/native.js"
     }
   },
   "bin": {
