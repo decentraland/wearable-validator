@@ -5,12 +5,10 @@
   "scripts": {
     "catalyst": "tsx src/catalyst-run.ts",
     "samples": "tsx src/make-samples.ts",
-    "renderer:probe": "tsx src/renderer-probe.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
     "tsx": "^4.20.0",
-    "playwright-core": "1.63.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {

@@ -5,26 +5,28 @@
 - **Backend** — one container (the root `Dockerfile`), deployed through the shared Decentraland pipeline: a merge to `main` deploys dev (`.github/workflows/docker-next.yml`), a GitHub release deploys prd (`docker-release.yml`), and `manual-deployment.yml` deploys any image tag. It runs as a single instance: runs, the queue and their streams live in the process.
 - **Identity** — the server verifies the Access JWT the Worker forwards (`packages/server/src/adapters/access.ts`); every run belongs to the email that started it. Access itself is the allow-list, so everyone it lets in is a curator: an operator who sees every run, the stats and the log. Service tokens (the Slack bot) see everything too but change nothing (`POST`/`DELETE` answer 403).
 - **Which build is running** — the Docker build reads the commit from the checkout's `.git/HEAD` into `packages/server/build-info.json`; `/api/health` and `/api/stats` answer `build: { version, commit, builtAt, startedAt }`, the startup log line carries the same, and the Slack bot's `stats` question reports it.
-- **Self-test** — at startup the server checks the two things a render depends on and says so in the log: the hosts it must reach (`cdn.decentraland.org` for the pinned wrapper, `peer.decentraland.org` for the avatar the previewer loads) and whether Chromium gets a WebGPU device in this container. A render that hangs with an idle CPU is one of those two; `RENDERER_SELF_TEST=0` skips it.
-- **Isolation** — creator files are hostile input. The code checks run in a worker thread with a 60 s deadline, so a file that stalls them never blocks the server. Chromium runs inside its own sandbox where the container runtime allows the user namespaces it needs (`CHROMIUM_SANDBOX`, on by default; the startup self-test fails when it cannot start) and gets only `PATH`/`HOME`-style variables, never the server's tokens.
-- **Logs** — one JSON line per event on stdout: every API request (caller, status, ms), each run's gate, queue, captures, model calls and result, and the browser's own story (launch, previewer load or failure with the last wrapper messages, page crashes, console errors, retried views). Operators can read the recent lines through `GET /api/logs`. Refused requests (bad Host, no sign-in, 403) are counted in the `refused_requests_total` metric and printed at debug level with the Host hashed; they never enter that log. `GET /metrics` serves the Prometheus registry (HTTP defaults, `runs_accepted_total`, `runs_finished_total{status}`, `render_duration_seconds`, `refused_requests_total{reason}`) on the server itself, outside the Host and sign-in checks, behind `WKC_METRICS_BEARER_TOKEN`; without the token it is served on loopback only.
+- **Self-test** — at startup the server checks the two things a render depends on and says so in the log: the content servers the render server loads the avatar from (`peer.decentraland.org`) and whether the render server draws here (one still of a stock item). A render that fails with nothing in the log is one of those two; `RENDERER_SELF_TEST=0` skips it.
+- **Renderer** — visual reviews render on the native render server: the Unity avatar scene as a Linux x86_64 player that draws on the CPU with Mesa, no browser. The image downloads it from the `render-server-1` release of dcl-regenesislabs/wearable-validator (sha256-checked) and sets `RENDER_SERVER`, `RENDER_SERVER_BUILD` and `RENDER_SERVER_WORK_DIR`. A 20-view item takes about 20 s with 4 vCPU and about 1 GB.
+- **Isolation** — creator files are hostile input. The code checks run in a worker thread with a 60 s deadline, so a file that stalls them never blocks the server. The render server runs as its own Linux user, `renderer` (`packages/server/render-server-user.sh` → `render-server.sh`), gets only the variables it needs, and is never handed a model that names a file outside itself; the server runs as `validator` and writes its run folders with umask 077. So an exploit in the player reads neither the server's tokens nor other creators' uploads, and `packages/server/check-renderer-user.sh` proves it against a built image.
+- **Logs** — one JSON line per event on stdout: every API request (caller, status, ms), each run's gate, queue, captures, model calls and result, and the render server's start and its failures (with its last log lines). Operators can read the recent lines through `GET /api/logs`. Refused requests (bad Host, no sign-in, 403) are counted in the `refused_requests_total` metric and printed at debug level with the Host hashed; they never enter that log. `GET /metrics` serves the Prometheus registry (HTTP defaults, `runs_accepted_total`, `runs_finished_total{status}`, `render_duration_seconds`, `refused_requests_total{reason}`) on the server itself, outside the Host and sign-in checks, behind `WKC_METRICS_BEARER_TOKEN`; without the token it is served on loopback only.
 
 ## One-time setup
 
-### 1. Upload the Unity build
+### 1. The render server build
 
-The Docker image downloads the PR #10053 renderer build from a GitHub release asset and checks its sha256. The current one is `renderer-build-2` (sha256 `41c129dd81e909797646353a9525df0245ac7a8213f2a8fa3896c377ece8f52b`), built from unity-explorer branch `feat/validator-capture-controls` with the render-profile parameters (`renderScale`, `hdr`, `shadowMap`, `postProcessing`) that the manifest's `rendering.quality` relies on.
+The image downloads the render server from a GitHub release asset of dcl-regenesislabs/wearable-validator and checks its sha256: `render-server-1` (sha256 `99f4927a1f044ec3995f59b5610dc97ffaf8d1c4bbb68031fca25f2a4eb4ae76`). It is the avatar-preview-renderer project from unity-explorer, branch `feat/render-server-local-items`: [PR #10268](https://github.com/decentraland/unity-explorer/pull/10268)'s native server with [PR #10053](https://github.com/decentraland/unity-explorer/pull/10053)'s camera controls, plus jobs that take a local item and worn, posed views.
 
-To build it: Unity 6000.5.9f1 with Web Build Support installed under Unity Hub, a unity-explorer checkout on that branch, then `tools/renderer-build/build.sh <unity-explorer dir>` (batch mode, about five minutes; the four files land in `tools/artifacts/avatar-preview-renderer/Build`). Then, with the tarball at `tools/artifacts/renderer-build.tar.gz`:
+To build the next one: Unity 6000.5.9f1 with **Linux Build Support (IL2CPP)**, Git LFS pulled, then from the unity-explorer checkout:
 
 ```sh
-gh release create renderer-build-3 tools/artifacts/renderer-build.tar.gz \
-  --repo dcl-regenesislabs/wearable-validator \
-  --title "renderer-build-3" \
-  --notes "Unity Web build of unity-explorer PR #10053 (avatar-preview-renderer). sha256 <sha>"
+Unity -batchmode -nographics -quit -projectPath avatar-preview-renderer -buildTarget Linux64 -executeMethod Editor.RenderServerBuild.Build
+cd avatar-preview-renderer
+tar -czf render-server.tar.gz --exclude='*_BackUpThisFolder_ButDontShipItWithYourGame' --exclude='*_DoNotShip' Builds/RenderServer RenderServer
+shasum -a 256 render-server.tar.gz
+gh release create render-server-2 render-server.tar.gz --repo dcl-regenesislabs/wearable-validator --latest=false
 ```
 
-To re-pin after a new Unity build: `COPYFILE_DISABLE=1 tar -czf renderer-build.tar.gz -C <Build dir> avatar-preview-renderer.loader.js avatar-preview-renderer.framework.js avatar-preview-renderer.wasm avatar-preview-renderer.data` (the four files at the tarball's top level and nothing else: without `COPYFILE_DISABLE` macOS adds `._*` metadata entries that GNU tar unpacks as junk files), `shasum -a 256 renderer-build.tar.gz`, create the next release the same way, then update the two `ARG` defaults (`RENDERER_BUILD_URL`, `RENDERER_BUILD_SHA256`) in the root `Dockerfile`.
+Then update the `RENDER_SERVER_URL` / `RENDER_SERVER_SHA256` defaults in the root `Dockerfile` and the defaults in `packages/server/render-server-docker.sh`. Keep it a release of dcl-regenesislabs: a release in this repo is a prd deploy.
 
 ### 2. Cloudflare Zero Trust (Access)
 
@@ -38,7 +40,7 @@ To re-pin after a new Unity build: `COPYFILE_DISABLE=1 tar -czf renderer-build.t
 
 A merge to `main` builds the image and deploys it to dev; publishing a GitHub release deploys it to prd; the **Manual deployment** workflow deploys any tag. `.github/workflows/ci.yml` runs typecheck, tests and the build on every pull request. The Unity build stays a release asset of dcl-regenesislabs/wearable-validator (§1), since a release here is a prd deploy.
 
-The first start pulls a large image (Chromium plus the Unity build); the log then shows the self-test: the dependencies it reached and whether WebGPU draws. The run server's environment needs:
+The log then shows the self-test: the content servers it reached and whether the render server draws. The run server's environment needs:
 
 The image listens on port 5000 on every interface and answers `/health/live`, like every well-known-components server.
 
@@ -49,7 +51,7 @@ The image listens on port 5000 on every interface and answers `/health/live`, li
 | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | the Access application (§2) whose JWT the Worker forwards |
 | `OPERATOR_TOKEN` | the Slack bot's shared secret (§5) |
 | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SITE_URL` | run notifications (§5b) |
-| `ARTIFACTS_DIR`, `CHROMIUM_PROFILE_DIR` | `/data/artifacts` and `/data/chromium`, the folders the image prepares |
+| `ARTIFACTS_DIR` | `/data/artifacts`, set by the image |
 
 Everything else has a default in `packages/server/.env.default`; the ones a deployment may want to change:
 
@@ -57,8 +59,8 @@ Everything else has a default in `packages/server/.env.default`; the ones a depl
 | --- | --- |
 | `CATALYST_URL` | the catalyst a run started from a shop item URL or URN fetches the published item from; default `https://peer.decentraland.org` |
 | `CATALYST_TIMEOUT_MS` | how long the whole catalyst fetch (lookup and every file) may take before the run ends with "The catalyst did not answer in time — try again in a moment."; default 60000 |
-| `MAX_CONCURRENT_RUNS` | renders at once, about one per 2 GB of RAM and 3 vCPU; default 1 |
-| `RENDER_COMMAND_TIMEOUT_MS`, `RENDER_LOAD_TIMEOUT_MS`, `RENDER_TOTAL_TIMEOUT_MS` | raise them on a host with few vCPUs: software rendering there is many times slower |
+| `MAX_CONCURRENT_RUNS` | renders at once, about one per 1 GB of RAM; default 1 |
+| `LP_NUM_THREADS` | Mesa's rendering threads; match the CPU limit (4 in the image) |
 
 ### 4. Workers
 
@@ -106,14 +108,12 @@ The thumbnail and the views are uploaded privately to the app (`files.getUploadU
 ## Local development
 
 ```sh
-# single local owner, no Access, site built into the server at http://127.0.0.1:4180
+# single local owner, no Access, site built into the server at http://127.0.0.1:4180; renders run the render server in Docker
 ANTHROPIC_OAUTH_SETUP_TOKEN=<claude setup-token> npm run serve
 
-# the image itself (defaults: the pinned release asset; to test another build pass BOTH args, the sha256 check has no bypass)
-docker build -t wearable-validator-server .
-docker build --build-arg RENDERER_BUILD_URL=<url> --build-arg RENDERER_BUILD_SHA256=<sha256 of that tarball> -t wearable-validator-server .
-# Chromium's sandbox needs Playwright's seccomp profile (utils/docker/seccomp_profile.json in the Playwright repo)
-docker run --rm --shm-size=1g --memory=4g --security-opt seccomp=seccomp_profile.json -p 5000:5000 -e INSECURE_ANONYMOUS=1 wearable-validator-server
+# the image itself (the render server is x86_64: on Apple Silicon Docker runs it emulated)
+docker build --platform linux/amd64 -t wearable-validator-server .
+docker run --rm --platform linux/amd64 -p 5000:5000 -e INSECURE_ANONYMOUS=1 wearable-validator-server
 ```
 
 Leave the token out and the server renders and writes the prompt without calling the model.
