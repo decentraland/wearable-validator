@@ -59,6 +59,7 @@ export function fakeRenderer(calls: ServiceCalls, gate?: { open: Promise<void> }
   const bytes = renderedFrame(size);
   return {
     available: true,
+    kind: "chromium",
     forRun: async (run: RunSink) => {
       if (gate) await gate.open;
       calls.services++;

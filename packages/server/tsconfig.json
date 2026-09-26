@@ -8,7 +8,8 @@
     "paths": {
       "@dcl-regenesislabs/wearable-validator": ["../wearable-validator/src/index.ts"],
       "@dcl-regenesislabs/wearable-validator/rendering": ["../wearable-validator/src/adapters/rendering.ts"],
-      "@dcl-regenesislabs/wearable-validator/ai": ["../wearable-validator/src/adapters/ai.ts"]
+      "@dcl-regenesislabs/wearable-validator/ai": ["../wearable-validator/src/adapters/ai.ts"],
+      "@dcl-regenesislabs/wearable-validator/native": ["../wearable-validator/src/adapters/native.ts"]
     }
   },
   "include": [

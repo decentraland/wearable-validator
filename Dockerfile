@@ -18,6 +18,9 @@ RUN ref=$(sed -n 's/^ref: //p' .git/HEAD); \
 FROM mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
 ARG RENDERER_BUILD_URL=https://github.com/dcl-regenesislabs/wearable-validator/releases/download/renderer-build-2/renderer-build.tar.gz
 ARG RENDERER_BUILD_SHA256=41c129dd81e909797646353a9525df0245ac7a8213f2a8fa3896c377ece8f52b
+# the native render server: the same Unity scene as a Linux player drawing on the CPU (Mesa llvmpipe), no browser
+ARG RENDER_SERVER_URL=https://github.com/dcl-regenesislabs/wearable-validator/releases/download/render-server-1/render-server.tar.gz
+ARG RENDER_SERVER_SHA256=99f4927a1f044ec3995f59b5610dc97ffaf8d1c4bbb68031fca25f2a4eb4ae76
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/wearable-validator/package.json packages/wearable-validator/
@@ -31,6 +34,19 @@ RUN curl -fsSL "$RENDERER_BUILD_URL" -o /tmp/renderer-build.tar.gz \
   && mkdir -p /app/packages/server/renderer-build \
   && tar -xzf /tmp/renderer-build.tar.gz -C /app/packages/server/renderer-build \
   && rm /tmp/renderer-build.tar.gz
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libgl1 libglx-mesa0 libgl1-mesa-dri xvfb \
+       libx11-6 libxcursor1 libxext6 libxi6 libxinerama1 libxrandr2 libxxf86vm1 libglib2.0-0t64 \
+  && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL "$RENDER_SERVER_URL" -o /tmp/render-server.tar.gz \
+  && echo "$RENDER_SERVER_SHA256  /tmp/render-server.tar.gz" | sha256sum -c - \
+  && mkdir -p /tmp/render-server /opt/renderer \
+  && tar -xzf /tmp/render-server.tar.gz -C /tmp/render-server \
+  && cp -R /tmp/render-server/Builds/RenderServer/. /opt/renderer/ \
+  && cp /tmp/render-server/RenderServer/entrypoint.sh /opt/renderer/entrypoint.sh \
+  && chmod +x /opt/renderer/entrypoint.sh /opt/renderer/renderer.x86_64 \
+  && rm -rf /tmp/render-server /tmp/render-server.tar.gz
+ENV LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=4 MESA_SHADER_CACHE_DIR=/data/mesa
 COPY tsconfig.base.json ./
 COPY packages/wearable-validator ./packages/wearable-validator
 COPY packages/server ./packages/server
@@ -57,8 +73,13 @@ RUN groupadd --system render \
   && install -o chrome -g render -m 6750 /usr/bin/setpriv /usr/local/lib/chromium/setpriv \
   && ln -s "$(node -p "require('playwright-core').chromium.executablePath()")" /usr/local/lib/chromium/chrome \
   && chmod 700 /home/chrome /data/artifacts \
-  && chgrp render /data/chromium && chmod 2770 /data/chromium
+  && chgrp render /data/chromium && chmod 2770 /data/chromium \
+  && mkdir -p /data/native /data/mesa && chgrp render /data/native /data/mesa && chmod 2770 /data/native /data/mesa \
+  && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 ENV CHROMIUM_EXECUTABLE=/app/packages/server/chromium-user.sh
+# visual reviews render on the native server; unset RENDER_SERVER to fall back to Chromium and the Unity Web build
+ENV RENDER_SERVER=/app/packages/server/render-server-user.sh RENDER_SERVER_WORK_DIR=/data/native
+ENV RENDER_SERVER_BUILD=render-server-1:${RENDER_SERVER_SHA256}
 USER pwuser
 EXPOSE 5000
 # umask 077: run folders stay the server's own, Chromium's user cannot read them

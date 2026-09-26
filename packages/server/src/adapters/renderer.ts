@@ -1,9 +1,10 @@
-/** The Unity renderer as a component: one browser per run, its captures and diagnostics routed to the run's stream and the log. */
+/** The Unity renderer as a component: the native render server (RENDER_SERVER) or one browser per run, its captures and diagnostics routed to the run's stream and the log. */
 import { mkdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { IConfigComponent, ILoggerComponent } from "@well-known-components/interfaces";
 import type { Renderer } from "@dcl-regenesislabs/wearable-validator";
+import { createNativeRenderer } from "@dcl-regenesislabs/wearable-validator/native";
 import { createRenderer } from "@dcl-regenesislabs/wearable-validator/rendering";
 import type { RunSink } from "../types.js";
 import { appLogger, type AppLogger } from "./log-buffer.js";
@@ -16,6 +17,8 @@ const SINGLETON_FILES = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
 
 export interface IRendererComponent {
   readonly available: boolean;
+  /** native: the Unity player drawing on the CPU with no browser; chromium: the Unity Web build in headless Chromium. */
+  readonly kind: "native" | "chromium";
   readonly buildDirectory?: string;
   /** Undefined when no build is configured. */
   forRun(run: RunSink): Promise<Renderer | undefined>;
@@ -56,6 +59,18 @@ export async function resolveProfileDirectory(config: IConfigComponent, log: App
 export async function createRendererComponent(components: { config: IConfigComponent; logs: ILoggerComponent }): Promise<IRendererComponent> {
   const { config, logs } = components;
   const log = appLogger(logs, "renderer");
+  const renderServer = await config.getString("RENDER_SERVER");
+  if (renderServer) {
+    const build = (await config.getString("RENDER_SERVER_BUILD")) ?? "unversioned";
+    const workDirectory = await config.getString("RENDER_SERVER_WORK_DIR");
+    log.info("native render server", { command: renderServer, build });
+    return {
+      available: true,
+      kind: "native",
+      forRun: async (run) =>
+        createNativeRenderer({ command: renderServer, build, workDirectory, onCapture: (capture) => void run.capture(capture), onLog: (message, fields) => log.info(message, { run: run.id, ...fields }) })
+    };
+  }
   const buildDirectory = await resolveBuildDirectory(await config.getString("RENDERER_BUILD"));
   // the library reads these from the process environment at launch; a value that only the config knows (a test map) is handed over here
   for (const key of ["CHROMIUM_ARGS", "CHROMIUM_SANDBOX", "CHROMIUM_EXECUTABLE"]) {
@@ -74,6 +89,7 @@ export async function createRendererComponent(components: { config: IConfigCompo
   const profileDirectory = await resolveProfileDirectory(config, log);
   return {
     available: Boolean(buildDirectory),
+    kind: "chromium",
     buildDirectory,
     forRun: async (run) =>
       buildDirectory
