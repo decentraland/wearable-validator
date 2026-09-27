@@ -2,10 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { CheckResult, Result } from "@dcl-regenesislabs/wearable-validator";
+import type { CheckResult, Finding, Result } from "@dcl-regenesislabs/wearable-validator";
 import type { WireResult } from "../src/api.js";
 import { EMPTY_VISUAL, reduceVisual, type VisualEvent, type VisualState } from "../src/progress.js";
 import { Results } from "../src/results.js";
+import { statusLabel } from "../src/rules.js";
 
 /** The results page rendered once, without a browser: what History says about a run's code checks at each phase. */
 
@@ -47,5 +48,16 @@ describe("results page", () => {
     const html = page(stateOf([{ type: "done", data: { gate } }]), gate);
     assert.match(html, /of \d+ code checks apply/);
     assert.doesNotMatch(html, /not saved|did not run|running/);
+  });
+});
+
+describe("statusLabel", () => {
+  const finding = (severity: "error" | "warning"): Finding => ({ check: "texture-size", group: "model", severity, message: "", rule: "M-03", docs: "" });
+  it("counts a failing rule's errors and a reviewed rule's warnings, so the list adds up to the verdict", () => {
+    assert.equal(statusLabel("failed", Array.from({ length: 8 }, () => finding("error"))), "8 errors");
+    assert.equal(statusLabel("failed", [finding("error")]), "1 error");
+    assert.equal(statusLabel("warning", [finding("warning")]), "1 warning");
+    assert.equal(statusLabel("passed", []), "Passed");
+    assert.equal(statusLabel("skipped", []), "Not checked");
   });
 });

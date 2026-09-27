@@ -1,6 +1,6 @@
 /** M-03 Texture size — oversized or non-square textures blow the avatar's memory budget and mip poorly. */
 import { imageDimensions, isJpegBytes, isPngBytes, pngHasAlpha } from "../../../logic/images.js";
-import { textureName } from "../../../logic/materials.js";
+import { textureLabel } from "../../../logic/materials.js";
 import { wearableMaterialsOnly } from "../../../logic/wearable-only.js";
 import { finding, type CheckContext, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -93,7 +93,7 @@ export const textureSize: CheckDefinition = {
       model.doc.getRoot().listTextures().forEach((tex, i) => {
         const img = tex.getImage();
         if (!img) return;
-        const where = `"${model.mainFile}" › ${textureName(tex, i)}`;
+        const where = `"${model.mainFile}" › ${textureLabel(model.doc, tex, i)}`;
         const dims = imageDimensions(img);
         // other formats are texture-format's finding; a PNG or JPEG whose header cannot be read is never "nothing to measure"
         if (!dims) {

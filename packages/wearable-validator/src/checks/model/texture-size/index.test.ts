@@ -27,6 +27,19 @@ describe("texture-size (M-03)", () => {
     assert.match(findings[0].message, /cannot be read/);
   });
 
+  it("tells two images with the same name apart by where each is used", async () => {
+    const glb = await syntheticGlb({
+      materialName: "M002T",
+      textureImages: [
+        { name: "M002", slot: "baseColor", bytes: pngBytes(515, 512) },
+        { name: "M002", slot: "emissive", bytes: pngBytes(515, 512, true) }
+      ]
+    });
+    const result = await validate(await syntheticZip({ glb }), { checks: ["texture-size"] });
+    const places = [...new Set(found(result, "texture-size").map((finding) => finding.where))].sort();
+    assert.deepEqual(places, ['"model.glb" › M002 (base color of M002T)', '"model.glb" › M002 (emissive of M002T)']);
+  });
+
   it("errors on non-square textures", async () => {
     const glb = await syntheticGlb({ texture: { size: 512, nonSquare: true } });
     const result = await validate(await syntheticZip({ glb }), { checks: ["texture-size"] });

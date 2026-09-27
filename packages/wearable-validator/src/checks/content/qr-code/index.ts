@@ -2,6 +2,7 @@
 import jsQR from "jsqr";
 import { decode as decodeJpeg } from "jpeg-js";
 import { decodePngSafe, imageDimensions, isJpegBytes, isPngBytes } from "../../../logic/images.js";
+import { textureLabel } from "../../../logic/materials.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { POLICY } from "../../docs.js";
 
@@ -119,7 +120,7 @@ export const qrCode: CheckDefinition = {
       model.doc.getRoot().listTextures().forEach((tex, i) => {
         const img = tex.getImage();
         if (!img) return;
-        const name = tex.getName() || tex.getURI() || `texture #${i}`;
+        const name = textureLabel(model.doc, tex, i);
         const where = `"${model.mainFile}" › ${name}`;
         const result = scan(img, maxPixels, budget);
         if (result.unscanned) return unscanned(`Texture "${name}" in "${model.mainFile}"`, where, result.unscanned);

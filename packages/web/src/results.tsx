@@ -3,7 +3,7 @@ import { checks as checkRegistry, fixes, registry, type Finding, type Group } fr
 import { limitFor } from "./limits.js";
 import { MetadataValues } from "./metadata-values.js";
 import { CODE_GROUPS, GROUP_LABELS, combinedVerdict, isRunning, renderingGroupShown, visualRows, visualVerdict, type CodeResult, type VisualState } from "./progress.js";
-import { CheckAbout, FindingCard, RESULT_FILTERS, RuleColumns, SectionToggle, StatusChip, filterStatuses, headToggle } from "./rules.js";
+import { CheckAbout, FindingCard, RESULT_FILTERS, RuleColumns, SectionToggle, StatusChip, filterStatuses, headToggle, statusLabel } from "./rules.js";
 import { RunView, type Sections } from "./run-view.js";
 import { NONE_COLLAPSED, allCollapsed, collapseAll, expandAll, toggleSection } from "./sections.js";
 
@@ -135,7 +135,7 @@ export function Results({ scope, result, visual, aiChecks, modelKnown, filter, o
                           <span className="mobile-label">Requirement</span>
                           {requirement ?? def?.describe ?? "—"}
                         </span>
-                        <StatusChip status={row.status} />
+                        <StatusChip status={row.status} label={statusLabel(row.status, findings)} />
                         <span className="rule-chevron" aria-hidden="true">›</span>
                       </summary>
                       <div className="check-body">
@@ -195,8 +195,8 @@ function Verdict({ result, visual, visualPhase, bare, reviewable }: { result: Co
       </div>
       <div className="verdict-facts">
         <div>
-          <span className={`n${errors ? " err" : ""}`}>{errors}</span> errors ·{" "}
-          <span className={`n${warnings ? " wrn" : ""}`}>{warnings}</span> warnings
+          <span className={`n${errors ? " err" : ""}`}>{errors}</span> {errors === 1 ? "error" : "errors"} ·{" "}
+          <span className={`n${warnings ? " wrn" : ""}`}>{warnings}</span> {warnings === 1 ? "warning" : "warnings"}
         </div>
         <div>
           {codeNote}

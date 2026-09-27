@@ -23,6 +23,15 @@ export const RESULT_FILTERS: { key: string; label: string; statuses: CheckStatus
   { key: "unchecked", label: "Not checked", statuses: ["skipped"] }
 ];
 
+export const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+/** A failing rule says how many problems it holds, so the list adds up to the verdict's totals. */
+export function statusLabel(status: CheckStatus, findings: Finding[]): string {
+  const count = findings.filter((finding) => finding.severity === (status === "failed" ? "error" : "warning")).length;
+  if ((status === "failed" || status === "warning") && count > 0) return plural(count, status === "failed" ? "error" : "warning");
+  return STATUS_LABELS[status];
+}
+
 export const filterStatuses = (key: string): CheckStatus[] => (RESULT_FILTERS.find((option) => option.key === key) ?? RESULT_FILTERS[0]).statuses;
 
 export function StatusChip({ status, label, busy }: { status: CheckStatus; label?: string; busy?: boolean }) {

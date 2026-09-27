@@ -1,6 +1,6 @@
 /** M-04 Texture format — the renderer decodes only 8-bit PNG/JPEG; anything else fails to load in-world. */
 import { isJpegBytes, isPngBytes, jpegPrecision } from "../../../logic/images.js";
-import { textureName } from "../../../logic/materials.js";
+import { textureLabel } from "../../../logic/materials.js";
 import { wearableMaterialsOnly } from "../../../logic/wearable-only.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -36,7 +36,7 @@ export const textureFormat: CheckDefinition = {
       model.doc.getRoot().listTextures().forEach((tex, i) => {
         const img = tex.getImage();
         if (!img) return;
-        const where = `"${model.mainFile}" › ${textureName(tex, i)}`;
+        const where = `"${model.mainFile}" › ${textureLabel(model.doc, tex, i)}`;
         if (isPngBytes(img)) {
           const depth = img[24];
           if (depth !== 8) {

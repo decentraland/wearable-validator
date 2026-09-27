@@ -1,7 +1,7 @@
 {
   "qr-code": {
     "file": "src/checks/content/qr-code/index.ts",
-    "line": 8
+    "line": 9
   },
   "animation-clips": {
     "file": "src/checks/emote/animation-clips/index.ts",
