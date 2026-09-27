@@ -6,13 +6,14 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { fetchCatalystItem, loadInput, parseItemReference, validate, type Input, type Result, type Services } from "@dcl-regenesislabs/wearable-validator";
 import { createPiReviewer, setupTokenCredentials } from "@dcl-regenesislabs/wearable-validator/ai";
-import { createRenderer } from "@dcl-regenesislabs/wearable-validator/rendering";
-import { resolveBuildDirectory } from "../adapters/renderer.js";
+import { createNativeRenderer } from "@dcl-regenesislabs/wearable-validator/native";
+import { DOCKER_RENDER_SERVER } from "../adapters/renderer.js";
 import { dryRunReviewer, recordingReviewer, replayReviewer } from "../adapters/reviewer.js";
 import { readEvidenceFile, readRun, resolveArtifactsDir, usageLine, writeRun } from "../logic/run-store.js";
 import { referenceName, VISUAL_CHECKS } from "../logic/runs.js";
 
 const NO_AI_REASON = "The model was not called (--no-ai).";
+
 
 const ROOT = resolve(import.meta.dirname, "../../../..");
 
@@ -21,7 +22,8 @@ export interface Args {
   file: string;
   /** The URN candidates a shop URL or URN resolved to; the item is fetched from the catalyst instead of read from disk. */
   reference?: string[];
-  buildDirectory?: string;
+  /** The render server to start; locally, the Docker launcher. */
+  renderServer: string;
   from?: string;
   answer: boolean;
   thumbnail?: string;
@@ -36,7 +38,7 @@ export async function readArgs(argv = process.argv.slice(2)): Promise<Args> {
     args: argv,
     allowPositionals: true,
     options: {
-      "renderer-build": { type: "string" },
+      "render-server": { type: "string" },
       from: { type: "string" },
       answer: { type: "boolean", default: false },
       thumbnail: { type: "string" },
@@ -46,7 +48,7 @@ export async function readArgs(argv = process.argv.slice(2)): Promise<Args> {
       out: { type: "string" }
     }
   });
-  const usage = "Usage: review -- <item.zip | urn | shop item URL> [--renderer-build <Build>] [--from <run dir>] [--answer] [--thumbnail <png>] [--standalone] [--no-ai] [--cache none|short] [--out packages/server/artifacts]";
+  const usage = "Usage: review -- <item.zip | urn | shop item URL> [--render-server <command>] [--from <run dir>] [--answer] [--thumbnail <png>] [--standalone] [--no-ai] [--cache none|short] [--out packages/server/artifacts]";
   if (positionals.length !== 1) throw new Error(usage);
   // npm -w runs scripts from packages/server; INIT_CWD is where the command was typed, so relative paths mean what the user sees
   const cwd = process.env.INIT_CWD ?? process.cwd();
@@ -59,7 +61,7 @@ export async function readArgs(argv = process.argv.slice(2)): Promise<Args> {
   return {
     file: reference ? positionals[0] : path(positionals[0])!,
     reference,
-    buildDirectory: await resolveBuildDirectory(values["renderer-build"] ?? process.env.RENDERER_BUILD),
+    renderServer: values["render-server"] ?? process.env.RENDER_SERVER ?? DOCKER_RENDER_SERVER,
     from: path(values.from),
     answer: values.answer!,
     thumbnail: path(values.thumbnail),
@@ -145,7 +147,7 @@ async function main(): Promise<void> {
   await mkdir(args.out, { recursive: true });
   const runDir = await mkdtemp(join(args.out, `visual-${name}-`));
   const captures = args.from ? await readRun(args.from) : undefined;
-  const renderer = args.buildDirectory ? await createRenderer({ buildDirectory: args.buildDirectory }) : undefined;
+  const renderer = await createNativeRenderer({ command: args.renderServer, build: process.env.RENDER_SERVER_BUILD ?? "local" });
   const reviewer = args.noAi ? dryRunReviewer(NO_AI_REASON)
     : args.answer ? replayReviewer(args.from!)
     : createPiReviewer({ credentials: setupTokenCredentials(process.env.ANTHROPIC_OAUTH_SETUP_TOKEN ?? ""), cache: args.cache });

@@ -51,6 +51,14 @@ describe("fetchCatalystItem", () => {
     assert.deepEqual(progress.slice(1).map((event) => [event.done, event.total]), [[0, 3], [1, 3], [2, 3], [3, 3]]);
   });
 
+  it("refuses a published file name that points outside the item", async () => {
+    const entity = await syntheticEntity(await syntheticZip(), MATIC);
+    const [first] = entity.content;
+    entity.content[0] = { file: "../../../../app/packages/server/render-server-user.sh", hash: first.hash };
+    entity.files.set(entity.content[0].file, entity.files.get(first.file)!);
+    await assert.rejects(fetchCatalystItem([MATIC], { fetch: catalystFetch([entity]) }), /not a file inside the item/);
+  });
+
   it("names the item after its URN when the metadata has no name", async () => {
     const entity = await syntheticEntity(await syntheticZip(), MATIC, { name: "" });
     const item = await fetchCatalystItem([MATIC], { fetch: catalystFetch([entity]) });

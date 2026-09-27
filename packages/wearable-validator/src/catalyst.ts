@@ -2,6 +2,7 @@
  * A published item straight from a catalyst: a URN or a marketplace URL becomes the entity's files and metadata,
  * the same {files, metadata, content} the platform itself validates. Isomorphic: the site and the run server share it.
  */
+import { assertItemPath, normalizePath } from "./loader.js";
 import { manifest } from "./manifest/index.js";
 
 export const DEFAULT_CATALYST = "https://peer.decentraland.org";
@@ -96,6 +97,7 @@ export async function fetchCatalystItem(candidates: string[], options: CatalystO
         const next = queue.shift();
         if (!next || signal.aborted) return;
         if (typeof next.file !== "string" || !/^[a-z0-9]+$/i.test(next.hash ?? "")) throw new Error("The catalyst listed a file without a usable hash.");
+        assertItemPath(normalizePath(next.file));
         const res = await fetchImpl(`${peer}/content/contents/${next.hash}`, { signal });
         if (!res.ok) throw new Error(`The catalyst answered ${res.status} for "${next.file}".`);
         const declared = Number(res.headers.get("content-length") ?? 0);

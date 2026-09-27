@@ -165,12 +165,6 @@
   "rendering": {
     "imageSizePx": 512,
     "recipeVersion": 4,
-    "quality": {
-      "renderScale": 1,
-      "hdr": false,
-      "shadowMapPx": 512,
-      "postProcessing": false
-    },
     "bodyShapes": [
       "urn:decentraland:off-chain:base-avatars:BaseMale",
       "urn:decentraland:off-chain:base-avatars:BaseFemale"
@@ -268,36 +262,12 @@
         "facial_hair": "head"
       }
     },
-    "profile": "default1",
     "background": "444444",
     "skin": "e8b89a",
     "wearablePose": "fist-pump",
     "wearablePoseFraction": 0,
-    "navigationTimeoutMs": 60000,
     "loadTimeoutMs": 180000,
-    "commandTimeoutMs": 15000,
-    "captureRetries": 1,
-    "timeoutMs": 360000,
-    "settleMs": 300,
-    "stabilityMs": 250,
-    "maxStabilityAttempts": 8,
-    "maxCaptureBytes": 8388608,
-    "probe": {
-      "pausedObservationMs": 1000,
-      "poseFractions": [
-        0.25,
-        0.75
-      ],
-      "cameraSideRadians": 1.5707963267948966,
-      "cameraElevationRadians": 0.5235987755982988,
-      "cameraZoomWorldUnits": 0.5,
-      "cameraPanTarget": {
-        "x": 0.25,
-        "y": 0,
-        "z": 0
-      },
-      "chromaSkin": "00ff00"
-    }
+    "maxCaptureBytes": 8388608
   },
   "ai": {
     "model": "claude-sonnet-5",

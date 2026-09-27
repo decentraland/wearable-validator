@@ -24,7 +24,7 @@ function reviewRequest(): ReviewRequest {
 }
 
 describe("code gate", () => {
-  it("stops on code failures before opening renderer binaries or OAuth", async () => {
+  it("stops on code failures before starting the render server or OAuth", async () => {
     const directory = await mkdtemp(join(tmpdir(), "run-folder-gate-"));
     try {
       const file = join(directory, "invalid.zip");
@@ -33,7 +33,7 @@ describe("code gate", () => {
       await assert.rejects(
         promisify(execFile)(process.execPath, [
           "--import", "tsx", script, file,
-          "--renderer-build", join(directory, "missing-build")
+          "--render-server", join(directory, "missing-render-server")
         ], { env: { ...process.env, ANTHROPIC_OAUTH_SETUP_TOKEN: "sk-ant-oat01-never-used" } }),
         (error) => {
           assert.ok(error && typeof error === "object" && "stdout" in error && "stderr" in error);

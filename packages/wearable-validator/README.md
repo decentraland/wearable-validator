@@ -3,7 +3,7 @@
 Decentraland's wearable and emote rule book as code. Hand it a Builder zip, a `.glb` or a published item and it returns every problem at once: what is wrong, where, the measured value against the limit, and how to fix it.
 
 - **35 code checks** (files, model, emote, content) run anywhere: browser or Node.
-- **4 visual checks** render the item and ask Claude to judge it. They run on a Node server only (headless Chromium plus a Unity build).
+- **4 visual checks** render the item and ask Claude to judge it. They run on a Node server only (a native Unity render server).
 
 ```sh
 npm i @dcl-regenesislabs/wearable-validator
@@ -40,25 +40,23 @@ const result = await validate({ files: item.files, metadata: item.metadata, cont
 
 The visual checks need three things next to the package:
 
-1. **The peers**, pinned exactly:
+1. **The peer**, pinned exactly: `npm i @earendil-works/pi-ai@0.84.1`
+2. **The native render server** (a Linux x86_64 Unity player that draws on the CPU through Mesa and Xvfb), a release asset checked by sha256:
    ```sh
-   npm i playwright-core@1.63.0 @earendil-works/pi-ai@0.84.1
-   npx playwright-core install chromium --no-shell
+   curl -fsSL https://github.com/dcl-regenesislabs/wearable-validator/releases/download/render-server-1/render-server.tar.gz -o render-server.tar.gz
+   echo "99f4927a1f044ec3995f59b5610dc97ffaf8d1c4bbb68031fca25f2a4eb4ae76  render-server.tar.gz" | sha256sum -c -
+   mkdir render-server && tar -xzf render-server.tar.gz -C render-server
    ```
-2. **The Unity renderer build**, a release asset checked by sha256:
-   ```sh
-   curl -fsSL https://github.com/dcl-regenesislabs/wearable-validator/releases/download/renderer-build-2/renderer-build.tar.gz -o renderer-build.tar.gz
-   echo "41c129dd81e909797646353a9525df0245ac7a8213f2a8fa3896c377ece8f52b  renderer-build.tar.gz" | sha256sum -c -   # macOS: shasum -a 256 -c -
-   mkdir renderer-build && tar -xzf renderer-build.tar.gz -C renderer-build
-   ```
+   It needs `libgl1 libglx-mesa0 libgl1-mesa-dri xvfb`. The repository's root `Dockerfile` is a working image, and on a laptop `packages/server/render-server-docker.sh` runs it in Docker.
 3. **A Claude setup token** (`claude setup-token`, `sk-ant-oat…`, valid about a year). API keys are refused.
 
 ```ts
 import { validate } from "@dcl-regenesislabs/wearable-validator";
-import { createRenderer } from "@dcl-regenesislabs/wearable-validator/rendering";
+import { createNativeRenderer } from "@dcl-regenesislabs/wearable-validator/native";
 import { createPiReviewer, setupTokenCredentials } from "@dcl-regenesislabs/wearable-validator/ai";
 
-const renderer = await createRenderer({ buildDirectory: "./renderer-build" }); // one per process, reused across items
+// one long-running render server per process, reused across items
+const renderer = await createNativeRenderer({ command: "./render-server/Builds/RenderServer/entrypoint.sh", build: "render-server-1" });
 const reviewer = createPiReviewer({ credentials: setupTokenCredentials(process.env.ANTHROPIC_OAUTH_SETUP_TOKEN!) });
 
 const result = await validate(zipBytes, {
@@ -69,10 +67,9 @@ const result = await validate(zipBytes, {
 await renderer.stop(); // on shutdown
 ```
 
-- **Cost:** a render takes about a minute of CPU (SwiftShader, no GPU; about 3 vCPU and 2 GB each). Each item makes at most two model calls.
+- **Cost:** everything renders on the CPU, with no GPU. Each item makes at most two model calls.
 - **Re-runs:** pass the earlier `result.captures` back as `captures` and only missing views are rendered again.
 - **Safe failure:** visual findings are warnings. A missing render, a refused or malformed answer, or no `reviewer` never passes; the row becomes `skipped` or `errored` with the reason. Each visual row carries `review` (model, prompt version, token usage).
-- **Linux containers** need `CHROMIUM_ARGS="--enable-features=Vulkan --use-vulkan=swiftshader --disable-dev-shm-usage"`. Chromium's sandbox needs user namespaces: in Docker, run with Playwright's seccomp profile. The repository's root `Dockerfile` is a working image.
 
 ## Options
 

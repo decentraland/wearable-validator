@@ -13,13 +13,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./rendering": {
-      "types": "./dist/adapters/rendering.d.ts",
-      "import": "./dist/adapters/rendering.js"
-    },
     "./ai": {
       "types": "./dist/adapters/ai.d.ts",
       "import": "./dist/adapters/ai.js"
+    },
+    "./native": {
+      "types": "./dist/adapters/native.d.ts",
+      "import": "./dist/adapters/native.js"
     }
   },
   "bin": {
@@ -64,18 +64,13 @@
     "@types/pako": "2.0.4",
     "tsx": "^4.20.0",
     "typescript": "^5.9.3",
-    "@earendil-works/pi-ai": "0.84.1",
-    "playwright-core": "1.63.0"
+    "@earendil-works/pi-ai": "0.84.1"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "0.84.1",
-    "playwright-core": "1.63.0"
+    "@earendil-works/pi-ai": "0.84.1"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-ai": {
-      "optional": true
-    },
-    "playwright-core": {
       "optional": true
     }
   },

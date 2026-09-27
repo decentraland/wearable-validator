@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import JSZip from "jszip";
 import { spawnSync } from "node:child_process";
 import { it } from "node:test";
 import { deflateSync } from "node:zlib";
 import { decode, encode } from "fast-png";
-import { screenshot, type PreviewSession } from "../src/adapters/rendering.js";
 import { digest, validCapture } from "../src/logic/captures.js";
 import { manifest } from "../src/manifest/index.js";
 import type { CaptureRequest } from "../src/types.js";
@@ -97,7 +97,7 @@ it("preserves indexed palettes, transparency and split IDAT streams", () => {
   assert.deepEqual(safe.palette, decode(bytes).palette);
 });
 
-it("applies PNG limits to thumbnail, QR, capture and screenshot decoding", async () => {
+it("applies PNG limits to thumbnail, QR and capture decoding", async () => {
   const bytes = oversizedPngData();
   const result = await validate({ files: new Map([["thumbnail.png", bytes]]) }, { checks: ["thumbnail", "qr-code"] });
   assert.ok(result.findings.some((finding) => finding.check === "thumbnail" && finding.severity === "error"));
@@ -107,11 +107,6 @@ it("applies PNG limits to thumbnail, QR, capture and screenshot decoding", async
   const request: CaptureRequest = { id: "test", key: "key", inputDigest: "input", rendererBuild: "test", recipeVersion: 1, bodyShape: manifest.rendering.bodyShapes[0], mainFile: "model.glb", view: "avatar", azimuthDegrees: 0, size: 1 };
   const capture = { request, bytes, sha256: await digest(bytes), width: 1, height: 1 };
   assert.equal(await validCapture(capture, request, manifest.rendering.maxCaptureBytes), false);
-  const session: PreviewSession = {
-    engine: "test", update: async () => ({ type: "load" }), pause: async () => {}, close: async () => {},
-    request: async () => `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`
-  };
-  await assert.rejects(screenshot(session, 1));
 });
 
 it("refuses accessors that would unpack past the file's data before allocating them", async () => {
@@ -145,5 +140,15 @@ it("stops decoding textures for QR codes once the item's scan budget is spent", 
     assert.match(skipped[0].message, /^3 textures were not scanned/);
   } finally {
     manifest.images.maxScanPixels = pixels;
+  }
+});
+
+it("refuses zip entries that would land outside the item, whatever the separator", async () => {
+  for (const name of ["..\\..\\..\\..\\app\\packages\\server\\render-server-user.sh", "models\\..\\..\\escape.glb", "C:\\Windows\\evil.dll"]) {
+    const zip = new JSZip();
+    zip.file("model.glb", new Uint8Array([1, 2, 3]));
+    zip.file(name, "#!/bin/sh\necho pwned\n");
+    const bytes = await zip.generateAsync({ type: "uint8array" });
+    await assert.rejects(unpackZip(bytes), /not a file inside the item/, name);
   }
 });
