@@ -23,7 +23,7 @@ async function readJson(path: string): Promise<Record<string, unknown>> {
 
 export async function createBuildInfoComponent(): Promise<IBuildInfoComponent> {
   const pkg = await readJson(resolve(PACKAGE_ROOT, "package.json")).catch(() => ({}));
-  // build-info.json is written by the Dockerfile from .git/HEAD; a plain checkout has none
+  // build-info.json is written by the Dockerfile from its COMMIT_HASH build arg; a plain checkout has none
   const build = await readJson(resolve(PACKAGE_ROOT, "build-info.json")).catch(() => ({}));
   return { commit: field(build, "commit") ?? "dev", builtAt: field(build, "builtAt") ?? null, version: field(pkg, "version") ?? "0.0.0", startedAt: Date.now() };
 }

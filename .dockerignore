@@ -4,10 +4,7 @@ node_modules
 packages/web
 tools
 packages/server/artifacts
-.git/**
-!.git/HEAD
-!.git/refs/heads/**
-!.git/packed-refs
+.git
 
 # a local secret must never reach an image layer
 **/.env

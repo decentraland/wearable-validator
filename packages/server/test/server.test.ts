@@ -120,7 +120,7 @@ describe("run server", () => {
 
   it("reports its capabilities, without identity, and names the caller when it can", async () => {
     const health = (await (await fetch(`${base}/api/health`)).json()) as { ok: boolean; visual: { renderer: boolean; reviewer: string }; checks: string[]; rulesVersion: string; owner: string | null; operator: boolean; build: { version: string; commit: string; builtAt: string | null; startedAt: number } };
-    assert.equal(health.build.commit, "dev", "a checkout has no build-info.json: the Docker image writes one from .git/HEAD");
+    assert.equal(health.build.commit, "dev", "a checkout has no build-info.json: the Docker image writes one from COMMIT_HASH");
     assert.equal(health.build.builtAt, null);
     assert.ok(health.build.startedAt > 0 && typeof health.build.version === "string");
     assert.equal(health.ok, true);
