@@ -95,19 +95,31 @@ describe("createNativeRenderer", () => {
     });
   });
 
-  it("never hands the player a model that points at a file outside itself", async () => {
-    await withFakeServer(async (command, log) => {
-      const renderer = await createNativeRenderer({ command, build: "test" });
-      const json = new TextEncoder().encode(JSON.stringify({ asset: { version: "2.0" }, buffers: [{ byteLength: 4, uri: "http://169.254.170.2/v2/credentials" }] }));
-      const glb = new Uint8Array(20 + Math.ceil(json.length / 4) * 4).fill(32);
-      const view = new DataView(glb.buffer);
-      for (const [offset, value] of [[0, 0x46546c67], [4, 2], [8, glb.length], [12, glb.length - 20], [16, 0x4e4f534a]]) view.setUint32(offset, value, true);
-      glb.set(json, 20);
-      const outside: RenderInput = { ...input, files: new Map([["male.glb", glb], ["female.glb", glb]]) };
-      await assert.rejects(renderer.capture(outside, [request(renderer.buildId, { view: "avatar" })]), /outside the GLB/);
-      await renderer.stop();
-      await assert.rejects(readFile(log), "the player never saw a job");
-    });
+  it("never hands the player a model that points at a file outside the item", async () => {
+    const outside = ["http://169.254.170.2/v2/credentials", "file:///etc/passwd", "/etc/passwd", "//host/x.png", "../../x.png", "textures/%2e%2e/%2e%2e/x.png", "C:/x.png", "..\\x.png"];
+    for (const uri of outside) {
+      await withFakeServer(async (command, log) => {
+        const renderer = await createNativeRenderer({ command, build: "test" });
+        const glb = glbNaming(uri);
+        const item: RenderInput = { ...input, files: new Map([["male.glb", glb], ["female.glb", glb]]) };
+        await assert.rejects(renderer.capture(item, [request(renderer.buildId, { view: "avatar" })]), /outside the item/, uri);
+        await renderer.stop();
+        await assert.rejects(readFile(log), `the player never saw a job for ${uri}`);
+      });
+    }
+  });
+
+  it("draws a model that names a file next to it in the item, as smart wearables do", async () => {
+    for (const uri of ["Bubble.png", "textures/Bubble%20Y.png", "./Bubble.png"]) {
+      await withFakeServer(async (command, log) => {
+        const renderer = await createNativeRenderer({ command, build: "test" });
+        const glb = glbNaming(uri);
+        const item: RenderInput = { ...input, files: new Map([["male.glb", glb], ["female.glb", glb]]) };
+        await renderer.capture(item, [request(renderer.buildId, { view: "avatar" })]);
+        await renderer.stop();
+        assert.ok((await readFile(log, "utf8")).length > 0, `the player got the job for ${uri}`);
+      });
+    }
   });
 
   it("writes only the files the representations draw, and never outside the item's folder", async () => {
@@ -141,3 +153,13 @@ describe("createNativeRenderer", () => {
     await assert.rejects(renderer.capture(input, [request(renderer.buildId, { view: "avatar" })]), /could not start|exited/);
   });
 });
+
+// a GLB with a JSON chunk only, whose one buffer is named by uri
+function glbNaming(uri: string): Uint8Array {
+  const json = new TextEncoder().encode(JSON.stringify({ asset: { version: "2.0" }, buffers: [{ byteLength: 4, uri }] }));
+  const glb = new Uint8Array(20 + Math.ceil(json.length / 4) * 4).fill(32);
+  const view = new DataView(glb.buffer);
+  for (const [offset, value] of [[0, 0x46546c67], [4, 2], [8, glb.length], [12, glb.length - 20], [16, 0x4e4f534a]]) view.setUint32(offset, value, true);
+  glb.set(json, 20);
+  return glb;
+}
