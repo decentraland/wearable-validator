@@ -29,6 +29,13 @@
     "dist",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/decentraland/wearable-validator.git",
+    "directory": "packages/wearable-validator"
+  },
+  "homepage": "https://github.com/decentraland/wearable-validator/tree/main/packages/wearable-validator#readme",
+  "bugs": "https://github.com/decentraland/wearable-validator/issues",
   "publishConfig": {
     "access": "public"
   },
