@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import JSZip from "jszip";
 import { spawnSync } from "node:child_process";
 import { it } from "node:test";
 import { deflateSync } from "node:zlib";
@@ -139,5 +140,15 @@ it("stops decoding textures for QR codes once the item's scan budget is spent", 
     assert.match(skipped[0].message, /^3 textures were not scanned/);
   } finally {
     manifest.images.maxScanPixels = pixels;
+  }
+});
+
+it("refuses zip entries that would land outside the item, whatever the separator", async () => {
+  for (const name of ["..\\..\\..\\..\\app\\packages\\server\\render-server-user.sh", "models\\..\\..\\escape.glb", "C:\\Windows\\evil.dll"]) {
+    const zip = new JSZip();
+    zip.file("model.glb", new Uint8Array([1, 2, 3]));
+    zip.file(name, "#!/bin/sh\necho pwned\n");
+    const bytes = await zip.generateAsync({ type: "uint8array" });
+    await assert.rejects(unpackZip(bytes), /not a file inside the item/, name);
   }
 });

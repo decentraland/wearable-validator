@@ -50,7 +50,7 @@ ENV HOST=0.0.0.0
 # 5000: the port every well-known-components server listens on in a container (local runs keep 4180)
 ENV PORT=5000
 # Two users: the server (validator) and the render server (renderer), which parses creator models and so must not read
-# the server's environment or run folders. validator steps down through a copy of setpriv that is setuid renderer,
+# the server's environment or run folders. /app stays root's, read-only to both, so no write can replace code that runs. validator steps down through a copy of setpriv that is setuid renderer,
 # setgid render; the work folder and Mesa's shader cache belong to the render group both users share.
 RUN groupadd --system render \
   && useradd --system --create-home --shell /usr/sbin/nologin validator \
@@ -60,7 +60,7 @@ RUN groupadd --system render \
   && install -o renderer -g render -m 6750 /usr/bin/setpriv /usr/local/lib/renderer/setpriv \
   && chmod +x /opt/renderer/renderer.x86_64 \
   && mkdir -p /data/artifacts /data/native /data/mesa /tmp/.X11-unix \
-  && chown -R validator:validator /app /data/artifacts && chmod 700 /home/renderer /data/artifacts \
+  && chown validator:validator /data/artifacts && chmod 700 /home/renderer /data/artifacts \
   && chgrp render /data/native /data/mesa && chmod 2770 /data/native /data/mesa && chmod 1777 /tmp/.X11-unix
 ENV ARTIFACTS_DIR=/data/artifacts
 ENV RENDER_SERVER=/app/packages/server/render-server-user.sh RENDER_SERVER_WORK_DIR=/data/native

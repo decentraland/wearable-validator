@@ -110,6 +110,25 @@ describe("createNativeRenderer", () => {
     });
   });
 
+  it("writes only the files the representations draw, and never outside the item's folder", async () => {
+    await withFakeServer(async (command) => {
+      const work = await mkdtemp(join(tmpdir(), "native-work-"));
+      const renderer = await createNativeRenderer({ command, build: "test", workDirectory: work });
+      const escaping: RenderInput = {
+        ...input,
+        files: new Map([...input.files, ["../../escape.sh", new Uint8Array([1])]]),
+        item: { ...input.item, representations: [{ bodyShapes: [MALE], mainFile: "male.glb", contents: ["male.glb", "../../escape.sh"] }] }
+      };
+      await assert.rejects(renderer.capture(escaping, [request(renderer.buildId, { view: "avatar" })]), /not a file inside the item/);
+      const undeclared: RenderInput = { ...input, files: new Map([...input.files, ["../../stray.sh", new Uint8Array([1])]]) };
+      await renderer.capture(undeclared, [request(renderer.buildId, { view: "avatar" })]);
+      await renderer.stop();
+      // the item folder is <work>/<run>/item, so two levels up is the work folder itself
+      await assert.rejects(readFile(join(work, "escape.sh")));
+      await assert.rejects(readFile(join(work, "stray.sh")));
+    });
+  });
+
   it("refuses requests planned for another renderer build", async () => {
     await withFakeServer(async (command) => {
       const renderer = await createNativeRenderer({ command, build: "test" });

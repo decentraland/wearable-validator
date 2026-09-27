@@ -8,7 +8,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { digest, digestJson } from "../logic/captures.js";
@@ -79,7 +79,9 @@ export async function createNativeRenderer(options: NativeRendererOptions): Prom
             const file = result.files.find((f) => f.bodyShape === shapeLabel(request.bodyShape) && same(f.yaw, request.azimuthDegrees)
               && (f.time === undefined || same(f.time, timeOf(input, request))));
             if (!file) throw new Error(`The render server returned no still for ${request.id}.`);
-            const bytes = new Uint8Array(await readFile(join(workDirectory, file.path)));
+            const still = resolve(workDirectory, file.path);
+            if (!still.startsWith(resolve(workDirectory, jobId) + "/")) throw new Error(`The render server answered with a still outside its job folder for ${request.id}.`);
+            const bytes = new Uint8Array(await readFile(still));
             const png = decodePngSafe(bytes);
             if (!png || png.width !== size || png.height !== size) throw new Error(`The render server's still for ${request.id} is not a ${size} px PNG.`);
             const record: CaptureRecord = { request, bytes, sha256: await digest(bytes), width: png.width, height: png.height };
@@ -156,9 +158,15 @@ function jobFor(id: string, entity: object, input: RenderInput, group: CaptureRe
 /** The item's files on disk, readable by the render server's user, and the preview's item JSON pointing at them. */
 async function writeItem(input: RenderInput, directory: string): Promise<object> {
   const urls = new Map<string, string>();
-  for (const [key, bytes] of input.files) {
+  // only what the representations draw, and only inside the item's folder: a file name is the creator's (or a publisher's)
+  const drawn = new Set((input.item.representations ?? []).flatMap((rep) => rep.contents));
+  for (const key of drawn) {
+    const bytes = input.files.get(key);
+    if (!bytes) continue;
     assertSelfContained(key, bytes);
-    const path = join(directory, key);
+    const path = resolve(directory, key);
+    const inside = relative(resolve(directory), path);
+    if (!inside || inside.startsWith("..") || isAbsolute(inside)) throw new Error(`"${key}" is not a file inside the item. Rename it and export the item again.`);
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, bytes);
     urls.set(key, pathToFileURL(path).href);
