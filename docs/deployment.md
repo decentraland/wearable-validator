@@ -26,7 +26,7 @@ shasum -a 256 render-server.tar.gz
 gh release create render-server-2 render-server.tar.gz --repo dcl-regenesislabs/wearable-validator --latest=false
 ```
 
-Then update the `RENDER_SERVER_URL` / `RENDER_SERVER_SHA256` defaults in the root `Dockerfile` and the defaults in `packages/server/render-server-docker.sh`. Keep it a release of dcl-regenesislabs: a release in this repo is a prd deploy.
+Then update the `RENDER_SERVER_RELEASE` / `RENDER_SERVER_SHA256` defaults in the root `Dockerfile` and the defaults in `packages/server/render-server-docker.sh`. Keep it a release of dcl-regenesislabs: a release in this repo is a prd deploy.
 
 ### 2. Cloudflare Zero Trust (Access)
 
