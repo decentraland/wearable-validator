@@ -1,9 +1,9 @@
 node_modules/
 dist/
 tools/corpus/blobs/
-# renderer-probe (tools) still writes its observation runs here
 tools/artifacts/
 packages/server/artifacts/
+# the old Unity Web build folder, from before the render server
 packages/server/renderer-build/
 .wrangler/
 # local overrides next to .env.default hold secrets

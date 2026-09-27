@@ -79,7 +79,7 @@ export async function createBaseComponents(config: IConfigComponent, logs: ILogg
   appLogger(logBuffer, "server").info("run server configured", {
     host: await config.requireString("HTTP_SERVER_HOST"),
     port: await config.requireNumber("HTTP_SERVER_PORT"),
-    renderer: renderer.available ? "local Unity build" : "none",
+    renderer: renderer.available ? "native render server" : "none",
     reviewer: reviewer.kind,
     model: reviewer.model,
     catalyst: catalyst.peer,
@@ -95,7 +95,7 @@ export async function createBaseComponents(config: IConfigComponent, logs: ILogg
   });
 
   // the port is already open: a slow probe must not delay the health check, and its answer is in the log either way
-  if (renderer.available && (await config.getString("RENDERER_SELF_TEST")) !== "0") void runSelfTest({ logs: logBuffer }).catch(() => {});
+  if (renderer.available && (await config.getString("RENDERER_SELF_TEST")) !== "0") void runSelfTest({ logs: logBuffer }, { probe: renderer.probe }).catch(() => {});
 
   return { config, logs: logBuffer, logBuffer, server, metrics, identity, renderer, reviewer, catalyst, runStore, queue, runs, site, slack, buildInfo };
 }

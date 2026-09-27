@@ -1,5 +1,5 @@
 /** Run folders on disk (docs/visual-validation.md §3) and the index of every run this server has seen. */
-import { mkdir, readdir, readFile, stat, writeFile, appendFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, stat, writeFile, appendFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import type { Context } from "@earendil-works/pi-ai";
 import { START_COMPONENT, type IBaseComponent, type IConfigComponent, type ILoggerComponent } from "@well-known-components/interfaces";
@@ -180,7 +180,7 @@ export async function readRun(dir: string): Promise<CaptureRecord[]> {
       throw new Error(`${join(folder, "captures.json")} holds an invalid capture entry. Run npm run review again to regenerate it.`);
     }
     const entry = value as CaptureEntry;
-    // a deleted PNG is a missing view: resolveCaptures renders it again (with --renderer-build) or reports it
+    // a deleted PNG is a missing view: resolveCaptures renders it again or reports it
     const bytes = await readEvidenceFile(join(folder, basename(entry.file))).catch(() => undefined);
     if (!bytes) continue;
     captures.push({ request: entry.request, bytes: new Uint8Array(bytes), sha256: entry.sha256, width: entry.width, height: entry.height });
@@ -384,6 +384,8 @@ export async function createRunStoreComponent(components: { config: IConfigCompo
   const { config, logs } = components;
   const log = appLogger(logs, "run-store");
   const root = resolveArtifactsDir(await config.getString("ARTIFACTS_DIR"));
+  // the server's alone, the render server runs as another user; best effort: a root that cannot be used fails its first run
+  await chmod(root, 0o700).catch(() => {});
   const index = new Map<string, StoredRun>();
   const previous = new Map<InputKey, string>();
   const indexed = indexRunFolders(root, previous, index).catch((error) => log.warn("could not index earlier runs", { error: error instanceof Error ? error.message : String(error) }));

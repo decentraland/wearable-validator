@@ -59,6 +59,7 @@ export function fakeRenderer(calls: ServiceCalls, gate?: { open: Promise<void> }
   const bytes = renderedFrame(size);
   return {
     available: true,
+    probe: async () => ({ ok: true, ms: 0 }),
     forRun: async (run: RunSink) => {
       if (gate) await gate.open;
       calls.services++;
@@ -135,7 +136,7 @@ const startable = (component: unknown): Startable => (component && typeof compon
 export async function startTestServer(options: TestServerOptions = {}): Promise<TestServer> {
   const port = await freePort();
   const artifacts = options.env?.ARTIFACTS_DIR ?? (await mkdtemp(join(tmpdir(), "run-server-")));
-  // the fake renderer says it can render, and the startup self-test would then launch a real Chromium behind every suite
+  // the fake renderer says it can render, and the startup self-test would then probe it behind every suite
   const env = { HTTP_SERVER_HOST: "127.0.0.1", MAX_CONCURRENT_RUNS: "1", RENDERER_SELF_TEST: "0", ...options.env, HTTP_SERVER_PORT: String(port), ARTIFACTS_DIR: artifacts };
   const config = createConfigComponent(env);
   const lines: RecordedLine[] = [];

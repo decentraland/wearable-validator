@@ -29,12 +29,12 @@ npm run catalyst -- --wearables 15 --emotes 10
 
 | | |
 |---|---|
-| `packages/wearable-validator` | the published package: 35 deterministic checks (files · model · emote · content) plus four visual checks (render-valid, thumbnail-honesty, visual-quality, emote-quality), rules manifest, CLI. One folder per check under `src/checks/<group>/<name>/` (algorithm, creator-facing text and tests together); shared algorithms in `src/logic/`; Node-only adapters in `src/adapters/` (`/rendering`, `/ai`). The root entry is isomorphic — the website runs it fully in the browser |
-| `packages/server` | the run server (`wearable-validator-server`): renders the item with the Unity build in headless Chromium, calls the vision model, streams every step over SSE and keeps one folder per run (owner-scoped); the terminal runner `npm run review`; the Docker image (`Dockerfile`). Run folders land in gitignored `packages/server/artifacts/` |
+| `packages/wearable-validator` | the published package: 35 deterministic checks (files · model · emote · content) plus four visual checks (render-valid, thumbnail-honesty, visual-quality, emote-quality), rules manifest, CLI. One folder per check under `src/checks/<group>/<name>/` (algorithm, creator-facing text and tests together); shared algorithms in `src/logic/`; Node-only adapters in `src/adapters/` (`/native`, `/ai`). The root entry is isomorphic — the website runs it fully in the browser |
+| `packages/server` | the run server (`wearable-validator-server`): renders the item with the native render server (the Unity avatar scene drawn on the CPU, no browser), calls the vision model, streams every step over SSE and keeps one folder per run (owner-scoped); the terminal runner `npm run review`; the Docker image (`Dockerfile`). Run folders land in gitignored `packages/server/artifacts/` |
 | `packages/web` | the website (`wearable-validator-web`): upload → filterable per-rule results with separate values, requirements, and colored status labels (including on mobile), inspectable metadata fields, plain explanations, concrete how-to-fix steps, exact-section docs links, a live 3D preview, and the Visual review panel when a run server answers `/api`; `worker.ts` is the Cloudflare Worker that serves it and forwards `/api/*` |
-| `tools` | catalyst runner (validate published items), sample generator, renderer probe |
+| `tools` | catalyst runner (validate published items), sample generator |
 
-Server and web import the library only by package name (`@dcl-regenesislabs/wearable-validator`, `/rendering`, `/ai`). Requirement labels are formatted in the website; the package owns the manifest values and category-dependent limit calculations.
+Server and web import the library only by package name (`@dcl-regenesislabs/wearable-validator`, `/native`, `/ai`). Requirement labels are formatted in the website; the package owns the manifest values and category-dependent limit calculations.
 
 Every check carries a rule-book ID (`M-01`…), a plain-language explanation, fix guidance, and a docs link — all exported from the package (`checks`, `explanations`, `fixes`) so no surface can drift from the code.
 
@@ -43,8 +43,7 @@ To add or change a rule, follow [docs/adding-a-check.md](docs/adding-a-check.md)
 Visual validation (Phase 4): the item is rendered headlessly on both body shapes once, then pinned vision calls judge the thumbnail, clipping, skinning, textures and scale (wearables) or pose, grounding, ending and motion (emotes). Every run writes a folder you can open — screenshots, the prompt, the exact context sent to the model, the raw answer and the finding. See [docs/visual-validation.md](docs/visual-validation.md).
 
 ```sh
-npx playwright-core install chromium --no-shell
-# once: put the Unity build from unity-explorer PR #10053 in packages/server/renderer-build/ (see docs/visual-validation.md)
+# renders run the render server in Docker (a Linux x86_64 player): have Docker running; the first render builds its image
 # the website with live visual review: builds the site and serves it with the run server at http://127.0.0.1:4180
 ANTHROPIC_OAUTH_SETUP_TOKEN=<claude setup-token> npm run serve   # drop a zip → when the code checks pass, screenshots and the two model answers stream in on their own; with errors, press "Render and review anyway"
 # or from the terminal
@@ -54,7 +53,7 @@ npm run review -- packages/web/public/samples/upper_body.zip \
 npm run review -- https://decentraland.org/shop/item/0x…/12 --no-ai     # a published item: a shop item URL or a URN, fetched from the catalyst
 ```
 
-Leave out the token and the server renders and writes the prompt without calling the model. The terminal shows one line per event (run accepted, code gate, each capture, the model request, the answer with tokens and cost); when hosted, the same process is configured with `PORT`, `HOST`, `ANTHROPIC_OAUTH_SETUP_TOKEN` (a year-long `claude setup-token`, no session file needed), `RENDERER_BUILD`, `ARTIFACTS_DIR`, `CATALYST_URL` (the peer marketplace items are fetched from), the Cloudflare Access variables, `SLACK_BOT_TOKEN` + `SLACK_CHANNEL` + `SITE_URL` (one Slack message per finished run) and logs JSON lines — see [docs/visual-validation.md](docs/visual-validation.md).
+Leave out the token and the server renders and writes the prompt without calling the model. The terminal shows one line per event (run accepted, code gate, each capture, the model request, the answer with tokens and cost); when hosted, the same process is configured with `PORT`, `HOST`, `ANTHROPIC_OAUTH_SETUP_TOKEN` (a year-long `claude setup-token`, no session file needed), `RENDER_SERVER`, `ARTIFACTS_DIR`, `CATALYST_URL` (the peer marketplace items are fetched from), the Cloudflare Access variables, `SLACK_BOT_TOKEN` + `SLACK_CHANNEL` + `SITE_URL` (one Slack message per finished run) and logs JSON lines — see [docs/visual-validation.md](docs/visual-validation.md).
 
 ## Deploy
 

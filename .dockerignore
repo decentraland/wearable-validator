@@ -4,8 +4,6 @@ node_modules
 packages/web
 tools
 packages/server/artifacts
-packages/server/renderer-build
-**/renderer-build.tar.gz
 .git/**
 !.git/HEAD
 !.git/refs/heads/**

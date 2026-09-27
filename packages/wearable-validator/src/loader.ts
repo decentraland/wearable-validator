@@ -90,6 +90,7 @@ export async function unpackZip(bytes: Uint8Array, maxInputBytes = manifest.file
   let inflated = 0;
   for (const entry of entries) {
     const path = normalizePath(entry.name);
+    assertItemPath(path);
     const base = path.split("/").pop() ?? path;
     if (base.startsWith(".")) continue;
     // headers can lie: the real bytes count against both caps as they come out of the inflater
@@ -415,6 +416,14 @@ export function normalizePath(path: string): string {
   let p = path.replace(/\\/g, "/");
   while (p.startsWith("./")) p = p.slice(2);
   return p;
+}
+
+/** A file name that stays inside the item wherever it is written: no absolute path, drive, `..` or empty segment. */
+export function assertItemPath(path: string): void {
+  const segments = path.split("/");
+  if (path.startsWith("/") || /^[a-z]:/i.test(path) || path.includes("\0") || segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+    throw new Error(`"${path}" is not a file inside the item: it points outside it or has an empty folder name. Rename it and export the item again.`);
+  }
 }
 
 const mb = (n: number) => Math.round((n / 1048576) * 10) / 10;

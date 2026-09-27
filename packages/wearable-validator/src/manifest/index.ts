@@ -44,16 +44,11 @@ export interface Manifest {
   };
   hands: { minHandWeightRatio: number };
   thumbnail: { minTransparentPixelRatio: number; alphaThreshold: number };
-  /** The headless renderer, shared by every visual rule — read by /rendering and captures.ts. */
+  /** The renderer, shared by every visual rule — read by /native and captures.ts. */
   rendering: {
     imageSizePx: number;
     /** Bumped when the capture recipe (views, poses, scene) changes; part of every capture key. */
     recipeVersion: number;
-    /**
-     * The previewer's render profile, sent as URL parameters and part of every capture key: no supersampling,
-     * LDR, a small shadow map, no post-processing. A build without unity-explorer PR #10053's parameters ignores them.
-     */
-    quality: { renderScale: number; hdr: boolean; shadowMapPx: number; postProcessing: boolean };
     bodyShapes: string[];
     /** The capture recipe every visual rule draws from: views × azimuths per body shape, clip fractions for emotes. */
     views: { wearable: ("avatar" | "wearable")[]; emote: ("avatar" | "wearable")[] };
@@ -70,17 +65,11 @@ export interface Manifest {
       poses: Record<string, { clip: string; fraction: number }[]>;
       categoryPoses: Record<string, string>;
     };
-    profile: string; background: string; skin: string;
+    background: string; skin: string;
     wearablePose: string; wearablePoseFraction: number;
-    navigationTimeoutMs: number; loadTimeoutMs: number; commandTimeoutMs: number; captureRetries: number; timeoutMs: number;
-    settleMs: number; stabilityMs: number; maxStabilityAttempts: number;
+    /** One render server job's deadline. */
+    loadTimeoutMs: number;
     maxCaptureBytes: number;
-    /** Phase-0 lab parameters, read only by tools/src/renderer-probe.ts. */
-    probe: {
-      pausedObservationMs: number; poseFractions: number[];
-      cameraSideRadians: number; cameraElevationRadians: number; cameraZoomWorldUnits: number;
-      cameraPanTarget: { x: number; y: number; z: number }; chromaSkin: string;
-    };
   };
   /** The one vision call, shared by every AI-backed rule — read by /ai (maxTextLength also by answer parsers). */
   ai: {
