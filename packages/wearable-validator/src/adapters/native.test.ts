@@ -96,7 +96,7 @@ describe("createNativeRenderer", () => {
   });
 
   it("never hands the player a model that points at a file outside the item", async () => {
-    const outside = ["http://169.254.170.2/v2/credentials", "file:///etc/passwd", "/etc/passwd", "//host/x.png", "../../x.png", "textures/%2e%2e/%2e%2e/x.png", "C:/x.png", "..\\x.png"];
+    const outside = ["http://169.254.170.2/v2/credentials", "file:///etc/passwd", "/etc/passwd", "//host/x.png", "../../x.png", "textures/%2e%2e/%2e%2e/x.png", "C:/x.png", "..\\x.png", "%252e%252e/%252e%252e/%252e%252e/etc/passwd", ".%252e/.%252e/etc/passwd", "%252e%252e%252f%252e%252e%252fetc/passwd", "..%255c..%255cetc", "x.bin?/../../etc/passwd", "file%253A///etc/passwd"];
     for (const uri of outside) {
       await withFakeServer(async (command, log) => {
         const renderer = await createNativeRenderer({ command, build: "test" });
@@ -110,7 +110,7 @@ describe("createNativeRenderer", () => {
   });
 
   it("draws a model that names a file next to it in the item, as smart wearables do", async () => {
-    for (const uri of ["Bubble.png", "textures/Bubble%20Y.png", "./Bubble.png"]) {
+    for (const uri of ["Bubble.png", "textures/Bubble%20Y.png", "./Bubble.png", "textures/../Bubble.png"]) {
       await withFakeServer(async (command, log) => {
         const renderer = await createNativeRenderer({ command, build: "test" });
         const glb = glbNaming(uri);

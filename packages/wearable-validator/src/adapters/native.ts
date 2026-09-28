@@ -8,7 +8,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { digest, digestJson } from "../logic/captures.js";
@@ -197,12 +197,14 @@ function assertInsideItem(key: string, bytes: Uint8Array): void {
   for (const list of [json.buffers, json.images]) {
     for (const entry of Array.isArray(list) ? list : []) {
       const uri = entry && typeof entry === "object" && "uri" in entry ? entry.uri : undefined;
-      if (typeof uri === "string" && pointsOutside(uri)) throw new Error(`"${key}" points at a file outside the item (${uri.slice(0, 80)}). Embed it in the .glb, or ship it in the item and name it by a relative path.`);
+      if (typeof uri === "string" && pointsOutside(key, uri)) throw new Error(`"${key}" points at a file outside the item (${uri.slice(0, 80)}). Embed it in the .glb, or ship it in the item and name it by a relative path.`);
     }
   }
 }
 
-function pointsOutside(uri: string): boolean {
+// the player unescapes a uri once more and its URL parser then treats %2e%2e as "..": after one decode, nothing
+// that could still be an escape, scheme, query or Windows path is allowed, and the path must land inside the item
+function pointsOutside(key: string, uri: string): boolean {
   if (uri.startsWith("data:")) return false;
   let path: string;
   try {
@@ -210,8 +212,9 @@ function pointsOutside(uri: string): boolean {
   } catch {
     return true;
   }
-  if (/^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith("/") || path.startsWith("\\")) return true;
-  return path.split(/[\\/]/).includes("..");
+  if (/[%?#:\\]/.test(path) || path.startsWith("/")) return true;
+  const target = posix.normalize(posix.join(posix.dirname(key), path));
+  return target === ".." || target.startsWith("../");
 }
 
 // the server writes under umask 077; the render server may run as another user that shares the folder's group
