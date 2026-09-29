@@ -126,6 +126,7 @@ describe("runs from a marketplace reference", () => {
     assert.equal(done.type, "done");
     assert.equal(done.data.name, "Test Wearable", "the run takes the item's name once the catalyst answers");
     assert.equal(done.data.zipUrl, undefined, "nothing to download: there was no upload");
+    assert.equal(done.data.reference, ETHEREUM, "the URN the item was found under, so the site can preview it");
     const gateResult = done.data.gate as { passed: boolean; checks: { check: string }[] };
     assert.equal(gateResult.passed, true);
     assert.ok(gateResult.checks.some((row) => row.check === "content-integrity"));
