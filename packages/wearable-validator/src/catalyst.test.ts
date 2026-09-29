@@ -8,7 +8,6 @@ const CONTRACT = "0x" + "ab".repeat(20);
 const MATIC = `urn:decentraland:matic:collections-v2:${CONTRACT}:12`;
 const ETHEREUM = `urn:decentraland:ethereum:collections-v2:${CONTRACT}:12`;
 const AMOY = `urn:decentraland:amoy:collections-v2:${CONTRACT}:12`;
-const SEPOLIA = `urn:decentraland:sepolia:collections-v2:${CONTRACT}:12`;
 
 describe("parseItemReference", () => {
   it("takes a URN as it is, lower-cased and trimmed", () => {
@@ -23,9 +22,9 @@ describe("parseItemReference", () => {
     assert.deepEqual(parseItemReference(`https://market.decentraland.org/marketplace/contracts/${CONTRACT}/items/12`), expected);
   });
 
-  it("turns a decentraland.zone shop URL into the test networks' candidates: amoy, then sepolia", () => {
-    assert.deepEqual(parseItemReference(`https://decentraland.zone/shop/item/${CONTRACT}/12`), [AMOY, SEPOLIA]);
-    assert.deepEqual(parseItemReference(`https://market.decentraland.zone/marketplace/contracts/${CONTRACT}/items/12`), [AMOY, SEPOLIA]);
+  it("turns a decentraland.zone shop URL into the amoy candidate", () => {
+    assert.deepEqual(parseItemReference(`https://decentraland.zone/shop/item/${CONTRACT}/12`), [AMOY]);
+    assert.deepEqual(parseItemReference(`https://market.decentraland.zone/marketplace/contracts/${CONTRACT}/items/12`), [AMOY]);
     assert.deepEqual(parseItemReference(AMOY), [AMOY]);
   });
 
@@ -140,17 +139,17 @@ describe("fetchCatalystItem", () => {
     assert.ok(seen.every((signal) => signal?.aborted), "the internal signal trips with the caller's");
   });
 
-  it("asks the .zone catalyst for test-network items and the .org one for mainnet, unless a peer is named", async () => {
+  it("asks the .zone catalyst for amoy items and the .org one for mainnet, unless a peer is named", async () => {
     assert.equal(catalystFor(AMOY), TESTNET_CATALYST);
-    assert.equal(catalystFor(SEPOLIA), TESTNET_CATALYST);
     assert.equal(catalystFor(MATIC), DEFAULT_CATALYST);
-    const entity = await syntheticEntity(await syntheticZip(), SEPOLIA);
+    assert.equal(catalystFor(ETHEREUM), DEFAULT_CATALYST);
+    const entity = await syntheticEntity(await syntheticZip(), AMOY);
     const fetch = catalystFetch([entity]);
-    const item = await fetchCatalystItem([AMOY, SEPOLIA], { fetch });
-    assert.equal(item.urn, SEPOLIA);
+    const item = await fetchCatalystItem([AMOY], { fetch });
+    assert.equal(item.urn, AMOY);
     assert.ok(fetch.calls.every((call) => call.url.startsWith(`${TESTNET_CATALYST}/content/`)), "lookups and downloads go to the .zone catalyst");
     const named = catalystFetch([entity]);
-    await fetchCatalystItem([SEPOLIA], { peer: "https://peer.example", fetch: named });
+    await fetchCatalystItem([AMOY], { peer: "https://peer.example", fetch: named });
     assert.ok(named.calls.every((call) => call.url.startsWith("https://peer.example/content/")), "a named peer wins");
   });
 

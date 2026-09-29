@@ -6,7 +6,7 @@ import { assertItemPath, normalizePath } from "./loader.js";
 import { manifest } from "./manifest/index.js";
 
 export const DEFAULT_CATALYST = "https://peer.decentraland.org";
-/** Items on the test networks (amoy, sepolia) are published on the .zone catalyst, the one decentraland.zone serves. */
+/** Items on amoy, the test network decentraland.zone lists, are published on the .zone catalyst. */
 export const TESTNET_CATALYST = "https://peer.decentraland.zone";
 const CONCURRENCY = 6;
 
@@ -38,9 +38,8 @@ export function parseItemReference(raw: string): string[] | null {
   const url = input.match(/shop\/item\/(0x[0-9a-fA-F]{40})\/(\d+)/) ?? input.match(/marketplace\/contracts\/(0x[0-9a-fA-F]{40})\/items\/(\d+)/);
   if (url) {
     const [, contract, item] = url;
-    // the URL does not say which chain: the Polygon one first (nearly every item), then Ethereum; decentraland.zone
-    // lists the test networks
-    const chains = /^(https?:\/\/)?([a-z0-9-]+\.)*decentraland\.zone\//i.test(input) ? ["amoy", "sepolia"] : ["matic", "ethereum"];
+    // the URL does not say which chain: matic first (nearly every item), then ethereum; decentraland.zone lists amoy
+    const chains = /^(https?:\/\/)?([a-z0-9-]+\.)*decentraland\.zone\//i.test(input) ? ["amoy"] : ["matic", "ethereum"];
     return chains.map((chain) => `urn:decentraland:${chain}:collections-v2:${contract.toLowerCase()}:${item}`);
   }
   // only a marketplace URL gets the hint: a local path such as ~/Downloads/tokens/shirt.zip is not a reference
@@ -48,9 +47,9 @@ export function parseItemReference(raw: string): string[] | null {
   return null;
 }
 
-/** The catalyst that publishes a URN's network: the test networks live on the .zone one. */
+/** The catalyst that publishes a URN's network: amoy lives on the .zone one. */
 export function catalystFor(urn: string): string {
-  return /^urn:decentraland:(amoy|sepolia):/i.test(urn) ? TESTNET_CATALYST : DEFAULT_CATALYST;
+  return /^urn:decentraland:amoy:/i.test(urn) ? TESTNET_CATALYST : DEFAULT_CATALYST;
 }
 
 interface ActiveEntity {
