@@ -20,6 +20,6 @@
     "review": "npm run review -w wearable-validator-server --"
   },
   "devDependencies": {
-    "wrangler": "4.136.0"
+    "wrangler": "4.143.1"
   }
 }
