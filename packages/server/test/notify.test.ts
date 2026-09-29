@@ -120,7 +120,7 @@ describe("run notifications", () => {
     }
   });
 
-  it("says a run stopped at the code gate is blocked, with the error count, and still keeps the zip", async () => {
+  it("says a run stopped at the code gate is blocked, naming the failing check, and still keeps the zip", async () => {
     const { server, posts } = await withSlack();
     const { base } = server;
     try {
@@ -129,7 +129,7 @@ describe("run notifications", () => {
       assert.equal(events.at(-1)!.data.skipped, true);
       assert.equal(events.at(-1)!.data.zipUrl, `/api/runs/${id}/input.zip`);
       await until(() => posts.length, (count) => count === 1);
-      assert.match(posts[0].blocks[1].text!.text, /\*Verdict\* ❌ Failed the code checks\n\*Approval\* ⛔ Blocked: \d+ code errors?/);
+      assert.match(posts[0].blocks[1].text!.text, /\*Verdict\* ❌ Failed the code checks\n\*Approval\* ⛔ Blocked: triangle-count: /);
       assert.ok(!posts[0].blocks.some((block) => block.type === "image"), "no thumbnail was extracted before the gate");
       assert.ok(posts[0].blocks.some((block) => block.text?.text.includes("*triangle-count*")), "the findings are listed");
     } finally {

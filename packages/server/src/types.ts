@@ -118,7 +118,7 @@ export type RunOutcome = "passed" | "failed" | "no-verdict" | "gate" | "error";
 export interface CuratorDecision {
   /** ready: nothing found, a curator glances at the views; review: something needs a curator's judgement; blocked: the creator must fix errors first. */
   state: "ready" | "review" | "blocked";
-  /** Short phrases in the order they were found: "2 warnings", "thumbnail-honesty: mismatch", "3 code errors". */
+  /** Short phrases in the order they were found: "2 warnings", "thumbnail-honesty: mismatch", "file-size: The item totals 4.03 MB; the limit for an emote is 3 MB". */
   reasons: string[];
 }
 

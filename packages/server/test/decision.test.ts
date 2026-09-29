@@ -50,11 +50,13 @@ describe("curatorDecision", () => {
     assert.deepEqual(curatorDecision({ gate: result([row("triangle-count", "passed")]), passed: null }), { state: "review", reasons: ["the visual review did not run"] });
   });
 
-  it("blocks on code errors with their count, whatever the visual review said", () => {
-    const gate = result([row("triangle-count", "failed")], [finding("triangle-count", "error", "Too many."), finding("texture-size", "error", "Too big."), finding("metadata", "warning", "Odd.")], false);
-    assert.deepEqual(curatorDecision({ gate, passed: false }), { state: "blocked", reasons: ["2 code errors"] });
-    assert.deepEqual(curatorDecision({ gate, visual: cleanVisual, passed: false }), { state: "blocked", reasons: ["2 code errors"] });
-    assert.deepEqual(curatorDecision({ gate: result([row("x", "failed")], [finding("x", "error", "One.")], false), passed: false }).reasons, ["1 code error"]);
+  it("blocks on code errors, naming each failing check with what is wrong, whatever the visual review said", () => {
+    const gate = result([row("triangle-count", "failed")], [finding("triangle-count", "error", "Too many — reduce them."), finding("texture-size", "error", "Too big."), finding("texture-size", "error", "Also big."), finding("metadata", "warning", "Odd.")], false);
+    const reasons = ["triangle-count: Too many", "texture-size: Too big. (+1 more)"];
+    assert.deepEqual(curatorDecision({ gate, passed: false }), { state: "blocked", reasons });
+    assert.deepEqual(curatorDecision({ gate, visual: cleanVisual, passed: false }), { state: "blocked", reasons });
+    const many = result([], ["a", "b", "c", "d", "e"].map((check) => finding(check, "error", `${check} is off.`)), false);
+    assert.deepEqual(curatorDecision({ gate: many, passed: false }).reasons, ["a: a is off.", "b: b is off.", "c: c is off.", "+2 more failing checks"]);
   });
 
   it("blocks on a failed visual row, naming what it measured", () => {

@@ -130,6 +130,7 @@ describe("runMessage", () => {
     assert.ok(plain.includes(`*Item* shirt · from the marketplace \`${other}\``), plain);
     assert.equal(marketplaceUrl(other), undefined);
     assert.equal(marketplaceUrl(`URN:decentraland:ethereum:collections-v2:${contract.toUpperCase()}:3`), `https://decentraland.org/marketplace/contracts/${contract}/items/3`);
+    assert.equal(marketplaceUrl(`urn:decentraland:amoy:collections-v2:${contract}:1`), `https://decentraland.zone/marketplace/contracts/${contract}/items/1`, "the test network's items live on decentraland.zone");
     assert.ok(!sectionText(blocksOf(runMessage(notice(), ""))[1]).includes("marketplace"), "an upload says nothing about it");
   });
 
@@ -163,6 +164,13 @@ describe("runMessage", () => {
     assert.equal(lines[1], "• *metadata* — Tag &lt;odd&gt; &amp; strange.");
     assert.equal(lines.length, 6);
     assert.equal(lines[5], "_+3 more_");
+  });
+
+  it("lists a finding every body shape repeats once, with how many times it came up", () => {
+    const seam = "This looping emote ends in a different pose than it starts.";
+    const gate = result({ findings: [finding("loop-seam", "warning", seam), finding("loop-seam", "warning", seam), finding("file-size", "error", "4.03 MB of 3 MB.")] });
+    const lines = sectionText(blocksOf(runMessage(notice({ gate }), ""))[2]).split("\n");
+    assert.deepEqual(lines, ["• *file-size* — 4.03 MB of 3 MB.", `• *loop-seam* — ${seam} _(×2)_`]);
   });
 
   it("never lets the findings section pass 3000 characters", () => {
