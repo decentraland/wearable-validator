@@ -106,4 +106,4 @@ Every input path is bounded before it is decoded: the zip's entry count and infl
 
 ## Versions
 
-The package version is the rules version (`manifest.version`). Every version bump merged to `main` publishes through npm trusted publishing. More in the [repository](https://github.com/decentraland/wearable-validator): [how a visual review works](https://github.com/decentraland/wearable-validator/blob/main/docs/visual-validation.md) and [adding a check](https://github.com/decentraland/wearable-validator/blob/main/docs/adding-a-check.md).
+Every library change merged to `main` publishes a snapshot on the `next` tag (`npm i @dcl-regenesislabs/wearable-validator@next`). A GitHub release tagged with a semver version publishes it on `latest`; tag it with the rules version (`manifest.version`). More in the [repository](https://github.com/decentraland/wearable-validator): [how a visual review works](https://github.com/decentraland/wearable-validator/blob/main/docs/visual-validation.md) and [adding a check](https://github.com/decentraland/wearable-validator/blob/main/docs/adding-a-check.md).
