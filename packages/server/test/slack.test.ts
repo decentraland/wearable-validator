@@ -173,6 +173,14 @@ describe("runMessage", () => {
     assert.deepEqual(lines, ["• *file-size* — 4.03 MB of 3 MB.", `• *loop-seam* — ${seam} _(×2)_`]);
   });
 
+  it("tells a finding both body shapes' files repeat once, naming the shapes", () => {
+    const male = '"male/SPRITE.glb" › Untitled';
+    const female = '"female/SPRITE.glb" › Untitled';
+    const gate = result({ findings: [finding("texture-size", "error", `${male} is 1024×1024.`), finding("texture-size", "error", `${female} is 1024×1024.`)].map((entry, i) => ({ ...entry, where: i === 0 ? male : female })) });
+    const lines = sectionText(blocksOf(runMessage(notice({ gate }), ""))[2]).split("\n");
+    assert.deepEqual(lines, ['• *texture-size* — "SPRITE.\u200bglb" › Untitled is 1024×1024. _(male, female)_'], "a file name never becomes a link");
+  });
+
   it("never lets the findings section pass 3000 characters", () => {
     const visual = result({ findings: Array.from({ length: 5 }, (_, i) => finding("visual-quality", "warning", `${i} ` + "x".repeat(900))) });
     const blocks = blocksOf(runMessage(notice({ visual }), ""));

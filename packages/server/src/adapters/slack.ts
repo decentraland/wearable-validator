@@ -2,7 +2,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { IConfigComponent, ILoggerComponent } from "@well-known-components/interfaces";
-import { manifest, type CaptureRecord, type Finding } from "@dcl-regenesislabs/wearable-validator";
+import { manifest, type CaptureRecord } from "@dcl-regenesislabs/wearable-validator";
+import { groupFindings, type FindingGroup } from "../logic/group-findings.js";
 import type { RunNotice } from "../types.js";
 import { appLogger } from "./log-buffer.js";
 
@@ -92,21 +93,16 @@ function itemLine(notice: RunNotice): string {
   return `${line} · from the marketplace ${url ? `<${url}|${escapeMrkdwn(notice.reference)}>` : `\`${escapeMrkdwn(notice.reference)}\``}`;
 }
 
-/** Errors before warnings, gate before visual, the same finding once however many body shapes repeat it; at most
- * MAX_FINDINGS bullet lines within one section's limit. */
+/** Errors before warnings, gate before visual, a finding every body shape repeats told once; at most MAX_FINDINGS
+ * bullet lines within one section's limit. */
 function findingsSection(notice: RunNotice): Block | undefined {
-  const unique = new Map<string, { finding: Finding; times: number }>();
-  for (const finding of [...(notice.gate?.findings ?? []), ...(notice.visual?.findings ?? [])]) {
-    const key = `${finding.check}\n${finding.severity}\n${finding.message}`;
-    const seen = unique.get(key);
-    if (seen) seen.times++;
-    else unique.set(key, { finding, times: 1 });
-  }
-  const all = [...unique.values()];
+  const all = groupFindings([...(notice.gate?.findings ?? []), ...(notice.visual?.findings ?? [])]);
   if (all.length === 0) return undefined;
   const ordered = [...all.filter(({ finding }) => finding.severity === "error"), ...all.filter(({ finding }) => finding.severity !== "error")];
-  const bullet = ({ finding, times }: { finding: Finding; times: number }): string =>
-    `• *${escapeMrkdwn(finding.check)}* — ${inertMrkdwn(finding.message)}${times > 1 ? ` _(×${times})_` : ""}`;
+  const bullet = ({ finding, message, shapes, count }: FindingGroup): string => {
+    const tail = shapes.length ? ` _(${escapeMrkdwn(shapes.join(", "))})_` : count > 1 ? ` _(×${count})_` : "";
+    return `• *${escapeMrkdwn(finding.check)}* — ${inertMrkdwn(message)}${tail}`;
+  };
   const lines: string[] = [];
   let shown = 0;
   for (const entry of ordered.slice(0, MAX_FINDINGS)) {
