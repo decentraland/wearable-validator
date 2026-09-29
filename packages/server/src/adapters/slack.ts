@@ -1,8 +1,9 @@
-/** One Slack message per finished run in the curators' channel: thumbnail, verdict, whether a curator is needed, a button to the run. */
+/** One Slack message per finished run in the curators' channel: verdict, whether a curator is needed, a button to the run, the thumbnail; the thumbnail and worn views in its thread. */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { IConfigComponent, ILoggerComponent } from "@well-known-components/interfaces";
-import { manifest, type CaptureRecord, type Finding } from "@dcl-regenesislabs/wearable-validator";
+import { manifest, type CaptureRecord } from "@dcl-regenesislabs/wearable-validator";
+import { groupFindings, type FindingGroup } from "../logic/group-findings.js";
 import type { RunNotice } from "../types.js";
 import { appLogger } from "./log-buffer.js";
 
@@ -17,11 +18,13 @@ const BUTTON_MAX = 75;
 const ALT_TEXT_MAX = 2000;
 const ALT_TXT_MAX = 1000;
 const MAX_FINDINGS = 5;
+// a file shared a moment ago may still be processing when the message is edited to show it
+const THUMBNAIL_RETRY_MS = 3000;
 
 export interface ISlackComponent {
   readonly enabled: boolean;
   readonly channel?: string;
-  /** Rejects with an actionable sentence when Slack refused the message; a missing thumbnail or a failed thread reply only logs. */
+  /** Rejects with an actionable sentence when Slack refused the message; images that could not be shared only log. */
   notify(notice: RunNotice): Promise<void>;
 }
 
@@ -90,21 +93,16 @@ function itemLine(notice: RunNotice): string {
   return `${line} · from the marketplace ${url ? `<${url}|${escapeMrkdwn(notice.reference)}>` : `\`${escapeMrkdwn(notice.reference)}\``}`;
 }
 
-/** Errors before warnings, gate before visual, the same finding once however many body shapes repeat it; at most
- * MAX_FINDINGS bullet lines within one section's limit. */
+/** Errors before warnings, gate before visual, a finding every body shape repeats told once; at most MAX_FINDINGS
+ * bullet lines within one section's limit. */
 function findingsSection(notice: RunNotice): Block | undefined {
-  const unique = new Map<string, { finding: Finding; times: number }>();
-  for (const finding of [...(notice.gate?.findings ?? []), ...(notice.visual?.findings ?? [])]) {
-    const key = `${finding.check}\n${finding.severity}\n${finding.message}`;
-    const seen = unique.get(key);
-    if (seen) seen.times++;
-    else unique.set(key, { finding, times: 1 });
-  }
-  const all = [...unique.values()];
+  const all = groupFindings([...(notice.gate?.findings ?? []), ...(notice.visual?.findings ?? [])]);
   if (all.length === 0) return undefined;
   const ordered = [...all.filter(({ finding }) => finding.severity === "error"), ...all.filter(({ finding }) => finding.severity !== "error")];
-  const bullet = ({ finding, times }: { finding: Finding; times: number }): string =>
-    `• *${escapeMrkdwn(finding.check)}* — ${inertMrkdwn(finding.message)}${times > 1 ? ` _(×${times})_` : ""}`;
+  const bullet = ({ finding, message, shapes, count }: FindingGroup): string => {
+    const tail = shapes.length ? ` _(${escapeMrkdwn(shapes.join(", "))})_` : count > 1 ? ` _(×${count})_` : "";
+    return `• *${escapeMrkdwn(finding.check)}* — ${inertMrkdwn(message)}${tail}`;
+  };
   const lines: string[] = [];
   let shown = 0;
   for (const entry of ordered.slice(0, MAX_FINDINGS)) {
@@ -134,7 +132,7 @@ export interface RunMessage {
   blocks: Block[];
 }
 
-/** The Block Kit message for a run; pure, so its shape is tested without Slack. siteUrl "" makes the button link relative. */
+/** The Block Kit message for a run; pure, so its shape is tested without Slack. siteUrl "" leaves out the button: Slack refuses a relative link. */
 export function runMessage(notice: RunNotice, siteUrl: string, fileId?: string): RunMessage {
   const name = displayName(notice);
   const verdict = verdictLine(notice);
@@ -152,10 +150,12 @@ export function runMessage(notice: RunNotice, siteUrl: string, fileId?: string):
   if (fileId) blocks.push({ type: "image", slack_file: { id: fileId }, alt_text: cut(`${name} thumbnail`, ALT_TEXT_MAX) });
   const findings = findingsSection(notice);
   if (findings) blocks.push(findings);
-  blocks.push({
-    type: "actions",
-    elements: [{ type: "button", style: "primary", text: { type: "plain_text", text: cut("Open run", BUTTON_MAX) }, url: `${siteUrl}/?run=${notice.id}`, action_id: "open-run" }]
-  });
+  if (siteUrl) {
+    blocks.push({
+      type: "actions",
+      elements: [{ type: "button", style: "primary", text: { type: "plain_text", text: cut("Open run", BUTTON_MAX) }, url: `${siteUrl}/?run=${notice.id}`, action_id: "open-run" }]
+    });
+  }
   blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: cut(contextLine(notice), SECTION_MAX) }] });
   return { text: `${inertMrkdwn(name)} — ${escapeMrkdwn(verdict)} — ${inertMrkdwn(approval)} (sent by ${escapeMrkdwn(notice.owner)})`, blocks };
 }
@@ -204,7 +204,7 @@ export async function createSlackComponent(components: SlackComponents): Promise
     return { enabled: false, notify: async () => {} };
   }
   if (!channel) throw new Error("SLACK_CHANNEL must be the id of the channel (C…) the run notifications go to when SLACK_BOT_TOKEN is set.");
-  if (!siteUrl) log.warn("SITE_URL is not set: the Open run button in Slack will carry a relative link");
+  if (!siteUrl) log.warn("SITE_URL is not set: Slack messages go out without the Open run button");
 
   async function send(url: string, init: RequestInit, retried = false): Promise<Response> {
     const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -235,8 +235,8 @@ export async function createSlackComponent(components: SlackComponents): Promise
     return answer;
   };
 
-  /** The three-step external upload; the file stays private to the app and is shown through slack_file in a block. */
-  async function upload(filename: string, bytes: Uint8Array, alt: string): Promise<string> {
+  /** The first two steps of Slack's external upload: the file exists, not yet shared anywhere. */
+  async function upload(filename: string, bytes: Uint8Array, alt: string): Promise<{ id: string; title: string }> {
     const ticket = ensure("files.getUploadURLExternal", await call("files.getUploadURLExternal", new URLSearchParams({ filename, length: String(bytes.byteLength), alt_txt: cut(alt, ALT_TXT_MAX) })));
     const uploadUrl = ticket.upload_url;
     const fileId = ticket.file_id;
@@ -246,51 +246,52 @@ export async function createSlackComponent(components: SlackComponents): Promise
     body.set(bytes);
     const put = await send(uploadUrl, { method: "POST", headers: { "content-type": "application/octet-stream" }, body });
     if (!put.ok) throw new Error(`Slack answered HTTP ${put.status} to the file upload.`);
-    ensure("files.completeUploadExternal", await call("files.completeUploadExternal", { files: [{ id: fileId, title: alt }] }));
-    return fileId;
+    return { id: fileId, title: alt };
   }
 
-  async function post(notice: RunNotice, fileId: string | undefined): Promise<string> {
-    const message = runMessage(notice, siteUrl, fileId);
-    let answer = await call("chat.postMessage", { channel, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
-    // slack_file on a file that was never shared is not promised by the docs: the message matters more than its picture
-    if (!answer.ok && answer.error === "invalid_blocks" && fileId) {
-      log.warn("slack refused the thumbnail block: posting without it", { run: notice.id });
-      const plain = runMessage(notice, siteUrl);
-      answer = await call("chat.postMessage", { channel, text: plain.text, unfurl_links: false, unfurl_media: false, blocks: plain.blocks });
-    }
-    const ts = ensure("chat.postMessage", answer).ts;
+  async function post(notice: RunNotice): Promise<string> {
+    const message = runMessage(notice, siteUrl);
+    const ts = ensure("chat.postMessage", await call("chat.postMessage", { channel, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks })).ts;
     if (typeof ts !== "string") throw new Error("Slack answered chat.postMessage without a ts.");
     return ts;
   }
 
-  async function reply(notice: RunNotice, ts: string): Promise<void> {
-    const views = frontViews(notice.visual?.captures ?? []);
-    if (views.length === 0) return;
+  /** The thumbnail and the worn front views, shared into the message's thread; the thumbnail's file id when it went up. */
+  async function shareImages(notice: RunNotice, ts: string): Promise<string | undefined> {
     const name = displayName(notice);
-    const blocks: Block[] = [];
-    for (const view of views) {
-      const id = await upload(`${view.request.id}.png`, view.bytes, `${name} worn, ${view.request.bodyShape}`);
-      blocks.push({ type: "image", slack_file: { id }, alt_text: cut(`${name} worn, ${view.request.bodyShape}`, ALT_TEXT_MAX) });
+    const files: { id: string; title: string }[] = [];
+    const thumbnail = await readFile(join(notice.dir, "thumbnail.png")).catch(() => undefined);
+    const thumbnailFile = thumbnail ? await upload("thumbnail.png", new Uint8Array(thumbnail), `${name} thumbnail`) : undefined;
+    if (thumbnailFile) files.push(thumbnailFile);
+    for (const view of frontViews(notice.visual?.captures ?? [])) files.push(await upload(`${view.request.id}.png`, view.bytes, `${name} worn, ${view.request.bodyShape}`));
+    if (files.length === 0) return undefined;
+    // an image block only shows a file shared where the message is: completing the upload into the thread shares them all
+    ensure("files.completeUploadExternal", await call("files.completeUploadExternal", { files, channel_id: channel, thread_ts: ts, initial_comment: "Thumbnail and rendered front views" }));
+    return thumbnailFile?.id;
+  }
+
+  /** Puts the shared thumbnail in the message itself; Slack may still be processing it, so one retry after a pause. */
+  async function addThumbnail(notice: RunNotice, ts: string, fileId: string): Promise<void> {
+    const message = runMessage(notice, siteUrl, fileId);
+    for (let attempt = 0; ; attempt++) {
+      const answer = await call("chat.update", { channel, ts, text: message.text, blocks: message.blocks });
+      if (answer.ok || attempt > 0 || answer.error !== "invalid_blocks") return void ensure("chat.update", answer);
+      await sleep(THUMBNAIL_RETRY_MS);
     }
-    ensure("chat.postMessage", await call("chat.postMessage", { channel, thread_ts: ts, text: "Rendered front views", unfurl_links: false, unfurl_media: false, blocks }));
   }
 
   return {
     enabled: true,
     channel,
     async notify(notice) {
-      const thumbnail = await readFile(join(notice.dir, "thumbnail.png")).catch(() => undefined);
-      let fileId: string | undefined;
-      if (thumbnail) {
-        fileId = await upload("thumbnail.png", new Uint8Array(thumbnail), `${displayName(notice)} thumbnail`).catch((error: unknown) => {
-          log.warn("slack thumbnail upload failed: posting without it", { run: notice.id, reason: error instanceof Error ? error.message : String(error) });
-          return undefined;
-        });
-      }
-      const ts = await post(notice, fileId);
+      const ts = await post(notice);
       log.info("slack notified", { run: notice.id, channel, ts });
-      await reply(notice, ts).catch((error: unknown) => log.warn("slack thread reply failed", { run: notice.id, reason: error instanceof Error ? error.message : String(error) }));
+      const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+      const thumbnail = await shareImages(notice, ts).catch((error: unknown) => {
+        log.warn("slack images failed", { run: notice.id, reason: reason(error) });
+        return undefined;
+      });
+      if (thumbnail) await addThumbnail(notice, ts, thumbnail).catch((error: unknown) => log.warn("slack kept the thumbnail in the thread only", { run: notice.id, reason: reason(error) }));
     }
   };
 }

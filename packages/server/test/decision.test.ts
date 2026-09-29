@@ -59,6 +59,12 @@ describe("curatorDecision", () => {
     assert.deepEqual(curatorDecision({ gate: many, passed: false }).reasons, ["a: a is off.", "b: b is off.", "c: c is off.", "+2 more failing checks"]);
   });
 
+  it("names a code error both body shapes repeat once, with the shapes", () => {
+    const at = (shape: string) => ({ ...finding("texture-size", "error", `"${shape}/a.glb" › Hat is 1024×1024; the limit is 512×512. Resize it.`), where: `"${shape}/a.glb" › Hat` });
+    const gate = result([], [at("male"), at("female")], false);
+    assert.deepEqual(curatorDecision({ gate, passed: false }).reasons, ['texture-size: "a.glb" › Hat is 1024×1024; the limit is 512×512. Resize it. (male, female)']);
+  });
+
   it("blocks on a failed visual row, naming what it measured", () => {
     const visual = result([row("render-valid", "failed", { measured: "12 views · 0.1% drawn at least" }), row("thumbnail-honesty", "warning", asked)], [finding("render-valid", "error", "Nothing visible."), finding("thumbnail-honesty", "warning", "Different.")]);
     assert.deepEqual(curatorDecision({ gate: cleanGate, visual, passed: false }), { state: "blocked", reasons: ["render-valid: 12 views · 0.1% drawn at least"] });

@@ -1,6 +1,7 @@
 /** What a curator must do with a finished run, from the code gate and the visual review alone: pure, no I/O. */
 import type { CheckResult, Finding, Result } from "@dcl-regenesislabs/wearable-validator";
 import type { CuratorDecision } from "../types.js";
+import { groupFindings, type FindingGroup } from "./group-findings.js";
 
 export interface DecisionInput {
   gate?: Result;
@@ -24,16 +25,16 @@ const MAX_NAMED_CHECKS = 3;
 
 /** "file-size: The item totals 4.03 MB; the limit for an emote is 3 MB" — each failing code check with the gist of its first error. */
 function codeReasons(gate: Result): string[] {
-  const byCheck = new Map<string, Finding[]>();
-  for (const entry of gate.findings) {
-    if (entry.severity !== "error") continue;
-    byCheck.set(entry.check, [...(byCheck.get(entry.check) ?? []), entry]);
+  const byCheck = new Map<string, FindingGroup[]>();
+  for (const group of groupFindings(gate.findings.filter((entry) => entry.severity === "error"))) {
+    byCheck.set(group.finding.check, [...(byCheck.get(group.finding.check) ?? []), group]);
   }
   if (byCheck.size === 0) return [plural(gate.summary.errors, "code error")];
-  const named = [...byCheck].slice(0, MAX_NAMED_CHECKS).map(([check, errors]) => {
+  const named = [...byCheck].slice(0, MAX_NAMED_CHECKS).map(([check, groups]) => {
     // the part before " — " says what is wrong; the rest is how to fix it, which the finding list carries
-    const gist = short(errors[0].message.split(" — ")[0], 90);
-    return `${check}: ${gist}${errors.length > 1 ? ` (+${errors.length - 1} more)` : ""}`;
+    const gist = short(groups[0].message.split(" — ")[0], 90);
+    const shapes = groups[0].shapes.length ? ` (${groups[0].shapes.join(", ")})` : "";
+    return `${check}: ${gist}${shapes}${groups.length > 1 ? ` (+${groups.length - 1} more)` : ""}`;
   });
   const rest = byCheck.size - named.length;
   return rest > 0 ? [...named, `+${plural(rest, "more failing check")}`] : named;
