@@ -57,7 +57,7 @@ Everything else has a default in `packages/server/.env.default`; the ones a depl
 
 | Variable | Value |
 | --- | --- |
-| `CATALYST_URL` | the catalyst a run started from a shop item URL or URN fetches the published item from; default `https://peer.decentraland.org` |
+| `CATALYST_URL` | the catalyst a run started from a shop item URL or URN fetches the published item from; unset, the item's network picks it: `https://peer.decentraland.org` for mainnet, `https://peer.decentraland.zone` for amoy and sepolia |
 | `CATALYST_TIMEOUT_MS` | how long the whole catalyst fetch (lookup and every file) may take before the run ends with "The catalyst did not answer in time — try again in a moment."; default 60000 |
 | `MAX_CONCURRENT_RUNS` | renders at once, about one per 1 GB of RAM; default 1 |
 | `LP_NUM_THREADS` | Mesa's rendering threads; match the CPU limit (4 in the image) |

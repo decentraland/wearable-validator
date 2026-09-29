@@ -6,6 +6,8 @@ import { assertItemPath, normalizePath } from "./loader.js";
 import { manifest } from "./manifest/index.js";
 
 export const DEFAULT_CATALYST = "https://peer.decentraland.org";
+/** Items on the test networks (amoy, sepolia) are published on the .zone catalyst, the one decentraland.zone serves. */
+export const TESTNET_CATALYST = "https://peer.decentraland.zone";
 const CONCURRENCY = 6;
 
 export interface CatalystItem {
@@ -19,7 +21,7 @@ export interface CatalystItem {
 }
 
 export interface CatalystOptions {
-  /** The catalyst to ask; DEFAULT_CATALYST unless the deployment names another. */
+  /** The catalyst to ask; without one, each candidate's network picks it (catalystFor). */
   peer?: string;
   /** Injectable so tests never patch the global fetch. */
   fetch?: typeof globalThis.fetch;
@@ -36,12 +38,19 @@ export function parseItemReference(raw: string): string[] | null {
   const url = input.match(/shop\/item\/(0x[0-9a-fA-F]{40})\/(\d+)/) ?? input.match(/marketplace\/contracts\/(0x[0-9a-fA-F]{40})\/items\/(\d+)/);
   if (url) {
     const [, contract, item] = url;
-    // the URL does not say which chain: matic first (nearly every item), then ethereum
-    return [`urn:decentraland:matic:collections-v2:${contract.toLowerCase()}:${item}`, `urn:decentraland:ethereum:collections-v2:${contract.toLowerCase()}:${item}`];
+    // the URL does not say which chain: the Polygon one first (nearly every item), then Ethereum; decentraland.zone
+    // lists the test networks
+    const chains = /^(https?:\/\/)?([a-z0-9-]+\.)*decentraland\.zone\//i.test(input) ? ["amoy", "sepolia"] : ["matic", "ethereum"];
+    return chains.map((chain) => `urn:decentraland:${chain}:collections-v2:${contract.toLowerCase()}:${item}`);
   }
   // only a marketplace URL gets the hint: a local path such as ~/Downloads/tokens/shirt.zip is not a reference
   if (/^(https?:\/\/)?([a-z0-9-]+\.)*decentraland\.(org|zone)\/.*\/tokens\//i.test(input)) throw new Error("That's an NFT token page — open the item's shop page instead (decentraland.org/shop/item/0x…/N).");
   return null;
+}
+
+/** The catalyst that publishes a URN's network: the test networks live on the .zone one. */
+export function catalystFor(urn: string): string {
+  return /^urn:decentraland:(amoy|sepolia):/i.test(urn) ? TESTNET_CATALYST : DEFAULT_CATALYST;
 }
 
 interface ActiveEntity {
@@ -53,7 +62,7 @@ interface ActiveEntity {
 
 /** The active entity behind the first candidate that resolves, then its files, within the manifest's input limits. */
 export async function fetchCatalystItem(candidates: string[], options: CatalystOptions = {}): Promise<CatalystItem> {
-  const peer = (options.peer ?? DEFAULT_CATALYST).replace(/\/+$/, "");
+  const peerFor = (urn: string): string => (options.peer ?? catalystFor(urn)).replace(/\/+$/, "");
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const progress = options.onProgress ?? (() => {});
   const maxFiles = options.maxFiles ?? manifest.fileSize.maxEntries;
@@ -66,8 +75,9 @@ export async function fetchCatalystItem(candidates: string[], options: CatalystO
   progress({ text: "Looking up the item on the catalyst" });
   let entity: ActiveEntity | undefined;
   let urn = candidates[0];
+  let peer = peerFor(urn);
   for (const candidate of candidates) {
-    const res = await fetchImpl(`${peer}/content/entities/active`, {
+    const res = await fetchImpl(`${peerFor(candidate)}/content/entities/active`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pointers: [candidate] }),
@@ -78,6 +88,7 @@ export async function fetchCatalystItem(candidates: string[], options: CatalystO
     if (entities.length > 0) {
       entity = entities[0];
       urn = candidate;
+      peer = peerFor(candidate);
       break;
     }
   }
