@@ -136,7 +136,7 @@ export interface RunMessage {
   blocks: Block[];
 }
 
-/** The Block Kit message for a run; pure, so its shape is tested without Slack. siteUrl "" makes the button link relative. */
+/** The Block Kit message for a run; pure, so its shape is tested without Slack. siteUrl "" leaves out the button: Slack refuses a relative link. */
 export function runMessage(notice: RunNotice, siteUrl: string, fileId?: string): RunMessage {
   const name = displayName(notice);
   const verdict = verdictLine(notice);
@@ -154,10 +154,12 @@ export function runMessage(notice: RunNotice, siteUrl: string, fileId?: string):
   if (fileId) blocks.push({ type: "image", slack_file: { id: fileId }, alt_text: cut(`${name} thumbnail`, ALT_TEXT_MAX) });
   const findings = findingsSection(notice);
   if (findings) blocks.push(findings);
-  blocks.push({
-    type: "actions",
-    elements: [{ type: "button", style: "primary", text: { type: "plain_text", text: cut("Open run", BUTTON_MAX) }, url: `${siteUrl}/?run=${notice.id}`, action_id: "open-run" }]
-  });
+  if (siteUrl) {
+    blocks.push({
+      type: "actions",
+      elements: [{ type: "button", style: "primary", text: { type: "plain_text", text: cut("Open run", BUTTON_MAX) }, url: `${siteUrl}/?run=${notice.id}`, action_id: "open-run" }]
+    });
+  }
   blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: cut(contextLine(notice), SECTION_MAX) }] });
   return { text: `${inertMrkdwn(name)} — ${escapeMrkdwn(verdict)} — ${inertMrkdwn(approval)} (sent by ${escapeMrkdwn(notice.owner)})`, blocks };
 }
@@ -206,7 +208,7 @@ export async function createSlackComponent(components: SlackComponents): Promise
     return { enabled: false, notify: async () => {} };
   }
   if (!channel) throw new Error("SLACK_CHANNEL must be the id of the channel (C…) the run notifications go to when SLACK_BOT_TOKEN is set.");
-  if (!siteUrl) log.warn("SITE_URL is not set: the Open run button in Slack will carry a relative link");
+  if (!siteUrl) log.warn("SITE_URL is not set: Slack messages go out without the Open run button");
 
   async function send(url: string, init: RequestInit, retried = false): Promise<Response> {
     const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });

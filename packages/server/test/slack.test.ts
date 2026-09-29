@@ -114,11 +114,10 @@ describe("runMessage", () => {
     assert.equal(message.text, "Red Shirt — ✅ Passed — ✅ Nothing found — look at the views before approving (sent by alice@example.com)");
   });
 
-  it("falls back to the zip name without .zip, skips the image without a file id, and links relatively without a site", () => {
+  it("falls back to the zip name without .zip, skips the image without a file id, and the button without a site", () => {
     const blocks = blocksOf(runMessage(notice({ name: "My-Item.ZIP" }), ""));
     assert.equal(blocks[0].text!.text, "My-Item");
-    assert.deepEqual(blocks.map((block) => block.type), ["header", "section", "actions", "context"]);
-    assert.equal(blocks[2].elements![0].url, `/?run=${notice().id}`);
+    assert.deepEqual(blocks.map((block) => block.type), ["header", "section", "context"], "Slack refuses a message whose button has a relative link");
   });
 
   it("says a marketplace item came from there, linking its page when the URN names a collections-v2 item", () => {
