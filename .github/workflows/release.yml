@@ -1,14 +1,16 @@
 name: Publish the library
 
-# Every merge to main that touches the library publishes @dcl-regenesislabs/wearable-validator through
-# npm's trusted publishing (GitHub OIDC): no npm token anywhere, and nothing to tag. Bump the version in
-# the same PR; npm refuses a version it already has. Set the trusted publisher once on npmjs.com (package → Settings →
-# Trusted Publisher: this repository, workflow release.yml).
+# Publishes @dcl-regenesislabs/wearable-validator with oddish, like the other Decentraland packages, through npm's
+# trusted publishing (GitHub OIDC): no npm token anywhere. oddish ignores the version in package.json:
+#   - a merge to main that touches the library publishes a snapshot on the `next` dist-tag;
+#   - a GitHub release tagged with a semver version (e.g. 0.5.0) publishes that version on `latest`.
+# The trusted publisher on npmjs.com names this repository and this file (release.yml): keep its name.
 on:
   push:
     branches: [main]
     paths: ["packages/wearable-validator/**", ".github/workflows/release.yml"]
-  workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -20,8 +22,6 @@ concurrency:
 
 jobs:
   publish:
-    # a manual run from any other branch would publish code that never passed review
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -37,5 +37,11 @@ jobs:
       - run: npm run typecheck -w @dcl-regenesislabs/wearable-validator
       - run: npm test -w @dcl-regenesislabs/wearable-validator
       - run: npm run build -w @dcl-regenesislabs/wearable-validator
-      # npm refuses a version it already has: a library change merged without a bump fails here, on purpose
-      - run: npm publish --provenance --access public -w @dcl-regenesislabs/wearable-validator
+      - name: Publish
+        uses: decentraland/oddish-action@0074f2d535c43b5c83f136525304a6277166d77f # @master
+        with:
+          cwd: ./packages/wearable-validator
+          registry-url: https://registry.npmjs.org
+          access: public
+          provenance: true
+          deterministic-snapshot: true
