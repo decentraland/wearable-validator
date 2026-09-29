@@ -75,8 +75,11 @@ function approvalLine(notice: RunNotice): string {
 
 /** The marketplace page of a collections-v2 URN (chain, contract, item id); undefined for any other URN shape. */
 export function marketplaceUrl(urn: string): string | undefined {
-  const match = /^urn:decentraland:(?:matic|ethereum):collections-v2:(0x[0-9a-f]{40}):(\d+)$/i.exec(urn);
-  return match ? `https://decentraland.org/marketplace/contracts/${match[1].toLowerCase()}/items/${match[2]}` : undefined;
+  const match = /^urn:decentraland:(matic|ethereum|amoy):collections-v2:(0x[0-9a-f]{40}):(\d+)$/i.exec(urn);
+  if (!match) return undefined;
+  // amoy items are listed on decentraland.zone, the test network's marketplace
+  const host = match[1].toLowerCase() === "amoy" ? "decentraland.zone" : "decentraland.org";
+  return `https://${host}/marketplace/contracts/${match[2].toLowerCase()}/items/${match[3]}`;
 }
 
 function itemLine(notice: RunNotice): string {
@@ -87,21 +90,31 @@ function itemLine(notice: RunNotice): string {
   return `${line} · from the marketplace ${url ? `<${url}|${escapeMrkdwn(notice.reference)}>` : `\`${escapeMrkdwn(notice.reference)}\``}`;
 }
 
-/** Errors before warnings, gate before visual; at most MAX_FINDINGS bullet lines within one section's limit. */
+/** Errors before warnings, gate before visual, the same finding once however many body shapes repeat it; at most
+ * MAX_FINDINGS bullet lines within one section's limit. */
 function findingsSection(notice: RunNotice): Block | undefined {
-  const all: Finding[] = [...(notice.gate?.findings ?? []), ...(notice.visual?.findings ?? [])];
+  const unique = new Map<string, { finding: Finding; times: number }>();
+  for (const finding of [...(notice.gate?.findings ?? []), ...(notice.visual?.findings ?? [])]) {
+    const key = `${finding.check}\n${finding.severity}\n${finding.message}`;
+    const seen = unique.get(key);
+    if (seen) seen.times++;
+    else unique.set(key, { finding, times: 1 });
+  }
+  const all = [...unique.values()];
   if (all.length === 0) return undefined;
-  const ordered = [...all.filter((finding) => finding.severity === "error"), ...all.filter((finding) => finding.severity !== "error")];
+  const ordered = [...all.filter(({ finding }) => finding.severity === "error"), ...all.filter(({ finding }) => finding.severity !== "error")];
+  const bullet = ({ finding, times }: { finding: Finding; times: number }): string =>
+    `• *${escapeMrkdwn(finding.check)}* — ${inertMrkdwn(finding.message)}${times > 1 ? ` _(×${times})_` : ""}`;
   const lines: string[] = [];
   let shown = 0;
-  for (const finding of ordered.slice(0, MAX_FINDINGS)) {
-    const line = `• *${escapeMrkdwn(finding.check)}* — ${inertMrkdwn(finding.message)}`;
+  for (const entry of ordered.slice(0, MAX_FINDINGS)) {
+    const line = bullet(entry);
     // leave room for the "+N more" line whatever gets cut
     if ([...lines, line].join("\n").length > SECTION_MAX - 20) break;
     lines.push(line);
     shown++;
   }
-  if (shown === 0) lines.push(cut(`• *${escapeMrkdwn(ordered[0].check)}* — ${inertMrkdwn(ordered[0].message)}`, SECTION_MAX - 20));
+  if (shown === 0) lines.push(cut(bullet(ordered[0]), SECTION_MAX - 20));
   const rest = all.length - Math.max(shown, 1);
   if (rest > 0) lines.push(`_+${rest} more_`);
   return { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } };

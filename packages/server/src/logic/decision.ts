@@ -20,6 +20,25 @@ function failedRow(row: CheckResult, findings: Finding[]): string {
   return cause ? `${row.check}: ${short(cause)}` : `${row.check} failed`;
 }
 
+const MAX_NAMED_CHECKS = 3;
+
+/** "file-size: The item totals 4.03 MB; the limit for an emote is 3 MB" — each failing code check with the gist of its first error. */
+function codeReasons(gate: Result): string[] {
+  const byCheck = new Map<string, Finding[]>();
+  for (const entry of gate.findings) {
+    if (entry.severity !== "error") continue;
+    byCheck.set(entry.check, [...(byCheck.get(entry.check) ?? []), entry]);
+  }
+  if (byCheck.size === 0) return [plural(gate.summary.errors, "code error")];
+  const named = [...byCheck].slice(0, MAX_NAMED_CHECKS).map(([check, errors]) => {
+    // the part before " — " says what is wrong; the rest is how to fix it, which the finding list carries
+    const gist = short(errors[0].message.split(" — ")[0], 90);
+    return `${check}: ${gist}${errors.length > 1 ? ` (+${errors.length - 1} more)` : ""}`;
+  });
+  const rest = byCheck.size - named.length;
+  return rest > 0 ? [...named, `+${plural(rest, "more failing check")}`] : named;
+}
+
 /** An errored or skipped visual row, with the library's own words for why (no model, an inconclusive answer, a refused call). */
 function unreviewedRow(row: CheckResult): string {
   return row.skipReason ? `${row.check}: ${short(row.skipReason)}` : `${row.check} was not reviewed`;
@@ -29,8 +48,7 @@ export function curatorDecision({ gate, visual, passed, error }: DecisionInput):
   if (error !== undefined) return { state: "blocked", reasons: ["the run failed"] };
   const blocked: string[] = [];
   const review: string[] = [];
-  const codeErrors = gate?.summary.errors ?? 0;
-  if (codeErrors > 0) blocked.push(plural(codeErrors, "code error"));
+  if (gate && gate.summary.errors > 0) blocked.push(...codeReasons(gate));
   for (const row of visual?.checks ?? []) {
     if (row.status === "failed") blocked.push(failedRow(row, visual?.findings ?? []));
     else if (row.status === "errored" || row.status === "skipped") review.push(unreviewedRow(row));

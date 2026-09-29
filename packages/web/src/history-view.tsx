@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { catalystFor, fetchCatalystItem, parseItemReference } from "@dcl-regenesislabs/wearable-validator";
 import { cancelRun, followRun, getRun } from "./api.js";
+import { Preview } from "./preview.js";
 import { EMPTY_VISUAL, codeResultOf, isRunning, itemContextOf, itemTypeOf, reduceVisual, type VisualState } from "./progress.js";
 import { Results } from "./results.js";
 import { elapsedText, historyRow, isModifiedClick, relativeTime, waitText, type HistoryRow } from "./run-list.js";
@@ -280,6 +282,7 @@ function RunDetail({ id, server, row, onBack }: { id: string; server: Server; ro
             </div>
           </div>
         </section>
+        {itemType && (state.itemReference || state.zipUrl) && <RunPreview reference={state.itemReference} zipUrl={state.zipUrl} name={name} kind={itemType} category={category} />}
       </aside>
       <main>
         {state.phase === "idle" ? (
@@ -311,4 +314,43 @@ function RunDetail({ id, server, row, onBack }: { id: string; server: Server; ro
       </main>
     </div>
   );
+}
+
+type PreviewFile = { name: string; isBareGlb: false; bytes?: Uint8Array; files?: Map<string, Uint8Array>; metadata?: unknown };
+
+/** The item on the avatar, as the Validate tab shows it: the run's zip, or the published item fetched again by its URN. */
+function RunPreview({ reference, zipUrl, name, kind, category }: { reference?: string; zipUrl?: string; name: string; kind: "wearable" | "emote"; category?: string }) {
+  const [file, setFile] = useState<PreviewFile | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async (): Promise<PreviewFile> => {
+      if (reference) {
+        const candidates = parseItemReference(reference) ?? [reference];
+        const item = await fetchCatalystItem(candidates, { peer: catalystFor(candidates[0]) });
+        return { name: item.name, isBareGlb: false, files: item.files, metadata: item.metadata };
+      }
+      const res = await fetch(zipUrl!);
+      if (!res.ok) throw new Error(`The run's zip answered ${res.status}.`);
+      return { name, isBareGlb: false, bytes: new Uint8Array(await res.arrayBuffer()) };
+    };
+    load().then(
+      (loaded) => alive && setFile(loaded),
+      () => alive && setFailed(true)
+    );
+    return () => {
+      alive = false;
+    };
+  }, [reference, zipUrl, name]);
+
+  if (failed) return <Notice tone="attention">The preview could not load this item. The rendered views below still show it.</Notice>;
+  if (!file) {
+    return (
+      <p className="loading-hint" role="status">
+        <Spinner size="sm" decorative /> Loading the preview
+      </p>
+    );
+  }
+  return <Preview file={file} kind={kind} category={category || undefined} />;
 }

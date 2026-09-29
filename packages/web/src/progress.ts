@@ -101,6 +101,8 @@ export interface VisualState {
   id?: string;
   /** The run started from a published item's reference: the server fetches it instead of taking an upload. */
   reference: boolean;
+  /** The URN or URL a reference run was started from, once its done event says it. */
+  itemReference?: string;
   /** Files fetched so far, from the server's fetch stages. */
   fetched?: { done?: number; total?: number };
   /** The server's own code run, once the gate event lands (or the done event of a finished run carries it). */
@@ -187,6 +189,7 @@ export function reduceVisual(state: VisualState, event: VisualEvent): VisualStat
         ...state,
         phase: "done",
         reference: event.data.reference !== undefined || state.reference,
+        itemReference: event.data.reference ?? state.itemReference,
         captures: [...state.captures, ...replayed],
         gate: event.data.gate ?? state.gate,
         result: event.data.result,

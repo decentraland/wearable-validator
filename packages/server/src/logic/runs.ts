@@ -279,7 +279,8 @@ export async function createRunsComponent(components: RunsComponents): Promise<I
     run.passed = data.result ? (run.gate?.passed === false ? false : verdict(data.result)) : null;
     run.outcome = data.result && !data.skipped ? (run.passed === null ? "no-verdict" : run.passed ? "passed" : "failed") : "gate";
     metrics.increment("runs_finished_total", { status: run.outcome });
-    emit(run, "done", run.zipUrl ? { ...wire, zipUrl: run.zipUrl } : wire);
+    // the same keys a run reloaded from its folder replays with: the site previews the item from them
+    emit(run, "done", { ...wire, ...(run.zipUrl ? { zipUrl: run.zipUrl } : {}), ...(run.reference ? { reference: run.reference } : {}) });
   }
 
   function noticeOf(run: Run): RunNotice {
