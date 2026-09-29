@@ -55,6 +55,7 @@ function fakeSlack(answer: (method: string, call: Call, index: number) => Respon
       case "files.getUploadURLExternal": return json({ ok: true, upload_url: `https://files.slack.com/upload/v1/ticket-${++files}`, file_id: `F${files}` });
       case "files.completeUploadExternal": return json({ ok: true, files: ((body as { files: { id: string; title: string }[] }).files).map(({ id, title }) => ({ id, title })) });
       case "chat.postMessage": return json({ ok: true, channel: "C123", ts: `1700000000.00010${++messages}` });
+      case "chat.update": return json({ ok: true, channel: "C123", ts: (body as { ts: string }).ts });
       case "upload": return new Response("OK", { status: 200 });
       default: return json({ ok: false, error: "unknown_method" });
     }
@@ -245,7 +246,7 @@ describe("the Slack component", () => {
     await assert.rejects(createSlackComponent({ config: createConfigComponent({ SLACK_BOT_TOKEN: "xoxb-x" }), logs: recordingLogs(lines), fetch: fake.fetch }), /SLACK_CHANNEL/);
   });
 
-  it("uploads the thumbnail privately, posts the message with it, then the two front views in a thread", async () => {
+  it("posts the message, shares the thumbnail and both front views into its thread, then shows the thumbnail in the message", async () => {
     const dir = await mkdtemp(join(tmpdir(), "slack-run-"));
     const thumbnail = pngBytes(8, 8);
     await writeFile(join(dir, "thumbnail.png"), thumbnail);
@@ -257,12 +258,20 @@ describe("the Slack component", () => {
       const visual = result({ captures: [capture("BaseMale-avatar-000", "BaseMale", "avatar", 0), capture("BaseMale-avatar-090", "BaseMale", "avatar", 90), capture("BaseFemale-avatar-000", "BaseFemale", "avatar", 0)] });
       await slack.notify(notice({ dir, visual, item: { name: "Red Shirt", itemType: "wearable" } }));
       assert.deepEqual(fake.calls.map(methodOf), [
-        "files.getUploadURLExternal", "upload", "files.completeUploadExternal", "chat.postMessage",
-        "files.getUploadURLExternal", "upload", "files.completeUploadExternal",
-        "files.getUploadURLExternal", "upload", "files.completeUploadExternal",
-        "chat.postMessage"
+        "chat.postMessage",
+        "files.getUploadURLExternal", "upload",
+        "files.getUploadURLExternal", "upload",
+        "files.getUploadURLExternal", "upload",
+        "files.completeUploadExternal",
+        "chat.update"
       ]);
-      const [ticket, upload, complete, post] = fake.calls;
+      const [post, ticket, upload] = fake.calls;
+      const body = post.body as { channel: string; text: string; unfurl_links: boolean; unfurl_media: boolean; blocks: Block[]; thread_ts?: string };
+      assert.equal(post.headers["content-type"], "application/json; charset=utf-8");
+      assert.deepEqual([body.channel, body.unfurl_links, body.unfurl_media, body.thread_ts], ["C123", false, false, undefined]);
+      assert.match(body.text, /^Red Shirt — ✅ Passed/);
+      assert.ok(!body.blocks.some((block) => block.type === "image"), "no image until its file is shared");
+      assert.equal(body.blocks.find((block) => block.type === "actions")!.elements![0].url, `https://validator.example/?run=${notice().id}`);
       assert.equal(ticket.headers.authorization, "Bearer xoxb-test-token");
       assert.equal(ticket.headers["content-type"], "application/x-www-form-urlencoded");
       assert.deepEqual(ticket.body, { filename: "thumbnail.png", length: String(thumbnail.byteLength), alt_txt: "Red Shirt thumbnail" });
@@ -270,18 +279,16 @@ describe("the Slack component", () => {
       assert.equal(upload.headers["content-type"], "application/octet-stream");
       assert.equal(upload.headers.authorization, undefined, "the pre-signed upload URL never sees the token");
       assert.deepEqual(upload.body, thumbnail);
-      assert.deepEqual(complete.body, { files: [{ id: "F1", title: "Red Shirt thumbnail" }] }, "no channel: the file stays private to the app");
-      const body = post.body as { channel: string; text: string; unfurl_links: boolean; unfurl_media: boolean; blocks: Block[]; thread_ts?: string };
-      assert.equal(post.headers["content-type"], "application/json; charset=utf-8");
-      assert.deepEqual([body.channel, body.unfurl_links, body.unfurl_media, body.thread_ts], ["C123", false, false, undefined]);
-      assert.match(body.text, /^Red Shirt — ✅ Passed/);
-      assert.deepEqual(body.blocks.find((block) => block.type === "image"), { type: "image", slack_file: { id: "F1" }, alt_text: "Red Shirt thumbnail" });
-      assert.equal(body.blocks.find((block) => block.type === "actions")!.elements![0].url, `https://validator.example/?run=${notice().id}`);
-      assert.deepEqual([fake.calls[4].body, fake.calls[7].body].map((entry) => (entry as Record<string, string>).filename), ["BaseMale-avatar-000.png", "BaseFemale-avatar-000.png"]);
-      const reply = fake.calls[10].body as { thread_ts: string; text: string; blocks: Block[] };
-      assert.equal(reply.thread_ts, "1700000000.000101");
-      assert.equal(reply.text, "Rendered front views");
-      assert.deepEqual(reply.blocks.map((block) => [block.type, block.slack_file!.id, block.alt_text]), [["image", "F2", "Red Shirt worn, BaseMale"], ["image", "F3", "Red Shirt worn, BaseFemale"]]);
+      assert.deepEqual([fake.calls[3].body, fake.calls[5].body].map((entry) => (entry as Record<string, string>).filename), ["BaseMale-avatar-000.png", "BaseFemale-avatar-000.png"]);
+      assert.deepEqual(fake.calls[7].body, {
+        files: [{ id: "F1", title: "Red Shirt thumbnail" }, { id: "F2", title: "Red Shirt worn, BaseMale" }, { id: "F3", title: "Red Shirt worn, BaseFemale" }],
+        channel_id: "C123",
+        thread_ts: "1700000000.000101",
+        initial_comment: "Thumbnail and rendered front views"
+      }, "one share into the message's thread");
+      const update = fake.calls[8].body as { channel: string; ts: string; blocks: Block[] };
+      assert.deepEqual([update.channel, update.ts], ["C123", "1700000000.000101"]);
+      assert.deepEqual(update.blocks.find((block) => block.type === "image"), { type: "image", slack_file: { id: "F1" }, alt_text: "Red Shirt thumbnail" });
       const notified = lines.filter((line) => line.message === "slack notified");
       assert.equal(notified.length, 1);
       assert.deepEqual(notified[0].extra, { run: notice().id, channel: "C123", ts: "1700000000.000101" });
@@ -300,7 +307,7 @@ describe("the Slack component", () => {
     assert.ok(!body.blocks.some((block) => block.type === "image"));
   });
 
-  it("rejects invalid_blocks without an image instead of retrying", async () => {
+  it("rejects a message Slack refuses", async () => {
     let posts = 0;
     const fake = fakeSlack((method) => {
       if (method !== "chat.postMessage") return undefined;
@@ -312,22 +319,21 @@ describe("the Slack component", () => {
     assert.equal(posts, 1);
   });
 
-  it("retries once without the image block when Slack answers invalid_blocks, and warns", async () => {
+  it("retries the thumbnail edit once while Slack processes the file, then leaves it in the thread and warns", async () => {
     const dir = await mkdtemp(join(tmpdir(), "slack-run-"));
     await writeFile(join(dir, "thumbnail.png"), pngBytes(8, 8));
     const lines: RecordedLine[] = [];
-    let posts = 0;
-    const fake = fakeSlack((method, call) => {
-      if (method !== "chat.postMessage") return undefined;
-      const hasImage = (call.body as { blocks: Block[] }).blocks.some((block) => block.type === "image");
-      posts++;
-      return hasImage ? json({ ok: false, error: "invalid_blocks" }) : undefined;
+    let updates = 0;
+    const fake = fakeSlack((method) => {
+      if (method !== "chat.update") return undefined;
+      updates++;
+      return json({ ok: false, error: "invalid_blocks" });
     });
     const slack = await component(fake, {}, lines);
     try {
       await slack.notify(notice({ dir }));
-      assert.equal(posts, 2);
-      assert.ok(lines.some((line) => line.level === "WARN" && line.message.startsWith("slack refused the thumbnail block")));
+      assert.equal(updates, 2);
+      assert.ok(lines.some((line) => line.level === "WARN" && line.message === "slack kept the thumbnail in the thread only"));
       assert.equal(lines.filter((line) => line.message === "slack notified").length, 1);
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -359,17 +365,16 @@ describe("the Slack component", () => {
     await assert.rejects((await component(fake)).notify(notice()), /Invite the Slack app to the channel/);
   });
 
-  it("still posts when the thumbnail upload fails, and only logs when the thread reply does", async () => {
+  it("still posts when the images cannot be shared, and only logs it", async () => {
     const dir = await mkdtemp(join(tmpdir(), "slack-run-"));
     await writeFile(join(dir, "thumbnail.png"), pngBytes(8, 8));
     const lines: RecordedLine[] = [];
-    const fake = fakeSlack((method, _call, index) => (method === "files.getUploadURLExternal" ? json({ ok: false, error: index === 0 ? "missing_scope" : "internal_error" }) : undefined));
+    const fake = fakeSlack((method) => (method === "files.getUploadURLExternal" ? json({ ok: false, error: "missing_scope" }) : undefined));
     const slack = await component(fake, {}, lines);
     try {
       await slack.notify(notice({ dir, visual: result({ captures: [capture("BaseMale-avatar-000", "BaseMale", "avatar", 0)] }) }));
-      assert.deepEqual(fake.calls.map(methodOf), ["files.getUploadURLExternal", "chat.postMessage", "files.getUploadURLExternal"]);
-      assert.ok(lines.some((line) => line.level === "WARN" && line.message.startsWith("slack thumbnail upload failed") && String(line.extra.reason).includes("files:write")));
-      assert.ok(lines.some((line) => line.level === "WARN" && line.message === "slack thread reply failed" && line.extra.reason === "Slack answered internal_error to files.getUploadURLExternal."));
+      assert.deepEqual(fake.calls.map(methodOf), ["chat.postMessage", "files.getUploadURLExternal"]);
+      assert.ok(lines.some((line) => line.level === "WARN" && line.message === "slack images failed" && String(line.extra.reason).includes("files:write")));
       assert.equal(lines.filter((line) => line.message === "slack notified").length, 1);
     } finally {
       await rm(dir, { recursive: true, force: true });

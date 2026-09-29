@@ -32,25 +32,40 @@ const bot = { "x-test-user": "service:slack-bot" };
 const zipUpload = { "content-type": "application/zip" };
 const body = (bytes: Uint8Array): ArrayBuffer => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-/** Answers every Slack call as Slack would and keeps the messages posted. */
-function slackRecorder(): { posts: Post[]; fetch: typeof globalThis.fetch } {
+interface Share {
+  files: { id: string }[];
+  channel_id: string;
+  thread_ts: string;
+}
+
+/** Answers every Slack call as Slack would and keeps the messages posted, the files shared and the edits. */
+function slackRecorder(): { posts: Post[]; shares: Share[]; updates: Post[]; fetch: typeof globalThis.fetch } {
   const posts: Post[] = [];
+  const shares: Share[] = [];
+  const updates: Post[] = [];
   let files = 0;
   const json = (value: unknown) => new Response(JSON.stringify(value), { status: 200, headers: { "content-type": "application/json" } });
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = String(input);
     if (url.endsWith("/files.getUploadURLExternal")) return json({ ok: true, upload_url: `https://files.slack.com/upload/${++files}`, file_id: `F${files}` });
-    if (url.endsWith("/files.completeUploadExternal")) return json({ ok: true });
+    if (url.endsWith("/files.completeUploadExternal")) {
+      shares.push(JSON.parse(String(init?.body)) as Share);
+      return json({ ok: true });
+    }
+    if (url.endsWith("/chat.update")) {
+      updates.push(JSON.parse(String(init?.body)) as Post);
+      return json({ ok: true });
+    }
     if (url.endsWith("/chat.postMessage")) {
       posts.push(JSON.parse(String(init?.body)) as Post);
       return json({ ok: true, ts: `1700000000.${String(posts.length).padStart(6, "0")}` });
     }
     return new Response("OK", { status: 200 });
   };
-  return { posts, fetch };
+  return { posts, shares, updates, fetch };
 }
 
-async function withSlack(renderer = fakeRenderer({ services: 0, rendered: [] })): Promise<{ server: TestServer; posts: Post[]; slackLines: RecordedLine[] }> {
+async function withSlack(renderer = fakeRenderer({ services: 0, rendered: [] })): Promise<{ server: TestServer; posts: Post[]; shares: Share[]; updates: Post[]; slackLines: RecordedLine[] }> {
   const slackLines: RecordedLine[] = [];
   const recorder = slackRecorder();
   const slack = await createSlackComponent({
@@ -59,7 +74,7 @@ async function withSlack(renderer = fakeRenderer({ services: 0, rendered: [] }))
     fetch: recorder.fetch
   });
   const server = await startTestServer({ renderer, slack });
-  return { server, posts: recorder.posts, slackLines };
+  return { server, posts: recorder.posts, shares: recorder.shares, updates: recorder.updates, slackLines };
 }
 
 async function startRun(base: string, zip: Uint8Array, query: string, headers: Record<string, string>, name = "shirt.zip"): Promise<string> {
@@ -88,16 +103,17 @@ const stopAndClean = async (server: TestServer) => {
 };
 
 describe("run notifications", () => {
-  it("tells the channel once per finished run: who sent it, the verdict, the thumbnail, the button, then the front views in a thread", async () => {
-    const { server, posts, slackLines } = await withSlack();
+  it("tells the channel once per finished run: who sent it, the verdict, the button, then the thumbnail and front views in its thread", async () => {
+    const { server, posts, shares, updates, slackLines } = await withSlack();
     const { base } = server;
     try {
       const id = await startRun(base, await syntheticZip(), "?standalone=1", alice);
       const events = await readEvents(`${base}/api/runs/${id}/events`, alice);
       assert.equal(events.at(-1)!.type, "done");
       assert.equal(events.at(-1)!.data.zipUrl, `/api/runs/${id}/input.zip`, "the done event points at the kept upload");
-      await until(() => posts.length, (count) => count === 2);
-      const [message, thread] = posts;
+      await until(() => updates.length, (count) => count === 1);
+      assert.equal(posts.length, 1, "one message; the images go to its thread as files");
+      const [message] = posts;
       assert.equal(message.channel, "C123");
       assert.equal(message.thread_ts, undefined);
       // the synthetic zip passes every code check without a warning and the fake reviewer passes every visual row
@@ -108,11 +124,11 @@ describe("run notifications", () => {
       assert.match(summary, /\*Sent by\* alice@example\.com/);
       assert.match(summary, /\*Verdict\* ✅ Passed/);
       assert.ok(summary.includes(`*Approval* ${approval}`), summary);
-      assert.ok(message.blocks.some((block) => block.type === "image" && block.slack_file?.id === "F1"), "the thumbnail was uploaded first and is shown");
+      assert.ok(!message.blocks.some((block) => block.type === "image"), "no image before its file is shared");
+      assert.ok(updates[0].blocks.some((block) => block.type === "image" && block.slack_file?.id === "F1"), "the message is edited to show the shared thumbnail");
       assert.equal(message.blocks.find((block) => block.type === "actions")!.elements![0].url, `https://validator.example/?run=${id}`);
       assert.match(message.blocks.at(-1)!.elements![0].text as string, new RegExp(`^run ${id} · rules v.* · rendered in \\d+ s$`));
-      assert.equal(thread.thread_ts, "1700000000.000001");
-      assert.deepEqual(thread.blocks.map((block) => block.slack_file!.id), ["F2", "F3"]);
+      assert.deepEqual(shares.map((share) => [share.channel_id, share.thread_ts, share.files.map((file) => file.id)]), [["C123", "1700000000.000001", ["F1", "F2", "F3"]]]);
       assert.deepEqual(slackLines.filter((line) => line.message === "slack notified").map((line) => line.extra.run), [id]);
       assert.ok(!server.lines.some((line) => line.message === "slack notification failed"));
     } finally {
