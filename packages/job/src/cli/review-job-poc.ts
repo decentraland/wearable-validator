@@ -6,6 +6,7 @@
  *   npm run poc -w wearable-validator-job -- [collection contract address] [how many items, default 3]
  */
 import { spawn } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
@@ -98,6 +99,10 @@ if (!result) {
   console.log(`\n✗ The job exited (${exitCode}) without posting a result.`);
   process.exit(1);
 }
+// the exact body the Builder received, to read in full
+const saved = fileURLToPath(new URL("../../artifacts/validation-result.json", import.meta.url));
+await mkdir(fileURLToPath(new URL("../../artifacts/", import.meta.url)), { recursive: true });
+await writeFile(saved, JSON.stringify(result, null, 2));
 step(`The Builder received the result after ${Math.round((Date.now() - started) / 1000)} s: verdict ${result.verdict}${result.reason ? ` (${result.reason})` : ""}, rules v${result.rulesVersion}`);
 for (const item of result.items) {
   const name = items[reviewItems.findIndex((entry) => entry.itemId === item.itemId)]?.name ?? item.itemId;
@@ -106,3 +111,4 @@ for (const item of result.items) {
   for (const finding of errors.slice(0, 3)) console.log(`    ${finding.rule} ${finding.check}${finding.bodyShape ? ` (${finding.bodyShape})` : ""}: ${finding.message.slice(0, 120)}`);
   if (item.visualSummary) console.log(`    ${item.visualSummary.split("\n")[0].slice(0, 140)}`);
 }
+console.log(`\n  the full body: ${saved}`);
