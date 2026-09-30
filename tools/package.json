@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "catalyst": "tsx src/catalyst-run.ts",
-    "samples": "tsx src/make-samples.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {

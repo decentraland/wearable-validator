@@ -1,73 +1,86 @@
-# Builder integration: queued reviews
+# Builder integration
 
-When a creator submits an item for curation, the Builder asks for a review; the validator checks, renders and reviews
-the item and posts the result back. Nothing waits on it: the Builder publishes an event and later receives a webhook.
+When a creator publishes a collection, the Builder asks for a validation; the validator checks, renders and reviews
+every item and posts one result for the collection back. Nothing waits on it.
 
 ```
-Builder ──event──▶ topic ──▶ queue ──▶ review job ──▶ POST /v1/items/:id/validation ──▶ Builder
-                                          │
-                                          └── GET /v1/storage/contents/:hash  (the item's files)
+builder-server ──request──▶ topic ──▶ queue ──▶ validation job ──▶ POST …/validation-result ──▶ builder-server
+                                                     │
+                                                     └── GET …/v1/storage/contents/:hash   (each item's files)
 ```
 
-The job scales to zero between submissions and drains the queue when one arrives. A message is deleted only once the
-webhook answers 2xx; anything else is retried (three tries, then a dead-letter queue).
+The job sleeps between collections: the queue wakes it, it drains the queue and exits. A message is deleted only once
+the callback answers 2xx; if the callback cannot be reached the whole collection is retried by the queue (three tries,
+then a dead-letter queue).
 
-## 1. The event the Builder publishes
+## 1. The request
 
-On the shared events topic, whenever an item is submitted or re-submitted for curation (a new `item_curations` row, or a
-new `content_hash` on one):
+Published on the events topic, one per collection and attempt:
 
 ```json
 {
   "type": "builder",
-  "subType": "item-review-requested",
-  "key": "<item id>",
+  "subType": "collection-validation-requested",
+  "key": "<collection id>",
   "timestamp": 1790000000000,
   "metadata": {
-    "itemId": "<item uuid>",
+    "validationId": "<uuid, new for every attempt>",
     "collectionId": "<collection uuid>",
-    "contentHash": "<the item curation's content_hash>",
-    "itemType": "wearable",
-    "entityMetadata": { "…": "the metadata the Builder would deploy for this item" },
-    "contents": { "male/shirt.glb": "<hash>", "thumbnail.png": "<hash>", "image.png": "<hash>" }
+    "items": [
+      {
+        "itemId": "<item uuid>",
+        "contentHash": "<the item's content hash>",
+        "metadata": { "…": "the entity metadata the Builder would deploy (@dcl/schemas shape)" },
+        "contents": { "male/shirt.glb": "<hash>", "thumbnail.png": "<hash>", "image.png": "<hash>" }
+      }
+    ]
   }
 }
 ```
 
-- `itemType` is `wearable` or `emote`.
-- `entityMetadata` is exactly what a deployment of the item would carry (`name`, `description`, `rarity`, `i18n`, and `data` for a
-  wearable or `emoteDataADR74` for an emote), so the checks judge what would be published.
-- `contents` maps every file of the item to the hash it is stored under; the job downloads each from
-  `<builder api>/v1/storage/contents/<hash>`. File names must be relative paths inside the item.
-- Messages that do not match this shape are dropped and logged, not retried.
+- 1 to 50 items; each lists 1 to 100 files as `path → hash`. Paths are relative and stay inside the item.
+- An emote is told by `metadata.emoteDataADR74`; anything else is a wearable.
+- Each file is downloaded from `<content url>/v1/storage/contents/<hash>`, at most 32 MB per item. The content URL is the
+  job's own configuration, never taken from the request.
+- A request that does not match this shape is dropped and logged, not retried.
 
-## 2. The webhook the Builder exposes
+## 2. The callback
 
-`POST <builder api>/v1/items/:itemId/validation`, JSON body:
+`POST <callback url>/v1/collections/:collectionId/validation-result`:
 
 ```json
 {
-  "itemId": "<item uuid>",
-  "collectionId": "<collection uuid>",
-  "contentHash": "<as received>",
+  "validationId": "<as received>",
+  "collectionId": "<as received>",
+  "verdict": "rejected",
   "rulesVersion": "0.4.0",
-  "passed": false,
-  "decision": { "state": "blocked", "reasons": ["file-size: The item totals 4.03 MB; the limit for an emote is 3 MB"] },
-  "summary": { "errors": 1, "warnings": 4 },
-  "checks": [{ "check": "render-valid", "group": "rendering", "status": "passed" }],
-  "findings": [{ "check": "file-size", "severity": "error", "message": "…", "docs": "https://…" }]
+  "items": [
+    {
+      "itemId": "<item uuid>",
+      "contentHash": "<as received>",
+      "passed": false,
+      "findings": [
+        { "rule": "S-05", "check": "file-size", "severity": "error", "message": "The item totals 4.03 MB; the limit for an emote is 3 MB …", "measured": 4228654, "limit": 3145728, "fix": "…", "docs": "https://…" }
+      ],
+      "visualSummary": "thumbnail-honesty: Compared the thumbnail with 20 rendered views. …"
+    }
+  ]
 }
 ```
 
-- `decision.state` is what the curator should do: `ready` (nothing found, look at the views), `review` (warnings or a
-  check the model could not answer) or `blocked` (errors). `reasons` are short, ready to show.
-- `passed` is `null` when there is no verdict (a visual check was not answered).
-- Store it against `contentHash`: if the item changed since, a newer event is already on its way and this result is stale.
-- Answer 2xx once stored. The same result may arrive twice (a retried delivery); storing it again must be harmless.
+- `verdict`: `passed` when every item passed; `rejected` when every item is decided and one or more failed; `error` when
+  an item is undecided (`passed: null`).
+- With `error`: `reason: "unsupported"` and `retryable: false` when every undecided item is one the validator cannot
+  judge — send it to a person. Otherwise `retryable: true`: send the collection again with a new `validationId`.
+- An item that could not be validated carries `error` with why; the others are still reported.
+- Findings carry `bodyShape` (`male` / `female`) when they point at one body shape's file, and `measured` / `limit`
+  only when they are numbers.
+- Retries: on a network error, a 5xx, a 408 or a 429 the job tries again with backoff; any other answer is final.
+  Answer 204, also for a result you already have.
 
-### Authenticating the webhook
+### Authenticating the callback
 
-Every call carries two headers, computed with a secret shared by both sides:
+Every call carries two headers, computed with a secret both sides share:
 
 - `x-wearable-validator-timestamp`: milliseconds since the epoch
 - `x-wearable-validator-signature`: `sha256=` + hex HMAC-SHA256 of `<timestamp>.<raw body>`
@@ -86,6 +99,6 @@ Compute it over the raw body, before JSON parsing.
 
 ## Trying it locally
 
-`npm run job:poc -w wearable-validator-server -- [shop item URL or URN]` runs the whole path on a laptop: a real SQS queue
-(ElasticMQ in Docker), a stand-in Builder serving the item's files and checking the signature, and the job rendering on
-the native render server. It needs Docker.
+`npm run poc -- [collection contract address] [items]` runs the whole path on a laptop (needs Docker): a real SQS queue
+(ElasticMQ), a stand-in Builder that serves the items' files and checks the signature, and the job rendering on the
+native render server. The collection is a published one from decentraland.zone, standing in for a Builder collection.

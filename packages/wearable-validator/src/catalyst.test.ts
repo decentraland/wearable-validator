@@ -61,7 +61,7 @@ describe("fetchCatalystItem", () => {
   it("refuses a published file name that points outside the item", async () => {
     const entity = await syntheticEntity(await syntheticZip(), MATIC);
     const [first] = entity.content;
-    entity.content[0] = { file: "../../../../app/packages/server/render-server-user.sh", hash: first.hash };
+    entity.content[0] = { file: "../../../../app/packages/job/render-server-user.sh", hash: first.hash };
     entity.files.set(entity.content[0].file, entity.files.get(first.file)!);
     await assert.rejects(fetchCatalystItem([MATIC], { fetch: catalystFetch([entity]) }), /not a file inside the item/);
   });

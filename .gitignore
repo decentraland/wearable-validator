@@ -2,14 +2,13 @@ node_modules/
 dist/
 tools/corpus/blobs/
 tools/artifacts/
-packages/server/artifacts/
+packages/job/artifacts/
 # the old Unity Web build folder, from before the render server
-packages/server/renderer-build/
+packages/job/renderer-build/
 .wrangler/
 # local overrides next to .env.default hold secrets
 .env
 .env.*
 !.env.default
-packages/server/build-info.json
 deploy/.env
 .auth.json
