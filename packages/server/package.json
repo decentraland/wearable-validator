@@ -6,10 +6,13 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "review": "tsx src/cli/review.ts",
+    "job": "tsx src/job.ts",
+    "job:poc": "tsx src/cli/review-job-poc.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "3.1143.0",
     "@dcl-regenesislabs/wearable-validator": "*",
     "@dcl/core-commons": "^0.11.0",
     "@dcl/http-commons": "^2.0.1",

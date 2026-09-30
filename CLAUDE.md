@@ -13,6 +13,7 @@ Boundary: server and web import the library only by package name (`@dcl-regenesi
 - `npm run dev` — the website (Vite); with `ANTHROPIC_OAUTH_SETUP_TOKEN=… npm start -w wearable-validator-server` running, the site streams visual reviews live over SSE
 - `npm run serve` — build the site and serve it with the run server at http://127.0.0.1:4180 (single local owner, no sign-in)
 - `npm run review -- <item.zip> [--no-ai] [--from <run dir>]` — visual review from the terminal (the render server runs in Docker); run folders in `packages/server/artifacts/`
+- `npm run job -w wearable-validator-server` — the queued Builder review job; `npm run job:poc -w wearable-validator-server` runs it end to end locally (Docker); contract in `docs/builder-integration.md`
 - `npx tsx src/cli.ts validate <file> [--checks triangle-count] [--groups model]` (from packages/wearable-validator)
 - `npm run catalyst -- --wearables 15 --emotes 10` — validate real published items
 - `npm run samples` — regenerate the website's example zips
