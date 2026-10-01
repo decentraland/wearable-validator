@@ -12,7 +12,7 @@ import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { digest, digestJson } from "../logic/captures.js";
-import { isGlb, readGlbJsonChunk } from "../logic/gltf.js";
+import { isGlb, isGltfJson, readGlbJsonChunk } from "../logic/gltf.js";
 import { decodePngSafe } from "../logic/images.js";
 import { manifest } from "../manifest/index.js";
 import type { CaptureRecord, CaptureRequest, RenderInput, Renderer } from "../types.js";
@@ -192,13 +192,26 @@ async function writeItem(input: RenderInput, directory: string): Promise<object>
 // the player fetches whatever URI a model names, from inside the server's network: only embedded data, or a
 // relative path that stays in the item's folder (smart wearables keep textures next to their models), is drawn
 function assertInsideItem(key: string, bytes: Uint8Array): void {
-  if (!isGlb(bytes)) return;
-  const json = readGlbJsonChunk(bytes);
+  const json = modelJson(bytes);
+  if (!json) return;
   for (const list of [json.buffers, json.images]) {
     for (const entry of Array.isArray(list) ? list : []) {
       const uri = entry && typeof entry === "object" && "uri" in entry ? entry.uri : undefined;
-      if (typeof uri === "string" && pointsOutside(key, uri)) throw new Error(`"${key}" points at a file outside the item (${uri.slice(0, 80)}). Embed it in the .glb, or ship it in the item and name it by a relative path.`);
+      if (typeof uri === "string" && pointsOutside(key, uri)) throw new Error(`"${key}" points at a file outside the item (${uri.slice(0, 80)}). Embed it in the model, or ship it in the item and name it by a relative path.`);
     }
+  }
+}
+
+/** The glTF JSON of a GLB or of any file that parses as JSON (a .gltf, whatever it is named); undefined otherwise. */
+function modelJson(bytes: Uint8Array): Record<string, unknown> | undefined {
+  if (isGlb(bytes)) return readGlbJsonChunk(bytes);
+  if (!isGltfJson(bytes)) return undefined;
+  try {
+    const json: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    return json && typeof json === "object" && !Array.isArray(json) ? (json as Record<string, unknown>) : undefined;
+  } catch {
+    // not JSON: the player cannot read it as glTF either
+    return undefined;
   }
 }
 

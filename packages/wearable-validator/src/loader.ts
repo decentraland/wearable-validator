@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { isGlb, parseGlb } from "./logic/gltf.js";
+import { isGlb, isGltfJson, parseModel } from "./logic/gltf.js";
 import { manifest } from "./manifest/index.js";
 import type { CheckContext, Finding, Input, InputKind, ItemType, MetadataMode, NormalizedItem, Options, ParsedModel } from "./types.js";
 import { WEARABLES } from "./checks/docs.js";
@@ -270,12 +270,12 @@ async function buildContext(args: BuildArgs): Promise<LoadedInput> {
   for (const { mainFile, bodyShapes } of modelPaths) {
     const bytes = files.get(mainFile);
     if (!bytes) continue; // representations (S-04) reports the missing file
-    if (!isGlb(bytes)) {
-      parseError = `"${mainFile}" is not a GLB (.gltf with external buffers is not supported — export as .glb)`;
+    if (!isGlb(bytes) && !isGltfJson(bytes)) {
+      parseError = `"${mainFile}" is neither a GLB nor glTF JSON — export it as .glb`;
       continue;
     }
     try {
-      const { doc, json } = await parseGlb(bytes);
+      const { doc, json } = await parseModel(bytes);
       models.push({ mainFile, bodyShapes, bytes, doc, json });
     } catch (err) {
       parseError = `"${mainFile}" failed to parse: ${err instanceof Error ? err.message : String(err)}`;

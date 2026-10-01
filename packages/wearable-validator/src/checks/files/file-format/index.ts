@@ -1,5 +1,5 @@
-/** S-01 File format — the engine loads self-contained GLBs; facial features are PNG sets, so anything else never renders. */
-import { isGlb } from "../../../logic/gltf.js";
+/** S-01 File format — the engine loads self-contained models (GLB, or glTF with everything embedded); facial features are PNG sets, so anything else never renders. */
+import { isGlb, readSelfContainedGltf } from "../../../logic/gltf.js";
 import { decodePngSafe, imageDimensions, isPngBytes } from "../../../logic/images.js";
 import { isFacial } from "../../../logic/facial.js";
 import { modelFileCandidates } from "../../../logic/model-files.js";
@@ -50,12 +50,12 @@ function facialPngFindings(ctx: CheckContext, path: string): Finding[] {
 export const fileFormat: CheckDefinition = {
   ...meta,
   title: "File format",
-  describe: ".glb for models; facial features are square PNG sets with alpha",
+  describe: ".glb (or a self-contained .gltf) for models; facial features are square PNG sets with alpha",
   explanation:
-    "Wearables must be exported as a single .glb file. Eyebrows, eyes and mouth items are PNG images with a transparent background instead of a 3D model.",
+    "Wearables must be exported as a single .glb file (a .gltf works too when everything is embedded in it). Eyebrows, eyes and mouth items are PNG images with a transparent background instead of a 3D model.",
   fix: "In Blender: File → Export → glTF 2.0, format 'glTF Binary (.glb)'. For eyebrows/eyes/mouth, export a square PNG with a transparent background instead.",
   details:
-    "Reads the model files' magic bytes — a real GLB starts with the 'glTF' header. Facial-feature categories route to the PNG path instead (square, ≤256×256, alpha channel) and skip every mesh rule.",
+    "Reads the model files' magic bytes — a real GLB starts with the 'glTF' header; a .gltf must embed every buffer and image (data: URIs), since a file it names elsewhere cannot be loaded from the item. Facial-feature categories route to the PNG path instead (square, ≤256×256, alpha channel) and skip every mesh rule.",
   measure: (ctx) => {
     const models = [...ctx.files.keys()].filter((p) => p.endsWith(".glb") || p.endsWith(".gltf"));
     return models.length > 0 ? `${models.length} model file${models.length > 1 ? "s" : ""}` : undefined;
@@ -88,7 +88,12 @@ export const fileFormat: CheckDefinition = {
     for (const path of candidates) {
       const bytes = ctx.files.get(path);
       if (path.endsWith(".gltf")) {
-        findings.push(finding(meta, "error", `"${path}" is a .gltf — only self-contained .glb (glTF 2.0 binary) is supported. Re-export as .glb.`, { where: path }));
+        // published items use .gltf with everything embedded; one that names other files cannot be loaded from the item
+        try {
+          if (bytes) readSelfContainedGltf(bytes);
+        } catch (error) {
+          findings.push(finding(meta, "error", `"${path}" cannot be used: ${error instanceof Error ? error.message : "it is not a valid glTF"}.`, { where: path }));
+        }
         continue;
       }
       if (!path.endsWith(".glb")) {

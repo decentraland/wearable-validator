@@ -1,5 +1,5 @@
 /** S-10 glTF hygiene — cameras, lights and unsupported extensions are ignored by the engine and only add weight or break parsing. */
-import { isGlb, readGlbJsonChunk } from "../../../logic/gltf.js";
+import { isGlb, readModelJson } from "../../../logic/gltf.js";
 import { isFacial } from "../../../logic/facial.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -40,9 +40,9 @@ export const gltfHygiene: CheckDefinition = {
     const inspected: { where: string; json: Record<string, unknown>; rotationSource?: (typeof ctx.models)[number] }[] = [];
     const parsedByFile = new Map(ctx.models.map((m) => [m.mainFile, m]));
     for (const [path, bytes] of ctx.files) {
-      if (!path.endsWith(".glb") || !isGlb(bytes)) continue;
+      if (!(path.endsWith(".glb") && isGlb(bytes)) && !path.endsWith(".gltf")) continue;
       try {
-        inspected.push({ where: path, json: readGlbJsonChunk(bytes), rotationSource: parsedByFile.get(path) });
+        inspected.push({ where: path, json: readModelJson(bytes), rotationSource: parsedByFile.get(path) });
       } catch {
         // gltf-valid (S-02) reports unreadable containers
       }
