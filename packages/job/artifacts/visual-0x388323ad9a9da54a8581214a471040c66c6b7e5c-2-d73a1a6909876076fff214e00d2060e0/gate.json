@@ -1,0 +1,243 @@
+{
+  "passed": false,
+  "checks": [
+    {
+      "check": "file-format",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1 model file",
+      "durationMs": 0
+    },
+    {
+      "check": "gltf-valid",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1 GLB parsed",
+      "durationMs": 0
+    },
+    {
+      "check": "metadata",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "entity metadata",
+      "durationMs": 72
+    },
+    {
+      "check": "representations",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 body shapes (male, female)",
+      "durationMs": 16
+    },
+    {
+      "check": "file-size",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0.26 MB total",
+      "durationMs": 0
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "status": "warning",
+      "coverage": "complete",
+      "measured": "1024×1024 · 0.11 MB",
+      "durationMs": 46
+    },
+    {
+      "check": "name-description",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "name 21 · description 46 · 9 tags",
+      "durationMs": 0
+    },
+    {
+      "check": "category",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "tiara",
+      "durationMs": 0
+    },
+    {
+      "check": "content-integrity",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "3 files hashed",
+      "durationMs": 0
+    },
+    {
+      "check": "gltf-hygiene",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 extensions used",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1 texture",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "status": "failed",
+      "coverage": "complete",
+      "measured": "largest 1024×1024",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-format",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "JPEG · 8-bit",
+      "durationMs": 1
+    },
+    {
+      "check": "texture-maps",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "base color",
+      "durationMs": 0
+    },
+    {
+      "check": "material-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1 material",
+      "durationMs": 0
+    },
+    {
+      "check": "material-names",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "no AvatarSkin_MAT",
+      "durationMs": 0
+    },
+    {
+      "check": "triangle-count",
+      "group": "model",
+      "status": "failed",
+      "coverage": "complete",
+      "measured": "504 tris",
+      "durationMs": 10
+    },
+    {
+      "check": "bounding-box",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0.002385796 × 0.001101151 × 0.00147991 m",
+      "durationMs": 1
+    },
+    {
+      "check": "skeleton",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "62 joints",
+      "durationMs": 0
+    },
+    {
+      "check": "bone-weights",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "skinned",
+      "durationMs": 0
+    },
+    {
+      "check": "hides-replaces",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "hides 0 · replaces 0",
+      "durationMs": 0
+    },
+    {
+      "check": "static-mesh",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 animations · 0 shape keys",
+      "durationMs": 0
+    },
+    {
+      "check": "spring-bones",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 spring bones",
+      "durationMs": 1
+    },
+    {
+      "check": "qr-code",
+      "group": "content",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 images scanned",
+      "durationMs": 118
+    }
+  ],
+  "findings": [
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "rule": "S-06",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails",
+      "severity": "warning",
+      "message": "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.",
+      "where": "thumbnail.png",
+      "measured": "1024×1024",
+      "limit": "256×256"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"DevilHornsPositionFix.glb\" › lambert20 (Base Color) image is 1024×1024; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"DevilHornsPositionFix.glb\" › lambert20 (Base Color) image",
+      "measured": "1024×1024",
+      "limit": "512×512"
+    },
+    {
+      "check": "triangle-count",
+      "group": "model",
+      "rule": "M-01",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#building-3d-models-for-wearables",
+      "severity": "error",
+      "message": "\"DevilHornsPositionFix.glb\" has 504 triangles — the limit is 500 for tiara. Remove geometry, or hide more slots to pool their budgets.",
+      "where": "DevilHornsPositionFix.glb",
+      "measured": 504,
+      "limit": 500,
+      "data": {
+        "category": "tiara",
+        "hides": []
+      }
+    }
+  ],
+  "captures": [],
+  "summary": {
+    "errors": 2,
+    "warnings": 1,
+    "checked": 24,
+    "skipped": 0
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "urn": "urn:decentraland:matic:collections-v2:0x388323ad9a9da54a8581214a471040c66c6b7e5c:2",
+  "id": "Qmc5ambwR8JfW3HNXSwkqByS78psFGmn2QjjEF52xkYGqw",
+  "name": "Devil Horns of Wonder",
+  "metadata": {
+    "id": "urn:decentraland:matic:collections-v2:0x388323ad9a9da54a8581214a471040c66c6b7e5c:2",
+    "name": "Devil Horns of Wonder",
+    "description": "Feeling naughty? Express it, you little devil!",
+    "collectionAddress": "0x388323ad9a9da54a8581214a471040c66c6b7e5c",
+    "rarity": "legendary",
+    "i18n": [
+      {
+        "code": "en",
+        "text": "Devil Horns of Wonder"
+      }
+    ],
+    "data": {
+      "replaces": [],
+      "hides": [],
+      "tags": [
+        "devil",
+        "naughty",
+        "red",
+        "fantasy",
+        "beast",
+        "horns",
+        "wonderzone",
+        "tiara",
+        "glow"
+      ],
+      "category": "tiara",
+      "representations": [
+        {
+          "bodyShapes": [
+            "urn:decentraland:off-chain:base-avatars:BaseMale"
+          ],
+          "mainFile": "DevilHornsPositionFix.glb",
+          "contents": [
+            "DevilHornsPositionFix.glb"
+          ],
+          "overrideHides": [],
+          "overrideReplaces": []
+        },
+        {
+          "bodyShapes": [
+            "urn:decentraland:off-chain:base-avatars:BaseFemale"
+          ],
+          "mainFile": "DevilHornsPositionFix.glb",
+          "contents": [
+            "DevilHornsPositionFix.glb"
+          ],
+          "overrideHides": [],
+          "overrideReplaces": []
+        }
+      ]
+    },
+    "image": "image.png",
+    "thumbnail": "thumbnail.png",
+    "metrics": {
+      "triangles": 504,
+      "materials": 1,
+      "textures": 1,
+      "meshes": 1,
+      "bodies": 1,
+      "entities": 1
+    },
+    "createdAt": 1626680717101,
+    "updatedAt": 1626680717101
+  },
+  "content": [
+    {
+      "file": "DevilHornsPositionFix.glb",
+      "hash": "QmdGmTEUxrhgfai3B257SeujRVqVJnYCuk7odZQTpZ3gWb"
+    },
+    {
+      "file": "image.png",
+      "hash": "QmW7C7BXPJEBSFYjaRzoPvSCAJFySekT8f5ZjHq6oF5mez"
+    },
+    {
+      "file": "thumbnail.png",
+      "hash": "QmaXyrZCC1s7WZsGfbvLMeDTj69c61yqFjD7eRNV9g7843"
+    }
+  ]
+}

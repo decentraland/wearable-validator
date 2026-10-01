@@ -1,0 +1,254 @@
+{
+  "passed": null,
+  "checks": [
+    {
+      "check": "render-valid",
+      "group": "rendering",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 views · 9.7% drawn at least",
+      "durationMs": 29650
+    },
+    {
+      "check": "thumbnail-honesty",
+      "group": "rendering",
+      "status": "skipped",
+      "coverage": "missing",
+      "skipReason": "Configure services.reviewer to run this review. Use the optional /ai adapter for Pi with OAuth.",
+      "durationMs": 58697
+    },
+    {
+      "check": "visual-quality",
+      "group": "rendering",
+      "status": "skipped",
+      "coverage": "missing",
+      "skipReason": "Configure services.reviewer to run this review. Use the optional /ai adapter for Pi with OAuth.",
+      "durationMs": 309
+    }
+  ],
+  "findings": [],
+  "captures": [
+    {
+      "sha256": "25a96c730f405dbec9ea8e4262cba1175d1b6ab6e3f50473144fff78ed3439bf",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseFemale-avatar-000",
+        "key": "b5456de07136ffde539e84f881656e350ad4a0ee3b54bc26bb7cfb12704e16c6",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/CBD_Female_Pants_2026 v5.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "size": 1024
+      },
+      "file": "captures/BaseFemale-avatar-000.png"
+    },
+    {
+      "sha256": "bcb69ecf31c39809ac106242525e2ad40310d63b511ebd662442adb0ac06a8fa",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseFemale-avatar-090",
+        "key": "3f34294ff0222920400b02a926fa67379b5315097e5fa5ccaf4a7a45a948643f",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/CBD_Female_Pants_2026 v5.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "size": 1024
+      },
+      "file": "captures/BaseFemale-avatar-090.png"
+    },
+    {
+      "sha256": "a12e9b1dea9a055da16101684b7e4d9a9fbae1f8cad86d2a3a00a4433ca0a9ad",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseFemale-avatar-180",
+        "key": "5b1c7feaa019b2fff7117c5b678dc8830c70ed0694786a029dc8773e8c493d1d",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/CBD_Female_Pants_2026 v5.glb",
+        "view": "avatar",
+        "azimuthDegrees": 180,
+        "size": 1024
+      },
+      "file": "captures/BaseFemale-avatar-180.png"
+    },
+    {
+      "sha256": "ba6389d93f7a90347c5ec8a21a0a6e92b96d55adac301fba7603bc1b221aa52f",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseFemale-wearable-000",
+        "key": "2a348db217e35f2676dd0c9aae273cdf36f4434b9cd745efde5a61f35985d0c1",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/CBD_Female_Pants_2026 v5.glb",
+        "view": "wearable",
+        "azimuthDegrees": 0,
+        "size": 1024
+      },
+      "file": "captures/BaseFemale-wearable-000.png"
+    },
+    {
+      "sha256": "3c383362ac85911595570f5560c2fa5f692ca685ef212a7e6813a29c116ff64d",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseFemale-wearable-090",
+        "key": "928c49c50dcbce97abdc44211c8d738580a8a89aef6444d80b4663990fe6eb87",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/CBD_Female_Pants_2026 v5.glb",
+        "view": "wearable",
+        "azimuthDegrees": 90,
+        "size": 1024
+      },
+      "file": "captures/BaseFemale-wearable-090.png"
+    },
+    {
+      "sha256": "bf7f7212b73576728494d7f5abe0af7167d438567a53be2a274fc6e6f60a3dd9",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseFemale-wearable-180",
+        "key": "d9945f37b1c316f2745834e08f3301ffbb3beb186586fadf939bffa980ca392c",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/CBD_Female_Pants_2026 v5.glb",
+        "view": "wearable",
+        "azimuthDegrees": 180,
+        "size": 1024
+      },
+      "file": "captures/BaseFemale-wearable-180.png"
+    },
+    {
+      "sha256": "9931b059d1d8e13fc3a08898fa0def0c11956ffab1fc281373b7fdd6ae1d7a13",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseMale-avatar-000",
+        "key": "68c9bf9c9e92fdb88023d262024923d955c6261546621a941a9c68d04f0041a0",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/CBD_Male_Pants_2026_V_5.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "size": 1024
+      },
+      "file": "captures/BaseMale-avatar-000.png"
+    },
+    {
+      "sha256": "e435dfbc7126adf3882ee8213856800731904ef9e745f29ae38e7e2c03446c09",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseMale-avatar-090",
+        "key": "deac25be393c14d2e3e8d698318227eab995a2228c1fdcab1f97533831c0b813",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/CBD_Male_Pants_2026_V_5.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "size": 1024
+      },
+      "file": "captures/BaseMale-avatar-090.png"
+    },
+    {
+      "sha256": "24bf49c6a9cc92ed7ef6076b1ce23d7a43141a969511d96bd03597cf88d3491b",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseMale-avatar-180",
+        "key": "f6ae7531fcbb2797c84c8a2b0ad2ba94cd7191eb6b469af91834b580762355a5",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/CBD_Male_Pants_2026_V_5.glb",
+        "view": "avatar",
+        "azimuthDegrees": 180,
+        "size": 1024
+      },
+      "file": "captures/BaseMale-avatar-180.png"
+    },
+    {
+      "sha256": "ef5f731f13346ebfb84626572dd3c71bc7fa161c29e4078b19371cbbc1eba095",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseMale-wearable-000",
+        "key": "e23f0d36f04952e106bf3b6bbd4ad222bb3e0e96584287148a836c722286b26f",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/CBD_Male_Pants_2026_V_5.glb",
+        "view": "wearable",
+        "azimuthDegrees": 0,
+        "size": 1024
+      },
+      "file": "captures/BaseMale-wearable-000.png"
+    },
+    {
+      "sha256": "f350b2e4946e3243f7a29efc12698d316518711cbea262240670aa9d21dfb4ae",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseMale-wearable-090",
+        "key": "4b995178b140aa9dcf4c8fd91b9ab2814ebab52f2261055652f362cb04cb7946",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/CBD_Male_Pants_2026_V_5.glb",
+        "view": "wearable",
+        "azimuthDegrees": 90,
+        "size": 1024
+      },
+      "file": "captures/BaseMale-wearable-090.png"
+    },
+    {
+      "sha256": "13db5bfb8935c19a5815f77865981e590bf1fbc5d4cdeaba94dc9e54ed37c7fa",
+      "width": 1024,
+      "height": 1024,
+      "request": {
+        "id": "BaseMale-wearable-180",
+        "key": "2d8edb07a36b0826814e19f66e83ec9a4925edf63a1d64c1fb2acc40d049fa2a",
+        "inputDigest": "afa6f03f9f3db80c3ae03cf2e5e818a7c1c103e6f8b9e292310f5ebe0deb0270",
+        "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+        "recipeVersion": 1,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/CBD_Male_Pants_2026_V_5.glb",
+        "view": "wearable",
+        "azimuthDegrees": 180,
+        "size": 1024
+      },
+      "file": "captures/BaseMale-wearable-180.png"
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "checked": 1,
+    "skipped": 2
+  }
+}

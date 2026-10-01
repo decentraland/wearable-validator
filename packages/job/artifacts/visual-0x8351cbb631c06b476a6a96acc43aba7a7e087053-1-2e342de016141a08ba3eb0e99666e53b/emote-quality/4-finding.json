@@ -1,0 +1,17 @@
+{
+  "check": {
+    "check": "emote-quality",
+    "group": "rendering",
+    "status": "errored",
+    "coverage": "missing",
+    "skipReason": "The model was not called: the run server has no ANTHROPIC_OAUTH_SETUP_TOKEN.",
+    "review": {
+      "provider": "none",
+      "model": "none",
+      "promptVersion": 2,
+      "promptDigest": "5c632de5954ae30d51e4da40042ce838ad0fa3e93a68e1d4272e7e7b9161af15"
+    },
+    "durationMs": 128
+  },
+  "findings": []
+}

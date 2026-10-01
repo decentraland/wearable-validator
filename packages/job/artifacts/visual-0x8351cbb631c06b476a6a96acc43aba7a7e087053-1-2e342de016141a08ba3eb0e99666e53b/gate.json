@@ -1,0 +1,233 @@
+{
+  "passed": false,
+  "checks": [
+    {
+      "check": "file-format",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 model files",
+      "durationMs": 0
+    },
+    {
+      "check": "gltf-valid",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 GLBs parsed",
+      "durationMs": 1
+    },
+    {
+      "check": "metadata",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "entity metadata",
+      "durationMs": 58
+    },
+    {
+      "check": "representations",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 body shapes (male, female)",
+      "durationMs": 12
+    },
+    {
+      "check": "file-size",
+      "group": "files",
+      "status": "failed",
+      "coverage": "complete",
+      "measured": "4.03 MB total",
+      "durationMs": 1
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "status": "warning",
+      "coverage": "complete",
+      "measured": "1024×1024 · 0.05 MB",
+      "durationMs": 25
+    },
+    {
+      "check": "name-description",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "name 12 · description 0 · 0 tags",
+      "durationMs": 0
+    },
+    {
+      "check": "category",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "fun",
+      "durationMs": 7
+    },
+    {
+      "check": "content-integrity",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "4 files hashed",
+      "durationMs": 3
+    },
+    {
+      "check": "gltf-hygiene",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 extensions used",
+      "durationMs": 0
+    },
+    {
+      "check": "duration",
+      "group": "emote",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "8 s",
+      "durationMs": 12
+    },
+    {
+      "check": "animation-clips",
+      "group": "emote",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "4: Action_Avatar, Action_Prop, Action_Avatar…",
+      "durationMs": 4
+    },
+    {
+      "check": "bone-targets",
+      "group": "emote",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "738 channels",
+      "durationMs": 1
+    },
+    {
+      "check": "loop-seam",
+      "group": "emote",
+      "status": "warning",
+      "coverage": "complete",
+      "measured": "loops",
+      "durationMs": 1
+    },
+    {
+      "check": "root-motion",
+      "group": "emote",
+      "status": "passed",
+      "coverage": "complete",
+      "durationMs": 0
+    },
+    {
+      "check": "clip-names",
+      "group": "emote",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "Action_Avatar, Action_Prop…",
+      "durationMs": 0
+    },
+    {
+      "check": "props",
+      "group": "emote",
+      "status": "passed",
+      "coverage": "complete",
+      "durationMs": 1
+    },
+    {
+      "check": "audio",
+      "group": "emote",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "no audio",
+      "durationMs": 0
+    },
+    {
+      "check": "qr-code",
+      "group": "content",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "5 images scanned",
+      "durationMs": 628
+    }
+  ],
+  "findings": [
+    {
+      "check": "file-size",
+      "group": "files",
+      "rule": "S-05",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#building-3d-models-for-wearables",
+      "severity": "error",
+      "message": "The item totals 4.03 MB; the limit for an emote is 3 MB — the thumbnail and rarity image count toward it (ADR-246). Reduce textures or geometry.",
+      "measured": 4228654,
+      "limit": 3145728,
+      "data": {
+        "includesThumbnailAndRarityImage": true
+      }
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "rule": "S-06",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails",
+      "severity": "warning",
+      "message": "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.",
+      "where": "thumbnail.png",
+      "measured": "1024×1024",
+      "limit": "256×256"
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "rule": "S-06",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails",
+      "severity": "warning",
+      "message": "Thumbnail has no alpha channel — the background should be transparent. Export as RGBA PNG.",
+      "where": "thumbnail.png"
+    },
+    {
+      "check": "loop-seam",
+      "group": "emote",
+      "rule": "E-04",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/emotes/creating-emotes#the-animation-specifications",
+      "severity": "warning",
+      "message": "This looping emote ends in a different pose than it starts — the loop will visibly snap on Flame_00, Flame_01, Flame_02, Flame_03, Flame_04 (+55 more). Match the first and last keyframes of those bones.",
+      "where": "male/Flamethrower.glb",
+      "data": {
+        "bones": [
+          "Flame_00",
+          "Flame_01",
+          "Flame_02",
+          "Flame_03",
+          "Flame_04"
+        ]
+      }
+    },
+    {
+      "check": "loop-seam",
+      "group": "emote",
+      "rule": "E-04",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/emotes/creating-emotes#the-animation-specifications",
+      "severity": "warning",
+      "message": "This looping emote ends in a different pose than it starts — the loop will visibly snap on Flame_00, Flame_01, Flame_02, Flame_03, Flame_04 (+55 more). Match the first and last keyframes of those bones.",
+      "where": "female/Flamethrower.glb",
+      "data": {
+        "bones": [
+          "Flame_00",
+          "Flame_01",
+          "Flame_02",
+          "Flame_03",
+          "Flame_04"
+        ]
+      }
+    }
+  ],
+  "captures": [],
+  "summary": {
+    "errors": 1,
+    "warnings": 4,
+    "checked": 19,
+    "skipped": 0
+  }
+}

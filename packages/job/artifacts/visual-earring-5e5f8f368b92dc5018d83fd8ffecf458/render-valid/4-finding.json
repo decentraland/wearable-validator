@@ -1,0 +1,11 @@
+{
+  "check": {
+    "check": "render-valid",
+    "group": "rendering",
+    "status": "passed",
+    "coverage": "complete",
+    "measured": "2 views · 17.1% drawn at least",
+    "durationMs": 22842
+  },
+  "findings": []
+}

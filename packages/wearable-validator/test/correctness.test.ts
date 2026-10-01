@@ -84,3 +84,10 @@ test("bounding-box measurement includes an oversized second representation", asy
   assert.match(result.checks[0]?.measured ?? "", /female\.glb: 2\.424/);
   assert.equal(result.findings[0]?.where, "female.glb");
 });
+
+test("an emote.json holding entity metadata keeps its category and representations from emoteDataADR74", async () => {
+  const representations = [{ bodyShapes: [BodyShape.MALE, BodyShape.FEMALE], mainFile: "model.glb", contents: ["model.glb"] }];
+  const manifest = { name: "Test", description: "synthetic", rarity: "common", emoteDataADR74: { category: "fun", loop: false, tags: [], representations } };
+  const result = await validate(await syntheticZip({ kind: "emote", manifest }), { checks: ["metadata", "category", "representations"] });
+  assert.deepEqual(Object.fromEntries(result.checks.map((row) => [row.check, row.status])), { metadata: "passed", category: "passed", representations: "passed" });
+});

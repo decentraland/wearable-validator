@@ -122,6 +122,29 @@ describe("createNativeRenderer", () => {
     }
   });
 
+  it("checks a .gltf's URIs like a GLB's, whatever the file is named, and draws one with everything embedded", async () => {
+    const gltf = (uri: string) => new TextEncoder().encode(JSON.stringify({ asset: { version: "2.0" }, buffers: [{ byteLength: 4, uri }] }));
+    const gltfInput = (bytes: Uint8Array): RenderInput => ({
+      ...input,
+      item: { ...input.item, representations: [{ bodyShapes: [MALE], mainFile: "male.gltf", contents: ["male.gltf"] }, { bodyShapes: [FEMALE], mainFile: "female.glb", contents: ["female.glb"] }] },
+      files: new Map([["male.gltf", bytes], ["female.glb", bytes]])
+    });
+    for (const uri of ["http://169.254.170.2/v2/credentials", "../../x.bin", "%252e%252e/%252e%252e/etc/passwd"]) {
+      await withFakeServer(async (command, log) => {
+        const renderer = await createNativeRenderer({ command, build: "test" });
+        await assert.rejects(renderer.capture(gltfInput(gltf(uri)), [request(renderer.buildId, { view: "avatar" })]), /outside the item/, uri);
+        await renderer.stop();
+        await assert.rejects(readFile(log), `the player never saw a job for ${uri}`);
+      });
+    }
+    await withFakeServer(async (command, log) => {
+      const renderer = await createNativeRenderer({ command, build: "test" });
+      await renderer.capture(gltfInput(gltf("data:application/octet-stream;base64,AAAAAA==")), [request(renderer.buildId, { view: "avatar" })]);
+      await renderer.stop();
+      assert.ok((await readFile(log, "utf8")).length > 0, "the player got the embedded .gltf");
+    });
+  });
+
   it("writes only the files the representations draw, and never outside the item's folder", async () => {
     await withFakeServer(async (command) => {
       const work = await mkdtemp(join(tmpdir(), "native-work-"));

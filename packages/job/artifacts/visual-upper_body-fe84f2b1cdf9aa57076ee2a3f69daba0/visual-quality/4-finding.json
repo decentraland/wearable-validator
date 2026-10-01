@@ -1,0 +1,17 @@
+{
+  "check": {
+    "check": "visual-quality",
+    "group": "rendering",
+    "status": "errored",
+    "coverage": "missing",
+    "skipReason": "The model was not called: the run server has no ANTHROPIC_OAUTH_SETUP_TOKEN.",
+    "review": {
+      "provider": "none",
+      "model": "none",
+      "promptVersion": 2,
+      "promptDigest": "e327a1dd88682343a6aa6cdfe4150177853ae6bce574f05d5e117437a7220a2b"
+    },
+    "durationMs": 125
+  },
+  "findings": []
+}

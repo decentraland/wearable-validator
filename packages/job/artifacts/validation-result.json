@@ -1,0 +1,124 @@
+{
+  "validationId": "44444444-5555-4666-8777-888888888888",
+  "collectionId": "99999999-8888-4777-8666-555555555555",
+  "rulesVersion": "0.4.0",
+  "items": [
+    {
+      "itemId": "00000001-0000-4000-8000-000000000000",
+      "contentHash": "bafkreiay3wivthsimrhcwslnmweiryg6fiqshbqrgqqtzgv6ewnkf34lc4",
+      "passed": false,
+      "findings": [
+        {
+          "rule": "S-06",
+          "check": "thumbnail",
+          "severity": "warning",
+          "message": "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.",
+          "where": "thumbnail.png",
+          "fix": "Export a 256×256 PNG with a transparent background (in Blender: render with Film → Transparent; in Photoshop/GIMP: delete the background layer before saving).",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails"
+        },
+        {
+          "rule": "S-06",
+          "check": "thumbnail",
+          "severity": "warning",
+          "message": "Thumbnail has no alpha channel — the background should be transparent. Export as RGBA PNG.",
+          "where": "thumbnail.png",
+          "fix": "Export a 256×256 PNG with a transparent background (in Blender: render with Film → Transparent; in Photoshop/GIMP: delete the background layer before saving).",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails"
+        },
+        {
+          "rule": "M-07",
+          "check": "material-names",
+          "severity": "error",
+          "message": "Mesh \"M_Mask_Eyebrows_Mesh.000\" in \"male/TropicalMask.glb\" contains the reserved token \"_eyebrows\", which is reserved for facial-feature wearables. Rename the mesh.",
+          "where": "\"male/TropicalMask.glb\" › M_Mask_Eyebrows_Mesh.000",
+          "bodyShape": "male",
+          "fix": "Rename the material that shows skin to exactly 'AvatarSkin_MAT' so the engine can tint it. Avoid reserved mesh-name patterns (_mouth, _eyebrows, _eyes) on non-facial items.",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures"
+        },
+        {
+          "rule": "M-07",
+          "check": "material-names",
+          "severity": "error",
+          "message": "Mesh \"M_Mask_Eyebrows_Mesh.000\" in \"female/TropicalMask.glb\" contains the reserved token \"_eyebrows\", which is reserved for facial-feature wearables. Rename the mesh.",
+          "where": "\"female/TropicalMask.glb\" › M_Mask_Eyebrows_Mesh.000",
+          "bodyShape": "female",
+          "fix": "Rename the material that shows skin to exactly 'AvatarSkin_MAT' so the engine can tint it. Avoid reserved mesh-name patterns (_mouth, _eyebrows, _eyes) on non-facial items.",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures"
+        }
+      ]
+    },
+    {
+      "itemId": "00000002-0000-4000-8000-000000000000",
+      "contentHash": "bafkreif3tosdifcoftx56qagbz6qnixhqudkpeymnrmyxby6umt2rytmhq",
+      "passed": false,
+      "findings": [
+        {
+          "rule": "S-05",
+          "check": "file-size",
+          "severity": "error",
+          "message": "The item totals 4.03 MB; the limit for an emote is 3 MB — the thumbnail and rarity image count toward it (ADR-246). Reduce textures or geometry.",
+          "measured": 4228654,
+          "limit": 3145728,
+          "fix": "Shrink textures first (biggest win): resize to 512×512 and re-bake. Then remove unused geometry and merge duplicated meshes. The thumbnail and rarity image count toward the limit too.",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#building-3d-models-for-wearables"
+        },
+        {
+          "rule": "S-06",
+          "check": "thumbnail",
+          "severity": "warning",
+          "message": "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.",
+          "where": "thumbnail.png",
+          "fix": "Export a 256×256 PNG with a transparent background (in Blender: render with Film → Transparent; in Photoshop/GIMP: delete the background layer before saving).",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails"
+        },
+        {
+          "rule": "S-06",
+          "check": "thumbnail",
+          "severity": "warning",
+          "message": "Thumbnail has no alpha channel — the background should be transparent. Export as RGBA PNG.",
+          "where": "thumbnail.png",
+          "fix": "Export a 256×256 PNG with a transparent background (in Blender: render with Film → Transparent; in Photoshop/GIMP: delete the background layer before saving).",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails"
+        },
+        {
+          "rule": "E-04",
+          "check": "loop-seam",
+          "severity": "warning",
+          "message": "This looping emote ends in a different pose than it starts — the loop will visibly snap on Flame_00, Flame_01, Flame_02, Flame_03, Flame_04 (+55 more). Match the first and last keyframes of those bones.",
+          "where": "male/Flamethrower.glb",
+          "bodyShape": "male",
+          "fix": "Copy the first frame's pose and paste it on the last frame so the loop closes cleanly (Blender: select all bones, Copy Pose on frame 1, Paste on the last frame).",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/emotes/creating-emotes#the-animation-specifications"
+        },
+        {
+          "rule": "E-04",
+          "check": "loop-seam",
+          "severity": "warning",
+          "message": "This looping emote ends in a different pose than it starts — the loop will visibly snap on Flame_00, Flame_01, Flame_02, Flame_03, Flame_04 (+55 more). Match the first and last keyframes of those bones.",
+          "where": "female/Flamethrower.glb",
+          "bodyShape": "female",
+          "fix": "Copy the first frame's pose and paste it on the last frame so the loop closes cleanly (Blender: select all bones, Copy Pose on frame 1, Paste on the last frame).",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/emotes/creating-emotes#the-animation-specifications"
+        }
+      ]
+    },
+    {
+      "itemId": "00000003-0000-4000-8000-000000000000",
+      "contentHash": "bafkreid2n2sd52vvgoiupxyahj4pp7hllmywgy4eyyb73nbfesoyyiyv2u",
+      "passed": true,
+      "findings": [
+        {
+          "rule": "S-06",
+          "check": "thumbnail",
+          "severity": "warning",
+          "message": "Thumbnail has no alpha channel — the background should be transparent. Export as RGBA PNG.",
+          "where": "thumbnail.png",
+          "fix": "Export a 256×256 PNG with a transparent background (in Blender: render with Film → Transparent; in Photoshop/GIMP: delete the background layer before saving).",
+          "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails"
+        }
+      ]
+    }
+  ],
+  "verdict": "rejected"
+}

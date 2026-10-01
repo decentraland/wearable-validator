@@ -1,4 +1,4 @@
-import { Document, WebIO, type Node, type Primitive } from "@gltf-transform/core";
+import { Document, WebIO, type GLTF, type Node, type Primitive } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { manifest } from "../manifest/index.js";
 
@@ -11,6 +11,62 @@ export async function parseGlb(bytes: Uint8Array, maxUnpackedBytes = manifest.gl
   assertBoundedUnpacking(json, maxUnpackedBytes);
   const doc = await io.readBinary(bytes);
   return { doc, json };
+}
+
+/** True when the bytes look like glTF JSON text (a .gltf) rather than a GLB container. */
+export function isGltfJson(bytes: Uint8Array): boolean {
+  for (const byte of bytes) {
+    if (byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d || byte === 0xef || byte === 0xbb || byte === 0xbf) continue;
+    return byte === 0x7b;
+  }
+  return false;
+}
+
+/**
+ * The JSON of a self-contained .gltf: every buffer and image embedded (a data: URI, or an image in a buffer view).
+ * Throws an actionable sentence for anything else — a .gltf naming another file or a URL cannot be checked or drawn
+ * from the item alone.
+ */
+export function readSelfContainedGltf(bytes: Uint8Array): Record<string, unknown> {
+  let json: unknown;
+  try {
+    json = JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new Error("it is not valid glTF JSON. Re-export the model as GLB");
+  }
+  if (!json || typeof json !== "object" || Array.isArray(json) || !("asset" in json)) throw new Error("it is not a glTF document. Re-export the model as GLB");
+  const record = json as Record<string, unknown>;
+  for (const [list, what] of [[record.buffers, "buffer"], [record.images, "image"]] as const) {
+    for (const entry of Array.isArray(list) ? list : []) {
+      const uri = entry && typeof entry === "object" && "uri" in entry ? (entry as { uri: unknown }).uri : undefined;
+      if (uri === undefined) continue;
+      if (typeof uri !== "string" || !uri.startsWith("data:")) {
+        throw new Error(`its ${what} points at "${String(uri).slice(0, 80)}" outside the file. Export it as glTF Embedded, or as GLB, so everything is inside one file`);
+      }
+    }
+  }
+  return record;
+}
+
+/** Parse a self-contained .gltf the same way as a GLB. */
+export async function parseGltf(bytes: Uint8Array, maxUnpackedBytes = manifest.gltf.maxUnpackedBytes): Promise<{ doc: Document; json: Record<string, unknown> }> {
+  const json = readSelfContainedGltf(bytes);
+  assertAcyclicNodes(json);
+  assertBoundedUnpacking(json, maxUnpackedBytes);
+  // embedded buffers and images are decoded from their data: URIs; there is nothing else to fetch
+  // the shape was checked above (an object with asset, every URI embedded); the reader validates the rest
+  const doc = await io.readJSON({ json: structuredClone(json) as unknown as GLTF.IGLTF, resources: {} });
+  return { doc, json };
+}
+
+/** A model file, GLB or self-contained .gltf. */
+export function parseModel(bytes: Uint8Array, maxUnpackedBytes = manifest.gltf.maxUnpackedBytes): Promise<{ doc: Document; json: Record<string, unknown> }> {
+  return isGlb(bytes) ? parseGlb(bytes, maxUnpackedBytes) : parseGltf(bytes, maxUnpackedBytes);
+}
+
+/** The glTF JSON of a model file without a full parse: the JSON chunk of a GLB, or a .gltf's own JSON. */
+export function readModelJson(bytes: Uint8Array): Record<string, unknown> {
+  return isGlb(bytes) ? readGlbJsonChunk(bytes) : readSelfContainedGltf(bytes);
 }
 
 const COMPONENT_BYTES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };

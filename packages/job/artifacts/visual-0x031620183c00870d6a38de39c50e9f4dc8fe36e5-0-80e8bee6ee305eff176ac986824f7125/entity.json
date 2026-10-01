@@ -1,0 +1,78 @@
+{
+  "urn": "urn:decentraland:matic:collections-v2:0x031620183c00870d6a38de39c50e9f4dc8fe36e5:0",
+  "id": "bafkreiawkjumslfy5u42rtnx7ccgvoyskl2hwsmqsswm35dhbhzdtjwzhu",
+  "name": "LosCat Pants",
+  "metadata": {
+    "id": "urn:decentraland:matic:collections-v2:0x031620183c00870d6a38de39c50e9f4dc8fe36e5:0",
+    "name": "LosCat Pants",
+    "description": "A stylish pair of unisex pants.",
+    "collectionAddress": "0x031620183c00870d6a38de39c50e9f4dc8fe36e5",
+    "rarity": "rare",
+    "i18n": [
+      {
+        "code": "en",
+        "text": "LosCat Pants"
+      }
+    ],
+    "data": {
+      "replaces": [],
+      "hides": [],
+      "removesDefaultHiding": [],
+      "tags": [],
+      "category": "lower_body",
+      "representations": [
+        {
+          "bodyShapes": [
+            "urn:decentraland:off-chain:base-avatars:BaseFemale"
+          ],
+          "mainFile": "female/lostcat_pants_female.glb",
+          "contents": [
+            "female/lostcat_pants_female.glb"
+          ],
+          "overrideHides": [],
+          "overrideReplaces": []
+        },
+        {
+          "bodyShapes": [
+            "urn:decentraland:off-chain:base-avatars:BaseMale"
+          ],
+          "mainFile": "male/lostcat_pants_male.glb",
+          "contents": [
+            "male/lostcat_pants_male.glb"
+          ],
+          "overrideHides": [],
+          "overrideReplaces": []
+        }
+      ],
+      "outlineCompatible": true
+    },
+    "image": "image.png",
+    "thumbnail": "thumbnail.png",
+    "metrics": {
+      "triangles": 818,
+      "materials": 2,
+      "meshes": 5,
+      "textures": 4,
+      "bodies": 5,
+      "entities": 1
+    }
+  },
+  "content": [
+    {
+      "file": "female/lostcat_pants_female.glb",
+      "hash": "bafkreido6e4n4wovamw3bnxudbym3hzwqhodbi5ifh3ephjocppcm4mbs4"
+    },
+    {
+      "file": "image.png",
+      "hash": "bafybeicxgvsgm6prqsaqzcj5vftnzxqxz7zapc2wvqwz5upfp3ioxixdbu"
+    },
+    {
+      "file": "male/lostcat_pants_male.glb",
+      "hash": "bafkreicnnqjijh7a2qxixrxi5wca24eeqtl74wx4uweic7govnnuztzb5y"
+    },
+    {
+      "file": "thumbnail.png",
+      "hash": "bafybeietzn67b72tnyuxpzaeke3cfmahybcaxpquma35nw4amusmezxmi4"
+    }
+  ]
+}
