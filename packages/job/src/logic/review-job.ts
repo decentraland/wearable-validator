@@ -102,10 +102,13 @@ function visualVerdict(visual: Result): boolean | null {
 }
 
 export function itemResult(item: ReviewItem, gate: Result, visual: Result): ItemResult {
-  const passed = gate.passed === false ? false : visualVerdict(visual);
+  // no verdict from the code checks (a facial feature is PNGs: no model check can measure it) is no verdict for the item
+  const passed = gate.passed === false ? false : gate.passed === null ? null : visualVerdict(visual);
+  const rows = [...gate.checks, ...visual.checks];
+  // undecided only because some checks cannot measure this kind of item, with nothing failed or unanswered: a person
+  // decides, and sending it again would answer the same
+  const unsupported = passed === null && rows.some((row) => row.status === "skipped" && row.coverage === "missing") && !rows.some((row) => row.status === "failed" || row.status === "errored");
   const visualRows = visual.checks;
-  // nothing to look at for this kind of item (every visual row skipped for it): a curator decides, not a retry
-  const unsupported = passed === null && visualRows.length > 0 && visualRows.every((row) => row.status === "skipped");
   // a visual row the model answered carries its summary as the measured value
   const visualSummary = visualRows.filter((row) => row.review && row.measured && row.status !== "errored" && row.status !== "skipped").map((row) => `${row.check}: ${row.measured}`).join("\n");
   return {

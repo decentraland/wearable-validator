@@ -8,7 +8,7 @@ import { collectionResult, createReviewJob, type CollectionResultBody, type Item
 import { InvalidReviewRequest, parseReviewRequest, REVIEW_EVENT, type ValidationRequest } from "../src/logic/review-request.js";
 import { fakeRenderer, fakeReviewer, silentLogs, type RenderCalls } from "./fakes.js";
 import { syntheticEntity, type SyntheticEntity } from "../../wearable-validator/test/helpers/entity.js";
-import { syntheticGlb, syntheticZip } from "../../wearable-validator/test/helpers/synthetic.js";
+import { pngBytes, syntheticGlb, syntheticZip } from "../../wearable-validator/test/helpers/synthetic.js";
 
 const CONTENT = "https://builder.example";
 const CALLBACK = "https://builder-callback.example";
@@ -71,7 +71,14 @@ async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [
 
 let clean: SyntheticEntity;
 let heavy: SyntheticEntity;
+let eyebrows: SyntheticEntity;
 before(async () => {
+  // a facial feature is PNGs, not a model: its representation's main file is the texture
+  const representation = { bodyShapes: ["urn:decentraland:off-chain:base-avatars:BaseMale"], mainFile: "eyebrows.png", contents: ["eyebrows.png", "eyebrows_mask.png"] };
+  const manifest = { name: "Brows", description: "synthetic", rarity: "common", data: { category: "eyebrows", tags: [], hides: [], replaces: [], representations: [representation] } };
+  eyebrows = await syntheticEntity(await syntheticZip({ manifest, extraFiles: { "eyebrows.png": pngBytes(256, 256), "eyebrows_mask.png": pngBytes(256, 256) } }), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:2`);
+  eyebrows.files.delete("model.glb");
+  eyebrows.content = eyebrows.content.filter(({ file }) => file !== "model.glb");
   clean = await syntheticEntity(await syntheticZip(), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:0`);
   heavy = await syntheticEntity(await syntheticZip({ glb: await syntheticGlb({ triangles: 5000 }) }), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:1`);
 });
@@ -133,6 +140,14 @@ describe("the review job", () => {
     assert.deepEqual([triangles.rule, triangles.severity, typeof triangles.measured, typeof triangles.limit, typeof triangles.fix], ["M-01", "error", "number", "number", "string"]);
   });
 
+  it("downloads a file both body shapes share once", async () => {
+    const builder = fakeBuilder([clean]);
+    const { reviewJob } = await job(builder);
+    const [model] = clean.content;
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0], { contents: { ...item(clean, ITEMS[0]).contents, [`female/${model.file}`]: model.hash } })]))));
+    assert.equal(builder.downloads.filter((hash) => hash === model.hash).length, 1);
+  });
+
   it("reports an item it cannot fetch as undecided and still validates the others", async () => {
     const builder = fakeBuilder([clean]);
     const { reviewJob } = await job(builder);
@@ -141,6 +156,15 @@ describe("the review job", () => {
     assert.deepEqual(body.items.map((entry) => entry.passed), [null, true]);
     assert.match(body.items[0].error!, /Builder storage answered 404/);
     assert.deepEqual([body.verdict, body.retryable], ["error", true]);
+  });
+
+  it("gives a facial feature no verdict and calls it unsupported, so the collection goes to a person and is not retried", async () => {
+    const builder = fakeBuilder([clean, eyebrows]);
+    const { reviewJob } = await job(builder);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0]), item(eyebrows, ITEMS[1])]))));
+    const body = builder.body();
+    assert.deepEqual(body.items.map(({ passed, unsupported }) => [passed, unsupported]), [[true, undefined], [null, true]]);
+    assert.deepEqual([body.verdict, body.reason, body.retryable], ["error", "unsupported", false]);
   });
 
   it("retries the callback on 5xx, 408 and 429, stops at a 4xx it meant, and leaves the message for SQS after the last try", async () => {

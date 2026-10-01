@@ -51,23 +51,24 @@ export async function createBuilderComponent(components: BuilderComponents): Pro
 
   return {
     async fetchFiles(item) {
-      const files = new Map<string, Uint8Array>();
-      const queue = Object.entries(item.contents);
+      // the Builder stores one file per body shape: male/x.glb and female/x.glb are often the same bytes under one hash,
+      // downloaded and counted once, as the catalyst counts a deployment's size
+      const byHash = new Map<string, Uint8Array>();
+      const queue = [...new Set(Object.values(item.contents))];
       let bytes = 0;
       const worker = async (): Promise<void> => {
-        for (let next = queue.shift(); next; next = queue.shift()) {
-          const [file, hash] = next;
+        for (let hash = queue.shift(); hash; hash = queue.shift()) {
           // the route redirects to the storage bucket; fetch follows it
           const res = await fetchImpl(`${contentUrl}/v1/storage/contents/${hash}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-          if (!res.ok) throw new Error(`Builder storage answered ${res.status} for "${file}".`);
+          if (!res.ok) throw new Error(`Builder storage answered ${res.status} for "${Object.keys(item.contents).find((file) => item.contents[file] === hash)}".`);
           const data = new Uint8Array(await res.arrayBuffer());
           bytes += data.byteLength;
           if (bytes > maxItemBytes) throw new Error(`The item's files exceed ${Math.round(maxItemBytes / 1048576)} MB.`);
-          files.set(file, data);
+          byHash.set(hash, data);
         }
       };
       await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-      return files;
+      return new Map(Object.entries(item.contents).map(([file, hash]) => [file, byHash.get(hash)!]));
     },
 
     async postResult(collectionId, body) {
