@@ -1,5 +1,5 @@
 /** S-05 File size — every byte is downloaded by every avatar nearby, so the whole item has a per-category ceiling (ADR-246). */
-import { mb } from "../../../logic/bytes.js";
+import { mb, uniqueBytesTotal } from "../../../logic/bytes.js";
 import { modelFileCandidates } from "../../../logic/model-files.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -13,12 +13,8 @@ export const fileSize: CheckDefinition = {
   explanation: "The full item — model, thumbnail and rarity image included — must stay under 3 MB (9 MB for skins) so it loads fast in-world.",
   fix: "Shrink textures first (biggest win): resize to 512×512 and re-bake. Then remove unused geometry and merge duplicated meshes. The thumbnail and rarity image count toward the limit too.",
   details:
-    "Sums the actual file bytes — model, thumbnail and rarity image included (ADR-246) — against the per-category ceiling, plus the model-alone headroom rule so nothing passes here and fails at deploy.",
-  measure: (ctx) => {
-    let total = 0;
-    for (const bytes of ctx.files.values()) total += bytes.length;
-    return `${mb(total)} MB total`;
-  },
+    "Sums the actual file bytes — model, thumbnail and rarity image included (ADR-246), each identical file once, as the catalyst counts a deployment by unique content hash — against the per-category ceiling, plus the model-alone headroom rule so nothing passes here and fails at deploy.",
+  measure: (ctx) => `${mb(uniqueBytesTotal(ctx.files.values()))} MB total`,
   categoryDependent: true,
   run: (ctx) => {
     const findings: Finding[] = [];
@@ -26,8 +22,8 @@ export const fileSize: CheckDefinition = {
     const limit = ctx.itemType === "emote" ? sizes.emoteBytes : ctx.category === "skin" ? sizes.skinBytes : sizes.wearableBytes;
     const label = ctx.itemType === "emote" ? "an emote" : ctx.category === "skin" ? "a skin" : "a wearable";
 
-    let total = 0;
-    for (const bytes of ctx.files.values()) total += bytes.length;
+    // the Builder keeps a copy per body shape (male/x.glb, female/x.glb): the catalyst stores and counts one
+    const total = uniqueBytesTotal(ctx.files.values());
     if (total > limit) {
       findings.push(
         finding(

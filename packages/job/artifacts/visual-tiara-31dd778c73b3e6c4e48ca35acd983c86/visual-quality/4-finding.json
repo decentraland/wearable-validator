@@ -1,0 +1,11 @@
+{
+  "check": {
+    "check": "visual-quality",
+    "group": "rendering",
+    "status": "skipped",
+    "coverage": "missing",
+    "skipReason": "Configure services.reviewer to run this review. Use the optional /ai adapter for Pi with OAuth.",
+    "durationMs": 225
+  },
+  "findings": []
+}

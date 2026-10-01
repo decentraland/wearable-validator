@@ -16,6 +16,15 @@ describe("file-size (S-05)", () => {
     assert.equal(findings[1].where, "model.glb");
   });
 
+  it("counts a file both body shapes share once, as the catalyst counts unique content hashes", async () => {
+    const glb = padBytes(await syntheticGlb(), 1_600_000);
+    const shared = await validate(await syntheticZip({ glb, extraFiles: { "female/model.glb": glb } }), { checks: ["file-size"] });
+    assert.equal(only(shared.findings, "file-size").length, 0, "the same 1.6 MB twice is one 1.6 MB upload");
+    const other = padBytes(await syntheticGlb({ triangles: 20 }), 1_600_000);
+    const distinct = await validate(await syntheticZip({ glb, extraFiles: { "female/model.glb": other } }), { checks: ["file-size"] });
+    assert.equal(only(distinct.findings, "file-size").length, 1, "two different files both count");
+  });
+
   it("gives skins the skin budget", async () => {
     const glb = padBytes(await syntheticGlb(), 4_000_000);
     const result = await validate(await syntheticZip({ glb, category: "skin" }), { checks: ["file-size"] });

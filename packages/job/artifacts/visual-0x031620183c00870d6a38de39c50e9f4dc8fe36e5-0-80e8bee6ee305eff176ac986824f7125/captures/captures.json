@@ -1,0 +1,386 @@
+[
+  {
+    "file": "BaseFemale-avatar-000.png",
+    "sha256": "280df80416342bdec2ca95d155b224608e574bef2b610a839b545160386f67e0",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-avatar-000",
+      "key": "124cc1c409d9f47ecdbb657ace176b4be972d90081c22d511758162ead032f59",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-090.png",
+    "sha256": "facd7054c36ea592a7087fd3b94f404f00781b3fcfe55a6951fa7663feabff5c",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-avatar-090",
+      "key": "6240b0ede7d335033850d32ff1a1d4c057dd80bd231161eebc1098e40e2ab86f",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-180.png",
+    "sha256": "b02a28a0fb33e87b7f8174d0787108bebe683650607ec4c5ab493c3740cd8ae0",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-avatar-180",
+      "key": "f9802c229b4796ca8566f9a492eaa04c5e845932b4224daf6ff7c035e65221b6",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "avatar",
+      "azimuthDegrees": 180,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-000.png",
+    "sha256": "d97dbffb93b7ca60dc8f7004b00162ddf0416c4678fc5a711c6775ef793e72e5",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-wearable-000",
+      "key": "1124eb06dba663da5df4e9928701c7ad807bea93745c7b2c8bd02ff68af0b1f9",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "wearable",
+      "azimuthDegrees": 0,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-090.png",
+    "sha256": "e2e546bbdbf899bdeec38057d58190295517b6784a8e58ad3339452c9d122bf0",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-wearable-090",
+      "key": "06b5b7243f4abac23f37acc86f8c3e3e5ce5de74ea4506ee733560c29561693f",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "wearable",
+      "azimuthDegrees": 90,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-180.png",
+    "sha256": "3062b8469f01a7a6c753b497be280237afdb69803c68e399695a7d8405d0760f",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-wearable-180",
+      "key": "a7dae672146b29917586b386a09903767be495f538b4a9b1f00d696743a47b5b",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "wearable",
+      "azimuthDegrees": 180,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-avatar-000.png",
+    "sha256": "216246181ac81bbb0f580b165cf5bfc89a021b791bf683d1292a0d1eb0d60a43",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-avatar-000",
+      "key": "d66bb4c598e7d1ab63feb250686ed4ffd54b99242a59f4d6145bad0e144724c8",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-avatar-090.png",
+    "sha256": "69dbd94e8c3d3c52c955b59d6f5186fbbd2e665138ab8adc07e9b122a0f422da",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-avatar-090",
+      "key": "21e968ee7cc45c819d3de8e8b8bd4d4cddad83b3ddac48c37eb885373c6d3439",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-avatar-180.png",
+    "sha256": "b39c265d154ac8747ae6d4654abed8f02decd678cbc51c63052eebecffc49505",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-avatar-180",
+      "key": "fe85e0fe1478f8153e2d475d4d0765cd5a7503a85477e7ddff59fa4465d6f312",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "avatar",
+      "azimuthDegrees": 180,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-wearable-000.png",
+    "sha256": "227f61273a41ec7cab5600e182cf15a1202a9ede9caf2b4e595d0f7f4daf677e",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-wearable-000",
+      "key": "3c32503ab47cc165a9f80773155cd400948088129a701571c1c9714d34915447",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "wearable",
+      "azimuthDegrees": 0,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-wearable-090.png",
+    "sha256": "e4d5f07fa3ce23405a83b944fec604faa4c8c7b61f816cad4fe6f196e32715da",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-wearable-090",
+      "key": "9f2fd19a6acb6093a6584fd93d247fdebecb988236da8777851ae1e08628d399",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "wearable",
+      "azimuthDegrees": 90,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-wearable-180.png",
+    "sha256": "7a77b38621c64af0885b8ff097b2f1a80c1d0f049cd05cd12a302409ffe74fd3",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-wearable-180",
+      "key": "c92cf1926d9af7a0bf3becbba91f1de6e985bce7cb4d8cb53beb93f9110edf06",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "wearable",
+      "azimuthDegrees": 180,
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-run-000-t0.25.png",
+    "sha256": "7200c529bc47809ce04f3bcf93ec72ed5d0d3ccf3d5a593a8a5f3808ba117583",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-avatar-run-000-t0.25",
+      "key": "68e633f945c6833387f7104185c21302ad0f08b325d22f2e93b5c8c4e8809871",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "pose": "run",
+      "timeFraction": 0.25,
+      "skin": "00ff00",
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-run-090-t0.25.png",
+    "sha256": "e0d7430b71e28d6068c98f20d453547e601ab03fcaa401aa7826929798dec243",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-avatar-run-090-t0.25",
+      "key": "993488e5cfa58c8c9d9c68489833ea3ba2638fdfe9144303df26c7ce90a1f56e",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "pose": "run",
+      "timeFraction": 0.25,
+      "skin": "00ff00",
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-jump-000-t0.75.png",
+    "sha256": "4250c4bd5021cf0fc2c9cb1712f1d93995920b44be20ca152d4bfbf334641e09",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-avatar-jump-000-t0.75",
+      "key": "a2152abb9467d72d110929652229e24bc69f70a3d95cd3811810cd469bfb5bee",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "pose": "jump",
+      "timeFraction": 0.75,
+      "skin": "00ff00",
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-jump-090-t0.75.png",
+    "sha256": "58bcf14d5082e734990127ae0f9c61bade317808a913e5f6947bc6f7886511c3",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseFemale-avatar-jump-090-t0.75",
+      "key": "fb9fde5a440fd45d20b4d9e91083cf12cc62fe7217a91d68c1fe15b3fa43d03d",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/lostcat_pants_female.glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "pose": "jump",
+      "timeFraction": 0.75,
+      "skin": "00ff00",
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-avatar-run-000-t0.25.png",
+    "sha256": "f39b192bc4a226a9d4c6cedef8a11c81c27b698a8b8af7a70144cf1d2ba80a55",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-avatar-run-000-t0.25",
+      "key": "779f1b98fad8bb68fbf91e425f5722d4881168adec97a6d68dc88aae0da96763",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "pose": "run",
+      "timeFraction": 0.25,
+      "skin": "00ff00",
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-avatar-run-090-t0.25.png",
+    "sha256": "a3e83b639fa4cd8156e3bb8188c4e875d81580f4d9a51ef7a8385732403c076c",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-avatar-run-090-t0.25",
+      "key": "29013d5482d5816e659f0582a3d6191c06838742f0fb43b5eb13005edd232dc9",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "pose": "run",
+      "timeFraction": 0.25,
+      "skin": "00ff00",
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-avatar-jump-000-t0.75.png",
+    "sha256": "41e459b6b2fe575d2ee9a125a009f4e03515ae896f01d493d2081411d66987f4",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-avatar-jump-000-t0.75",
+      "key": "43a92b32c98e05cb8135ebc6b5267ff4f57f1e9397eeff0f32770407b657511a",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "pose": "jump",
+      "timeFraction": 0.75,
+      "skin": "00ff00",
+      "size": 512
+    }
+  },
+  {
+    "file": "BaseMale-avatar-jump-090-t0.75.png",
+    "sha256": "70e449ebc0eb078dafc6bed43b09f0c678fb3aa03f5281b055b6b61e0ae8cd80",
+    "width": 512,
+    "height": 512,
+    "request": {
+      "id": "BaseMale-avatar-jump-090-t0.75",
+      "key": "de0c31cea8d3ac76612e0d9845ed9b26ed8f113f96be67433b0c626222f4809e",
+      "inputDigest": "a352a411da8cef7449a3bcb4a668482af2a8b4da542e361532356fb03549c8fd",
+      "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+      "recipeVersion": 4,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/lostcat_pants_male.glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "pose": "jump",
+      "timeFraction": 0.75,
+      "skin": "00ff00",
+      "size": 512
+    }
+  }
+]

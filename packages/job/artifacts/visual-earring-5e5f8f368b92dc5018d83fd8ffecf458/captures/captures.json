@@ -1,0 +1,218 @@
+[
+  {
+    "file": "BaseMale-avatar-000.png",
+    "sha256": "4b132f8c520f806a3aedfd9ff276a62c7f08de92ed918324b283acd3b2dbc806",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-avatar-000",
+      "key": "880ae835dc524cb35aed0be1b00aa28ffaf4861946c0d3633a3f297c26eb683e",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/03_QuackSack_unisex.glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-avatar-090.png",
+    "sha256": "f6b3475b9aad50c74eb37bc1be6cc6696554a4f8628d610c5c2e4866597ce9e2",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-avatar-090",
+      "key": "75cc82364f44fda826ddd0be4c2ce2b97196ec76c8aabe678f8a4b342f28963f",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/03_QuackSack_unisex.glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-avatar-180.png",
+    "sha256": "b140bdd2e9dc18294c1d302449c1b0e63f0da66b555de54423273966bb7de647",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-avatar-180",
+      "key": "8844f89055d8d51af49f3489415983daaca2ce57fc4089ee30bf8563ffe1626b",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/03_QuackSack_unisex.glb",
+      "view": "avatar",
+      "azimuthDegrees": 180,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-wearable-000.png",
+    "sha256": "e58d422d36d8d9d2644815ddf0b09957a68fdb609b7a581d8771b5cdd2928d10",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-wearable-000",
+      "key": "53fafb36530b0723cafc183af2dae25b4e18f882dc58488099a2fe877c10a9bf",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/03_QuackSack_unisex.glb",
+      "view": "wearable",
+      "azimuthDegrees": 0,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-wearable-090.png",
+    "sha256": "f3f86feda3fec29245dae21c4f716eaab0f8f198965214a4ece51ce9b291f1f3",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-wearable-090",
+      "key": "6716574dc924e80354b628b00f4695e96043808763f78ba6abeab4b59b5b79ce",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/03_QuackSack_unisex.glb",
+      "view": "wearable",
+      "azimuthDegrees": 90,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-wearable-180.png",
+    "sha256": "657c4c9d1bd313a946f6cdc03c7a4b96faf7990bd6bce8e5fe999c6f3442d3f7",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-wearable-180",
+      "key": "64a618f4fa7f21381daf0fc14b6c98b46c72481c38e5d3fcfedbe103fb3ac917",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/03_QuackSack_unisex.glb",
+      "view": "wearable",
+      "azimuthDegrees": 180,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-000.png",
+    "sha256": "01ae5aabe6868f103f67880846661628e958abf015036585a266c70aff873690",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-avatar-000",
+      "key": "4b01df400d95814957fd1c9397e2c6475ccc9dc7d3f7b5ebf9d6f2f705b66aa4",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/03_QuackSack_unisex.glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-090.png",
+    "sha256": "d194e280b03e64ea010cfc77f7c95debb3c3fed6d9750daf5a3b2e0c87b9d390",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-avatar-090",
+      "key": "daaa862ec678eca4a891d564ac731d6eda428336d0eb39eca624bc20d7ea9ad5",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/03_QuackSack_unisex.glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-180.png",
+    "sha256": "093b3c0aa2c6e7dbd7f729b266953649a1f72f0604ce051353e8e81fefa8b6f7",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-avatar-180",
+      "key": "b10af2e61df528d151b450fb99568304b3d15c4a566e1cbe11d719cb9a2a4cb0",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/03_QuackSack_unisex.glb",
+      "view": "avatar",
+      "azimuthDegrees": 180,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-000.png",
+    "sha256": "d103487352c2c8276f7dfa07c08b93c7a981d066e295557940f613bca9ef87b7",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-wearable-000",
+      "key": "ffd4de05fcaaced2e619361ede6a3d4f5bd1a5e879643540c0ca5a7332b1134d",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/03_QuackSack_unisex.glb",
+      "view": "wearable",
+      "azimuthDegrees": 0,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-090.png",
+    "sha256": "baca6e9a204cd388d2ca92450aa84121cfc724ce492dca98638b5c0e2aa904f9",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-wearable-090",
+      "key": "23ee4261a33d69d4a63126c920f2efdb1efb740cbeb18d19f8c337ac5c8a3bf1",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/03_QuackSack_unisex.glb",
+      "view": "wearable",
+      "azimuthDegrees": 90,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-180.png",
+    "sha256": "63c9a61c9f9e615a77d8a0b9fe12db26f812240fb62faa41f3d4b74f01df1f47",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-wearable-180",
+      "key": "c1b7b00b7061b2e3beb0f12da469471cba9441ece2e35c83081a3ec5c22533df",
+      "inputDigest": "31966830db66e2778851c78be520ea1bc29de032673a767a9a1f662427bb859b",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/03_QuackSack_unisex.glb",
+      "view": "wearable",
+      "azimuthDegrees": 180,
+      "size": 1024
+    }
+  }
+]

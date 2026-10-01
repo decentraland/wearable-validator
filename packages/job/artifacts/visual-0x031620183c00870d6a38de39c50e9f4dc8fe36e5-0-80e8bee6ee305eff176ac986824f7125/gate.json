@@ -1,0 +1,301 @@
+{
+  "passed": false,
+  "checks": [
+    {
+      "check": "file-format",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 model files",
+      "durationMs": 0
+    },
+    {
+      "check": "gltf-valid",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 GLBs parsed",
+      "durationMs": 0
+    },
+    {
+      "check": "metadata",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "entity metadata",
+      "durationMs": 47
+    },
+    {
+      "check": "representations",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 body shapes (female, male)",
+      "durationMs": 7
+    },
+    {
+      "check": "file-size",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1.25 MB total",
+      "durationMs": 0
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "status": "warning",
+      "coverage": "complete",
+      "measured": "1024×1024 · 0.55 MB",
+      "durationMs": 85
+    },
+    {
+      "check": "name-description",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "name 12 · description 31 · 0 tags",
+      "durationMs": 0
+    },
+    {
+      "check": "category",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "lower_body",
+      "durationMs": 0
+    },
+    {
+      "check": "content-integrity",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "4 files hashed",
+      "durationMs": 3
+    },
+    {
+      "check": "gltf-hygiene",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 extensions used",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 textures",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "status": "failed",
+      "coverage": "complete",
+      "measured": "largest 515×512",
+      "durationMs": 1
+    },
+    {
+      "check": "texture-format",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "PNG · 8-bit",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-maps",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "emission · base color",
+      "durationMs": 0
+    },
+    {
+      "check": "material-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 materials",
+      "durationMs": 0
+    },
+    {
+      "check": "material-names",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "no AvatarSkin_MAT",
+      "durationMs": 0
+    },
+    {
+      "check": "triangle-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "818 tris",
+      "durationMs": 0
+    },
+    {
+      "check": "bounding-box",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "female/lostcat_pants_female.glb: 0.004435754 × 0.009454984 × 0.01222014 m / male/lostcat_pants_male.glb: 0.00429114 × 0.009486599 × 0.01222014 m",
+      "durationMs": 2
+    },
+    {
+      "check": "skeleton",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "62 joints",
+      "durationMs": 0
+    },
+    {
+      "check": "bone-weights",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "skinned",
+      "durationMs": 0
+    },
+    {
+      "check": "hides-replaces",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "hides 0 · replaces 0",
+      "durationMs": 0
+    },
+    {
+      "check": "static-mesh",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 animations · 0 shape keys",
+      "durationMs": 0
+    },
+    {
+      "check": "spring-bones",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 spring bones",
+      "durationMs": 0
+    },
+    {
+      "check": "qr-code",
+      "group": "content",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "5 images scanned",
+      "durationMs": 208
+    }
+  ],
+  "findings": [
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "rule": "S-06",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails",
+      "severity": "warning",
+      "message": "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.",
+      "where": "thumbnail.png",
+      "measured": "1024×1024",
+      "limit": "256×256"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"female/lostcat_pants_female.glb\" › M002 is 515×512; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"female/lostcat_pants_female.glb\" › M002",
+      "measured": "515×512",
+      "limit": "512×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"female/lostcat_pants_female.glb\" › M002 is 515×512 — textures must be square. Re-export it with equal width and height.",
+      "where": "\"female/lostcat_pants_female.glb\" › M002",
+      "measured": "515×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"female/lostcat_pants_female.glb\" › M002 is 515×512; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"female/lostcat_pants_female.glb\" › M002",
+      "measured": "515×512",
+      "limit": "512×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"female/lostcat_pants_female.glb\" › M002 is 515×512 — textures must be square. Re-export it with equal width and height.",
+      "where": "\"female/lostcat_pants_female.glb\" › M002",
+      "measured": "515×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"male/lostcat_pants_male.glb\" › M002 is 515×512; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"male/lostcat_pants_male.glb\" › M002",
+      "measured": "515×512",
+      "limit": "512×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"male/lostcat_pants_male.glb\" › M002 is 515×512 — textures must be square. Re-export it with equal width and height.",
+      "where": "\"male/lostcat_pants_male.glb\" › M002",
+      "measured": "515×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"male/lostcat_pants_male.glb\" › M002 is 515×512; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"male/lostcat_pants_male.glb\" › M002",
+      "measured": "515×512",
+      "limit": "512×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"male/lostcat_pants_male.glb\" › M002 is 515×512 — textures must be square. Re-export it with equal width and height.",
+      "where": "\"male/lostcat_pants_male.glb\" › M002",
+      "measured": "515×512"
+    }
+  ],
+  "captures": [],
+  "summary": {
+    "errors": 8,
+    "warnings": 1,
+    "checked": 24,
+    "skipped": 0
+  }
+}

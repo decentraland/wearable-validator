@@ -1,0 +1,434 @@
+{
+  "passed": null,
+  "checks": [
+    {
+      "check": "render-valid",
+      "group": "rendering",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 views · 19.8% drawn at least",
+      "durationMs": 16719
+    },
+    {
+      "check": "thumbnail-honesty",
+      "group": "rendering",
+      "status": "errored",
+      "coverage": "missing",
+      "skipReason": "The model was not called: the run server has no ANTHROPIC_OAUTH_SETUP_TOKEN.",
+      "review": {
+        "provider": "none",
+        "model": "none",
+        "promptVersion": 4,
+        "promptDigest": "9df22b603a06cf320e3e50575783a46fb32fc61482dc459ceabc4ee6dc8f5dee"
+      },
+      "durationMs": 188
+    },
+    {
+      "check": "visual-quality",
+      "group": "rendering",
+      "status": "errored",
+      "coverage": "missing",
+      "skipReason": "The model was not called: the run server has no ANTHROPIC_OAUTH_SETUP_TOKEN.",
+      "review": {
+        "provider": "none",
+        "model": "none",
+        "promptVersion": 2,
+        "promptDigest": "e327a1dd88682343a6aa6cdfe4150177853ae6bce574f05d5e117437a7220a2b"
+      },
+      "durationMs": 127
+    }
+  ],
+  "findings": [],
+  "captures": [
+    {
+      "sha256": "8aa3d5709a3cf671bd7f7bbc098ece58c99fc209f4ee529ba681953f5f1fc4c4",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-000",
+        "key": "61316a3c33e4e8d5f3fe551555ecb6b948d5abcd8b4c8e895bc86595f6d3a2a3",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-000.png"
+    },
+    {
+      "sha256": "88c88b08ca9cc461f6ee074ad82c84e48cdfe16b0aea2238e2b82b5a53cad395",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-090",
+        "key": "8cce332b783e19b0bd1965a0b6ff5fddab0323f2925c94270d4eac62770d263c",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-090.png"
+    },
+    {
+      "sha256": "ecaefe69df7e488efa7ddb9cb6f5c18368bd28bd6905d0fe221d998cb4900417",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-180",
+        "key": "663d5338fbc85ccdd79d591f522cba941d38a3c37b3308cc3c374d795cd648e7",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "avatar",
+        "azimuthDegrees": 180,
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-180.png"
+    },
+    {
+      "sha256": "65a7740cfa52000f1a44d043596b6f05d26e6de43821fadd68e86a36c7d4c290",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-wearable-000",
+        "key": "74ceb6de29c337260dfa634a55a2e9ed3e3c52835917efaba980bc2f4f61794c",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "wearable",
+        "azimuthDegrees": 0,
+        "size": 512
+      },
+      "file": "captures/BaseMale-wearable-000.png"
+    },
+    {
+      "sha256": "0ae50b204ea4a401886881152d1be1f32c58d131767a6b0f821eb2b7b0b68ddc",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-wearable-090",
+        "key": "b76f481e4109678782ce74b808d2fa7e9dec45df9e81abcd57833295d857ba87",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "wearable",
+        "azimuthDegrees": 90,
+        "size": 512
+      },
+      "file": "captures/BaseMale-wearable-090.png"
+    },
+    {
+      "sha256": "5aea0ec32a42cb602f683e9d92e3d27bacaac7360eef95c5834183cf55e2c7aa",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-wearable-180",
+        "key": "d83ab41a1a144bd99a909729d995d5e72dbee6990503ca12f6085ed4a35e826a",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "wearable",
+        "azimuthDegrees": 180,
+        "size": 512
+      },
+      "file": "captures/BaseMale-wearable-180.png"
+    },
+    {
+      "sha256": "9685785833eb742c41bf9bf39a10dd1aa01f70c53e24ef87d51b535f9c036608",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-000",
+        "key": "8ed0f79a1150f1477694f412eb679b6fa6d4e7a67f396e716e779feaacb2331b",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-000.png"
+    },
+    {
+      "sha256": "774c06d14e324621d42eddaedab04d6bd44dd6eb24249b660a6412adeaaecdda",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-090",
+        "key": "a1381c2fd97dbc2775b2b5737cd31e36bd52287dc281c6db94c78ab397512c1d",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-090.png"
+    },
+    {
+      "sha256": "e5b0ae393db1b9970c476414db11b9a8ee1056da6dad8c4670efbcc339fa6bf1",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-180",
+        "key": "40a51ded26b3c28587d61766495455164786f854f6aae28df1839638367b6fb2",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "avatar",
+        "azimuthDegrees": 180,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-180.png"
+    },
+    {
+      "sha256": "67589727019ca03fd369eceec2016d05b96fcda8cdfd6ce519b6e57158791b6e",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-wearable-000",
+        "key": "07e91cc0b163bb64df544893bfbcb16a33e805e7ff3d239d76d13e66450dcab2",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "wearable",
+        "azimuthDegrees": 0,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-wearable-000.png"
+    },
+    {
+      "sha256": "1bab92fdaff574670ca1c9411770d813571a7eeb1f7ee3e9de7de708a4d70126",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-wearable-090",
+        "key": "7f105c0052503506f39cb7ad8ef3159925113a5ba106519cdf1aedf985dc65cd",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "wearable",
+        "azimuthDegrees": 90,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-wearable-090.png"
+    },
+    {
+      "sha256": "c7f39c06a368ecd4e7b605bb7962679fb78ff9c61d09dd4f913c924c73a70970",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-wearable-180",
+        "key": "8bf0b4ef404d4c0af4fb0e24fbe15dea1690ece0ac19d791585320dd8eb7177d",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "wearable",
+        "azimuthDegrees": 180,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-wearable-180.png"
+    },
+    {
+      "sha256": "1f1f704c8d48115a2d830485133714a0a2f1bb6f8c5d63a6f860d9ecb679e0d0",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-dab-000-t0.5",
+        "key": "49ac58a91996a5bc8543c6e7130547fe6551ba03fc9d08e14bc61c4dc033e46d",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "pose": "dab",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-dab-000-t0.5.png"
+    },
+    {
+      "sha256": "0b30d7ce461618944ee212fce4faa52731c83b56c51746d60685c32bf287c2ba",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-dab-090-t0.5",
+        "key": "c1f7553a0affcd53bbef1e34e8e96e322a8ea55f3c044ab1a6b9b564cf667c48",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "pose": "dab",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-dab-090-t0.5.png"
+    },
+    {
+      "sha256": "ee3721d6e3f2a501269d6685696c7fd258bb08259d440481bf3c415bb97765d9",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-clap-000-t0.5",
+        "key": "4d8b9ebab4bd5023951af43a1990e2cee83c3f1acc6b85035bf4a70971507079",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "pose": "clap",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-clap-000-t0.5.png"
+    },
+    {
+      "sha256": "3139c4850197a16f3d2d2d4f657e77ae4e6f2cd0e4a41198a2a39d21678ce30e",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-clap-090-t0.5",
+        "key": "73831dbf9d5211c955c137e82ecbb0dba27608f70d6f6a1097e844dce8435350",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/01-NFTNYC-TALLTEE_M.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "pose": "clap",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-clap-090-t0.5.png"
+    },
+    {
+      "sha256": "7aefac727fa782a144b1ce2454cf53d8664e9c93df0649ff8fafd6e05de8c2eb",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-dab-000-t0.5",
+        "key": "457a59a727e09c96f4c37a7dbb66baf9b8eabb2ba79b749b15b70249c49ea0bb",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "pose": "dab",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-dab-000-t0.5.png"
+    },
+    {
+      "sha256": "7d20b377be81978a31cdb51501e3b5ba66ccf66bc12e9f9ee74a6c3153e17d10",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-dab-090-t0.5",
+        "key": "33fa6bb852e40e20a8a7936d134335b8da7f9fefcac12837f08bdb34994e837b",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "pose": "dab",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-dab-090-t0.5.png"
+    },
+    {
+      "sha256": "ecb4fabfca84c3bb9b8dd58499ed565cb07b8452d9b9ac78e48ccf4ef16ccb0f",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-clap-000-t0.5",
+        "key": "2196d137356499d018d93e196f575545c4c2b7de2ef07587646370ba9ac08c1c",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "pose": "clap",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-clap-000-t0.5.png"
+    },
+    {
+      "sha256": "c97d176f3fce0e9cef855c2f5834bdb2f061a825e0d1ce71a8d774128f280e4e",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-clap-090-t0.5",
+        "key": "3ecb83d029d3ffd63c7f453acf006d6f11fbdff325b2a03743b9a22abba7194f",
+        "inputDigest": "365bf2d4ffb9571457a43b023d3386c6df7d5635bd6ba05b473ab9c77efb727e",
+        "rendererBuild": "0bfd804f19436ad2b552411cb5ddc3abb1ce5da9063ceb598ff69d8d8079ae41",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/02-NFTNYC-TALLTEE_F.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "pose": "clap",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-clap-090-t0.5.png"
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "checked": 3,
+    "skipped": 0
+  }
+}

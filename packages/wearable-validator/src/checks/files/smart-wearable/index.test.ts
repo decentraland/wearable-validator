@@ -69,4 +69,19 @@ describe("smart-wearable (S-11)", () => {
     assert.equal(only(result.findings, "smart-wearable").length, 0);
     assert.equal(result.checks[0]?.status, "passed");
   });
+
+  it("reads a scene bundle in each body shape's folder, as the Builder keeps them, resolving the main script from there", async () => {
+    const bundle = (folder: string) => ({ [`${folder}/scene.json`]: enc(JSON.stringify({ main: "bin/game.js" })), [`${folder}/bin/game.js`]: enc("//bundle") });
+    const both = await validate(await syntheticZip({ extraFiles: { ...bundle("male"), ...bundle("female") } }), { checks: ["smart-wearable"] });
+    assert.equal(only(both.findings, "smart-wearable").length, 0, "male/scene.json → male/bin/game.js");
+    const missing = await validate(await syntheticZip({ extraFiles: { ...bundle("male"), "female/scene.json": enc(JSON.stringify({ main: "bin/game.js" })) } }), { checks: ["smart-wearable"] });
+    assert.deepEqual(only(missing.findings, "smart-wearable").map((finding) => finding.where), ["female/bin/game.js"], "each folder needs its own bundle");
+    const escaping = await validate(await syntheticZip({ extraFiles: { "male/scene.json": enc(JSON.stringify({ main: "../../game.js" })), "game.js": enc("//bundle") } }), { checks: ["smart-wearable"] });
+    assert.equal(only(escaping.findings, "smart-wearable").length, 1, "a main script outside the item is never found");
+  });
+
+  it("refuses a scene.json that is not a JSON object", async () => {
+    const zip = await syntheticZip({ extraFiles: { "scene.json": enc("null"), "game.js": enc("//bundle") } });
+    assert.match(only((await validate(zip, { checks: ["smart-wearable"] })).findings, "smart-wearable")[0].message, /not a valid scene definition/);
+  });
 });

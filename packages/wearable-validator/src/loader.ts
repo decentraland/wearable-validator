@@ -340,7 +340,8 @@ function readEmbeddedManifest(files: Map<string, Uint8Array>): { kind: "wearable
 
 /** Builder wearable.json / emote.json — fields live either flat or under `data`. Tolerant by design. */
 function normalizeBuilderManifest(raw: Record<string, unknown>, kind: "wearable" | "emote"): NormalizedItem {
-  const data = (raw.data ?? {}) as Record<string, unknown>;
+  // an emote.json may hold entity metadata, with the emote's data under emoteDataADR74 instead of data
+  const data = (raw.data ?? raw.emoteDataADR74 ?? {}) as Record<string, unknown>;
   const pick = <T>(key: string): T | undefined => (data[key] ?? raw[key]) as T | undefined;
   const item: NormalizedItem = {
     name: raw.name as string | undefined,

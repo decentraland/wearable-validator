@@ -1,0 +1,218 @@
+[
+  {
+    "file": "BaseMale-avatar-000.png",
+    "sha256": "b0b88f039b834f77ec9e0f48a43ac074cd2bd9a2c2a73ee0b4fb0444038f28d0",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-avatar-000",
+      "key": "d0d06cdf55cda9126c3e87011263159c6b25bf9e74b1f691b60a8074e560da7c",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/HORN 5 (Working) .glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-avatar-090.png",
+    "sha256": "5a1d942fa6cc178c977da381a4483d9427c7e2c026c95b37508ae7a4aede71a1",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-avatar-090",
+      "key": "c2a852560715e4741fe66aec83165a61b5f62c28f1e6be4f5162be8c09b2b89e",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/HORN 5 (Working) .glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-avatar-180.png",
+    "sha256": "9c384233c0bf3611414e68d64dc0be53e58beaf6300c5df1bb1a8feb5390a9d0",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-avatar-180",
+      "key": "17ed3f1b3e84a4dcd444e9a6d16d3a53925feefa6d22d36d574426f244f79899",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/HORN 5 (Working) .glb",
+      "view": "avatar",
+      "azimuthDegrees": 180,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-wearable-000.png",
+    "sha256": "df1dfd5d7365c8f077563ff987b8232e2438dbd35933d0e2850a75d48ce37a4f",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-wearable-000",
+      "key": "e6157f2031290c5053dc1e437737b14bd3184f49e41028dd1e8ff4ae13218578",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/HORN 5 (Working) .glb",
+      "view": "wearable",
+      "azimuthDegrees": 0,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-wearable-090.png",
+    "sha256": "021c244a1f5e1adb1c34164d8738dcc78a427ee5df3840f9e5e2f7d7bb40a9b4",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-wearable-090",
+      "key": "a5fa93035f4483509253e2cfd259760ae35126fe531a573c66b2e2815eafded5",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/HORN 5 (Working) .glb",
+      "view": "wearable",
+      "azimuthDegrees": 90,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseMale-wearable-180.png",
+    "sha256": "1d6c54d68f3c03da1de9c1564a4240e25e5d6e74373a28bf1ed0a25fa15e5797",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseMale-wearable-180",
+      "key": "7dcef1c38428a10b54fb14f064776faf970f8e6589eac820fce7fa7c479af297",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+      "mainFile": "male/HORN 5 (Working) .glb",
+      "view": "wearable",
+      "azimuthDegrees": 180,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-000.png",
+    "sha256": "1c040aa4275d2e42c4c00e29499968d10a084ada0f081c88ee262307b5c97362",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-avatar-000",
+      "key": "c04d79c383a1e2b8a11fcbb949b9cf03605bdee3cb82a4c0802234657a92b4f0",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/HORN 5 (Working) .glb",
+      "view": "avatar",
+      "azimuthDegrees": 0,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-090.png",
+    "sha256": "e616eced34c26542345f7f7d94087e77e0bc33de899de01bb72b2314f099c020",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-avatar-090",
+      "key": "59f826a2f5f207463c165805fd9598a961d3458940e2bb19868a65e888c511ef",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/HORN 5 (Working) .glb",
+      "view": "avatar",
+      "azimuthDegrees": 90,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-avatar-180.png",
+    "sha256": "62249ecfea51996e80e621374645e9fc4afb73c2c0718eced56c4d54c70e3510",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-avatar-180",
+      "key": "3eb098549ac7b52f60657ed7e17918d0bda26e6a3c50654d5a694c074a6c447e",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/HORN 5 (Working) .glb",
+      "view": "avatar",
+      "azimuthDegrees": 180,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-000.png",
+    "sha256": "c006fa456d4bb309d432161b00c55e37900ef382979074029dfd29131670c62c",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-wearable-000",
+      "key": "2ceb9b4c113518dbc7cc81751af30093698ec98d79150f32126ddf8d2331a4ac",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/HORN 5 (Working) .glb",
+      "view": "wearable",
+      "azimuthDegrees": 0,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-090.png",
+    "sha256": "a4c6b639fa7ad32d1620635d57fefff5f7ad71028953aa509a018b3921bdcf17",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-wearable-090",
+      "key": "2e5c8874efcf35b8f74130a8567ca0bcf6563b0eeb6243e162cf07b3155134cf",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/HORN 5 (Working) .glb",
+      "view": "wearable",
+      "azimuthDegrees": 90,
+      "size": 1024
+    }
+  },
+  {
+    "file": "BaseFemale-wearable-180.png",
+    "sha256": "aaafe19034f36dbd3e7430d8298432cc08a6b33937c4cd5f199cd89e09ca018d",
+    "width": 1024,
+    "height": 1024,
+    "request": {
+      "id": "BaseFemale-wearable-180",
+      "key": "516b5e6dbdaccd482d98a4ded8a1c1cf6a11d7b78dc131080fa1082fe1ea5d7f",
+      "inputDigest": "c97645d8546c1417e71e077d244bd3daebaaeb0ca713d041f2224f4a2d32eed6",
+      "rendererBuild": "c3a99f9c108e5327fae5f2836e15e22115fd77bcb56ff19d657e2e464e22aab7",
+      "recipeVersion": 1,
+      "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+      "mainFile": "female/HORN 5 (Working) .glb",
+      "view": "wearable",
+      "azimuthDegrees": 180,
+      "size": 1024
+    }
+  }
+]

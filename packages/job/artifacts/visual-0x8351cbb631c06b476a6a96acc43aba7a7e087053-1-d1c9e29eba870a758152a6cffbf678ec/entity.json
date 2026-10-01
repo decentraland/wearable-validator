@@ -1,0 +1,71 @@
+{
+  "urn": "urn:decentraland:amoy:collections-v2:0x8351cbb631c06b476a6a96acc43aba7a7e087053:1",
+  "id": "bafkreif3tosdifcoftx56qagbz6qnixhqudkpeymnrmyxby6umt2rytmhq",
+  "name": "Flamethrower",
+  "metadata": {
+    "id": "urn:decentraland:amoy:collections-v2:0x8351cbb631c06b476a6a96acc43aba7a7e087053:1",
+    "name": "Flamethrower",
+    "description": "",
+    "collectionAddress": "0x8351cbb631c06b476a6a96acc43aba7a7e087053",
+    "rarity": "mythic",
+    "i18n": [
+      {
+        "code": "en",
+        "text": "Flamethrower"
+      }
+    ],
+    "emoteDataADR74": {
+      "category": "fun",
+      "representations": [
+        {
+          "bodyShapes": [
+            "urn:decentraland:off-chain:base-avatars:BaseMale"
+          ],
+          "mainFile": "male/Flamethrower.glb",
+          "contents": [
+            "male/Flamethrower.glb"
+          ]
+        },
+        {
+          "bodyShapes": [
+            "urn:decentraland:off-chain:base-avatars:BaseFemale"
+          ],
+          "mainFile": "female/Flamethrower.glb",
+          "contents": [
+            "female/Flamethrower.glb"
+          ]
+        }
+      ],
+      "tags": [],
+      "loop": true
+    },
+    "image": "image.png",
+    "thumbnail": "thumbnail.png",
+    "metrics": {
+      "triangles": 0,
+      "materials": 0,
+      "textures": 0,
+      "meshes": 0,
+      "bodies": 0,
+      "entities": 1
+    }
+  },
+  "content": [
+    {
+      "file": "female/Flamethrower.glb",
+      "hash": "bafybeib3yrqonsoaqvbjxcoehtj5c5l3e466p2a4lcxehi7i7ipfmd2cim"
+    },
+    {
+      "file": "image.png",
+      "hash": "bafkreie3lsbmnavamymtiob5idxnuogycuhif7tfavphl774s5y3b4wf3y"
+    },
+    {
+      "file": "male/Flamethrower.glb",
+      "hash": "bafybeib3yrqonsoaqvbjxcoehtj5c5l3e466p2a4lcxehi7i7ipfmd2cim"
+    },
+    {
+      "file": "thumbnail.png",
+      "hash": "bafkreihztjtojac5zcd6przwdiy6jccixxihno4aamugrjcfbp2tfy2vsq"
+    }
+  ]
+}

@@ -1,0 +1,240 @@
+{
+  "passed": false,
+  "checks": [
+    {
+      "check": "file-format",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 model files",
+      "durationMs": 0
+    },
+    {
+      "check": "gltf-valid",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 GLBs parsed",
+      "durationMs": 1
+    },
+    {
+      "check": "metadata",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "builder manifest",
+      "durationMs": 20
+    },
+    {
+      "check": "representations",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 body shapes (male, female)",
+      "durationMs": 10
+    },
+    {
+      "check": "file-size",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1.54 MB total",
+      "durationMs": 0
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "status": "warning",
+      "coverage": "complete",
+      "measured": "1024×1024 · 0.29 MB",
+      "durationMs": 37
+    },
+    {
+      "check": "name-description",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "name 30 · 5 tags",
+      "durationMs": 0
+    },
+    {
+      "check": "category",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "upper_body",
+      "durationMs": 0
+    },
+    {
+      "check": "gltf-hygiene",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 extensions used",
+      "durationMs": 1
+    },
+    {
+      "check": "texture-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 textures",
+      "durationMs": 1
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "status": "failed",
+      "coverage": "complete",
+      "measured": "largest 2048×2048",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-format",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "PNG · 8-bit",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-maps",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "base color",
+      "durationMs": 0
+    },
+    {
+      "check": "material-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1 material",
+      "durationMs": 0
+    },
+    {
+      "check": "material-names",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "has AvatarSkin_MAT",
+      "durationMs": 0
+    },
+    {
+      "check": "triangle-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1,204 tris",
+      "durationMs": 9
+    },
+    {
+      "check": "bounding-box",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "male/01-NFTNYC-TALLTEE_M.glb: 0.0136784 × 0.003908 × 0.007233475 m / female/02-NFTNYC-TALLTEE_F.glb: 0.01368504 × 0.004230625 × 0.007123069 m",
+      "durationMs": 2
+    },
+    {
+      "check": "skeleton",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "62 joints",
+      "durationMs": 0
+    },
+    {
+      "check": "bone-weights",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "skinned",
+      "durationMs": 1
+    },
+    {
+      "check": "hides-replaces",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "hides 0 · replaces 0",
+      "durationMs": 0
+    },
+    {
+      "check": "static-mesh",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 animations · 0 shape keys",
+      "durationMs": 0
+    },
+    {
+      "check": "spring-bones",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 spring bones",
+      "durationMs": 0
+    },
+    {
+      "check": "qr-code",
+      "group": "content",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "5 images scanned",
+      "durationMs": 500
+    }
+  ],
+  "findings": [
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "rule": "S-06",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails",
+      "severity": "warning",
+      "message": "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.",
+      "where": "thumbnail.png",
+      "measured": "1024×1024",
+      "limit": "256×256"
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "rule": "S-06",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails",
+      "severity": "warning",
+      "message": "Thumbnail has no alpha channel — the background should be transparent. Export as RGBA PNG.",
+      "where": "thumbnail.png"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"male/01-NFTNYC-TALLTEE_M.glb\" › combi-2026_c is 2048×2048; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"male/01-NFTNYC-TALLTEE_M.glb\" › combi-2026_c",
+      "measured": "2048×2048",
+      "limit": "512×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"female/02-NFTNYC-TALLTEE_F.glb\" › combi-2026_c is 2048×2048; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"female/02-NFTNYC-TALLTEE_F.glb\" › combi-2026_c",
+      "measured": "2048×2048",
+      "limit": "512×512"
+    }
+  ],
+  "captures": [],
+  "summary": {
+    "errors": 2,
+    "warnings": 2,
+    "checked": 23,
+    "skipped": 0
+  }
+}

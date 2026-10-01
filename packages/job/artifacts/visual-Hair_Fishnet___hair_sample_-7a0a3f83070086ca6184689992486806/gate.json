@@ -1,0 +1,240 @@
+{
+  "passed": false,
+  "checks": [
+    {
+      "check": "file-format",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 model files",
+      "durationMs": 0
+    },
+    {
+      "check": "gltf-valid",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 GLBs parsed",
+      "durationMs": 0
+    },
+    {
+      "check": "metadata",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "builder manifest",
+      "durationMs": 25
+    },
+    {
+      "check": "representations",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 body shapes (male, female)",
+      "durationMs": 11
+    },
+    {
+      "check": "file-size",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2.07 MB total",
+      "durationMs": 0
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "status": "warning",
+      "coverage": "complete",
+      "measured": "1024×1024 · 0.18 MB",
+      "durationMs": 35
+    },
+    {
+      "check": "name-description",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "name 13 · 0 tags",
+      "durationMs": 0
+    },
+    {
+      "check": "category",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "hair",
+      "durationMs": 0
+    },
+    {
+      "check": "gltf-hygiene",
+      "group": "files",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 extensions used",
+      "durationMs": 1
+    },
+    {
+      "check": "texture-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "1 texture",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "status": "failed",
+      "coverage": "complete",
+      "measured": "largest 1024×1024",
+      "durationMs": 0
+    },
+    {
+      "check": "texture-format",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "PNG · 8-bit",
+      "durationMs": 1
+    },
+    {
+      "check": "texture-maps",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "base color",
+      "durationMs": 0
+    },
+    {
+      "check": "material-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 materials",
+      "durationMs": 1
+    },
+    {
+      "check": "material-names",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "no AvatarSkin_MAT",
+      "durationMs": 0
+    },
+    {
+      "check": "triangle-count",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2,206 tris",
+      "durationMs": 9
+    },
+    {
+      "check": "bounding-box",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "male/obj_fishy_hair_both.glb: 0.003932338 × 0.004209491 × 0.005159742 m / female/obj_fishy_hair_both.glb: 0.003932338 × 0.004209491 × 0.005159742 m",
+      "durationMs": 2
+    },
+    {
+      "check": "skeleton",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "62 joints",
+      "durationMs": 0
+    },
+    {
+      "check": "bone-weights",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "skinned",
+      "durationMs": 2
+    },
+    {
+      "check": "hides-replaces",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "hides 3 · replaces 0",
+      "durationMs": 0
+    },
+    {
+      "check": "static-mesh",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 animations · 0 shape keys",
+      "durationMs": 1
+    },
+    {
+      "check": "spring-bones",
+      "group": "model",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "0 spring bones",
+      "durationMs": 0
+    },
+    {
+      "check": "qr-code",
+      "group": "content",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "3 images scanned",
+      "durationMs": 254
+    }
+  ],
+  "findings": [
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "rule": "S-06",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails",
+      "severity": "warning",
+      "message": "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.",
+      "where": "thumbnail.png",
+      "measured": "1024×1024",
+      "limit": "256×256"
+    },
+    {
+      "check": "thumbnail",
+      "group": "files",
+      "rule": "S-06",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/manage-collections/uploading-wearables#custom-thumbnails",
+      "severity": "warning",
+      "message": "Thumbnail has no alpha channel — the background should be transparent. Export as RGBA PNG.",
+      "where": "thumbnail.png"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"male/obj_fishy_hair_both.glb\" › obj_fishy_hair01 is 1024×1024; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"male/obj_fishy_hair_both.glb\" › obj_fishy_hair01",
+      "measured": "1024×1024",
+      "limit": "512×512"
+    },
+    {
+      "check": "texture-size",
+      "group": "model",
+      "rule": "M-03",
+      "docs": "https://docs.decentraland.org/creator/wearables-and-emotes/wearables/creating-wearables#base-materials-and-textures",
+      "severity": "error",
+      "message": "\"female/obj_fishy_hair_both.glb\" › obj_fishy_hair01 is 1024×1024; the maximum texture size is 512×512. Resize it to 512×512 or smaller.",
+      "where": "\"female/obj_fishy_hair_both.glb\" › obj_fishy_hair01",
+      "measured": "1024×1024",
+      "limit": "512×512"
+    }
+  ],
+  "captures": [],
+  "summary": {
+    "errors": 2,
+    "warnings": 2,
+    "checked": 23,
+    "skipped": 0
+  }
+}

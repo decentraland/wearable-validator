@@ -1,0 +1,11 @@
+{
+  "check": {
+    "check": "thumbnail-honesty",
+    "group": "rendering",
+    "status": "errored",
+    "coverage": "missing",
+    "skipReason": "The render server exited (1). Its last log lines: /var/folders/dr/wth71hr173z2359v0n9k806c0000gn/T/tmp.1rbJjmGvhj/render-server.tar.gz: OK | ERROR: failed to connect to the docker API at unix:///Users/boedo/.docker/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/boedo/.docker/run/docker.sock: connect: no such file or directory",
+    "durationMs": 2809
+  },
+  "findings": []
+}

@@ -1,0 +1,434 @@
+{
+  "passed": null,
+  "checks": [
+    {
+      "check": "render-valid",
+      "group": "rendering",
+      "status": "passed",
+      "coverage": "complete",
+      "measured": "2 views · 10.6% drawn at least",
+      "durationMs": 31660
+    },
+    {
+      "check": "thumbnail-honesty",
+      "group": "rendering",
+      "status": "errored",
+      "coverage": "missing",
+      "skipReason": "The model was not called: the run server has no ANTHROPIC_OAUTH_SETUP_TOKEN.",
+      "review": {
+        "provider": "none",
+        "model": "none",
+        "promptVersion": 4,
+        "promptDigest": "9df22b603a06cf320e3e50575783a46fb32fc61482dc459ceabc4ee6dc8f5dee"
+      },
+      "durationMs": 199
+    },
+    {
+      "check": "visual-quality",
+      "group": "rendering",
+      "status": "errored",
+      "coverage": "missing",
+      "skipReason": "The model was not called: the run server has no ANTHROPIC_OAUTH_SETUP_TOKEN.",
+      "review": {
+        "provider": "none",
+        "model": "none",
+        "promptVersion": 2,
+        "promptDigest": "e327a1dd88682343a6aa6cdfe4150177853ae6bce574f05d5e117437a7220a2b"
+      },
+      "durationMs": 200
+    }
+  ],
+  "findings": [],
+  "captures": [
+    {
+      "sha256": "df81da34b465ef27a9cb0650303f55ecaf8fc92455243d493346d9d7b2ea7c5d",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-000",
+        "key": "39f327652391772cb1b429fe56edcca5a6b56d6b0397e8e45043d6e4517409a7",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-000.png"
+    },
+    {
+      "sha256": "7823f56293e9f9fc70b1b954756992c08e5a32adef6b8deeb1c677a2d91928cc",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-090",
+        "key": "bbc3f8e63d27e4556590817027cd180c5db3c50d6bd24fdcd16bb1af64f9c485",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-090.png"
+    },
+    {
+      "sha256": "6830ffdec97b42f936632092124f594d9158fbe60fdba892356b9c02100038cf",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-180",
+        "key": "3f3cd8ea8e77c1c14395939adff9d43ed9381a4fa96228c9aa20e4d3b9efc42d",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 180,
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-180.png"
+    },
+    {
+      "sha256": "deffb191dbfc4716f8232eff94e4ea61b030579fa6342176a6800bd0738ce317",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-wearable-000",
+        "key": "f5bf88a7bf75d6686bc03f63db0645254e7236425d376ba5c732267fc62e1e74",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "wearable",
+        "azimuthDegrees": 0,
+        "size": 512
+      },
+      "file": "captures/BaseMale-wearable-000.png"
+    },
+    {
+      "sha256": "561a79c6b9a69b0ddf95b5602d88e8e3b6e6a07c58bae63a238a3d5721093a3b",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-wearable-090",
+        "key": "4e36d2af79d9fb667ef14a274c116d146879882637add6cd4fc1c885983e8ace",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "wearable",
+        "azimuthDegrees": 90,
+        "size": 512
+      },
+      "file": "captures/BaseMale-wearable-090.png"
+    },
+    {
+      "sha256": "2e10ce3f82634944c991ffc86034ef9037f89c4a2c6e951d2c2d796c17a9831a",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-wearable-180",
+        "key": "5c4a7443a29a01e9c88f73fff7691c120da57a15d3c8b883a954b680c02c2ec3",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "wearable",
+        "azimuthDegrees": 180,
+        "size": 512
+      },
+      "file": "captures/BaseMale-wearable-180.png"
+    },
+    {
+      "sha256": "9b85cca780bb945298648addf163a7f6ad39d8da7e96b0aaa7a5de4d258d561b",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-000",
+        "key": "f8d48520179c2006933d0749b9a672ac007ed8b17a3185ee1fddfb0e1ea42b4e",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-000.png"
+    },
+    {
+      "sha256": "5878971e60d8b88b8428177173a67a727316bf81988954e05f1be2118c7343f7",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-090",
+        "key": "5756e68d0ebd8e93ebee7f2a7645dd06589edb3deeedb4472fd193c33ba6ec35",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-090.png"
+    },
+    {
+      "sha256": "c671cac53703d516a84046a275526ddcbb4d1ef8e4274fdfcdb6f58ffb19201e",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-180",
+        "key": "6fdbb83d9183dbd017c37628ebff9e7fd66f71e685b1e99d8e1a3fef16a672aa",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 180,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-180.png"
+    },
+    {
+      "sha256": "deffb191dbfc4716f8232eff94e4ea61b030579fa6342176a6800bd0738ce317",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-wearable-000",
+        "key": "75ebfd41e653ae775a17e8a8a8a04cf9a014e7049fc438a1d01a3f5ef576b752",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "wearable",
+        "azimuthDegrees": 0,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-wearable-000.png"
+    },
+    {
+      "sha256": "561a79c6b9a69b0ddf95b5602d88e8e3b6e6a07c58bae63a238a3d5721093a3b",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-wearable-090",
+        "key": "6fa12a8a2d9bc8b3869222861bb872708c544ff8d295ee65ead7f4f0c7a6f2dd",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "wearable",
+        "azimuthDegrees": 90,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-wearable-090.png"
+    },
+    {
+      "sha256": "2e10ce3f82634944c991ffc86034ef9037f89c4a2c6e951d2c2d796c17a9831a",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-wearable-180",
+        "key": "932f95c7dce0fe1843618eeb4efbad1aab715951fda522d9884049800db2562d",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "wearable",
+        "azimuthDegrees": 180,
+        "size": 512
+      },
+      "file": "captures/BaseFemale-wearable-180.png"
+    },
+    {
+      "sha256": "79b46de2ce43e31f77999bf57e1a4608b8200942788c2ee77cac0a9969995634",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-head-explode-000-t0.25",
+        "key": "26c530440cecd7a79ef20a0e8181fdac9fc0e1992e38e8069f4641a0a8d08a32",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "pose": "head-explode",
+        "timeFraction": 0.25,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-head-explode-000-t0.25.png"
+    },
+    {
+      "sha256": "fe9bb979f58b9d2d6f0bda18f928891bd01b644cd27eda19f5700579702bd8db",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-head-explode-090-t0.25",
+        "key": "10991d8a8805a860072eabcdbcf091fc853903225c0f7237d6ccd31cd8d6978f",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "pose": "head-explode",
+        "timeFraction": 0.25,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-head-explode-090-t0.25.png"
+    },
+    {
+      "sha256": "c0ccc40b9fe6cf88e6fc4d86a939415c6b575c7d29de7bc88482a76566982620",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-dab-000-t0.5",
+        "key": "83057761b7fd54e4e4d874f6a535a0ea0a5fd280f6c0fef3c1b120747164a5b7",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "pose": "dab",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-dab-000-t0.5.png"
+    },
+    {
+      "sha256": "5e1502a517737443074424bf506c3fb7b548fddebe64bd2e59ed9fa562b59477",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseMale-avatar-dab-090-t0.5",
+        "key": "e0b0245d37c355c32f95e0d63fa6b0efe41b26f595a6798c9a7d03768e23d23e",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseMale",
+        "mainFile": "male/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "pose": "dab",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseMale-avatar-dab-090-t0.5.png"
+    },
+    {
+      "sha256": "5f7b2710bbadc399ea57c3fb558f34a079087b46f0ccb67286989cb02616c43d",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-head-explode-000-t0.25",
+        "key": "ad759c631938b95dfd7a71ea98ae1156618c06f219013e21827c9e8f2217ea84",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "pose": "head-explode",
+        "timeFraction": 0.25,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-head-explode-000-t0.25.png"
+    },
+    {
+      "sha256": "180a37b6443f25ed5f34bd732b84fb0607237408282411f69125848ac569643a",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-head-explode-090-t0.25",
+        "key": "424556745d4d82f6a40f30f9d0a9269a1e95e50e9f619e26be73f4029e862166",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "pose": "head-explode",
+        "timeFraction": 0.25,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-head-explode-090-t0.25.png"
+    },
+    {
+      "sha256": "dab740ac86df015a417f738a82def9dbeaf81252f43bd6a148205c3856c71701",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-dab-000-t0.5",
+        "key": "07c65f81344028e196f496c5676f32d79c5e62df8583d246020fe19b01d7d8e2",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 0,
+        "pose": "dab",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-dab-000-t0.5.png"
+    },
+    {
+      "sha256": "707f60aa501ba163df9cfaed61dcd4486c6df2c9cd607d201f90260751dcf54e",
+      "width": 512,
+      "height": 512,
+      "request": {
+        "id": "BaseFemale-avatar-dab-090-t0.5",
+        "key": "9b78942254c9601f3547bf81c520d6fda332af853661862369ab9f76953753e6",
+        "inputDigest": "18a479d83d580b02234d9a809e64ad278e483767525cca00ef0aacc74d7a57cf",
+        "rendererBuild": "d7c7400dbdd59adbe92a7d6de871dc92dd500a99c3f9328ff4845ae19262a2af",
+        "recipeVersion": 4,
+        "bodyShape": "urn:decentraland:off-chain:base-avatars:BaseFemale",
+        "mainFile": "female/HATwearable.glb",
+        "view": "avatar",
+        "azimuthDegrees": 90,
+        "pose": "dab",
+        "timeFraction": 0.5,
+        "skin": "00ff00",
+        "size": 512
+      },
+      "file": "captures/BaseFemale-avatar-dab-090-t0.5.png"
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "checked": 3,
+    "skipped": 0
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "check": {
+    "check": "visual-quality",
+    "group": "rendering",
+    "status": "errored",
+    "coverage": "missing",
+    "skipReason": "The model was not called (--no-ai).",
+    "review": {
+      "provider": "none",
+      "model": "none",
+      "promptVersion": 1,
+      "promptDigest": "1b6689fefc12538e528d0d1358f7b96f4292ca8aae0b2f7e464f556cf73217ef"
+    },
+    "durationMs": 87
+  },
+  "findings": []
+}
