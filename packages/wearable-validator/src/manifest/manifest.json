@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -18,7 +18,8 @@
       "feet": 1500,
       "skin": 5000
     },
-    "handsWearHiddenHandsLimit": 1500
+    "handsWearHiddenHandsLimit": 1500,
+    "helmetHiddenHeadLimit": 4000
   },
   "textures": {
     "default": 2,

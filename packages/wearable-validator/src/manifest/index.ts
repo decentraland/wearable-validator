@@ -2,7 +2,7 @@ import manifestJson from "./manifest.json" with { type: "json" };
 
 export interface Manifest {
   version: string;
-  triangles: { default: number; perCategory: Record<string, number>; handsWearHiddenHandsLimit: number };
+  triangles: { default: number; perCategory: Record<string, number>; handsWearHiddenHandsLimit: number; helmetHiddenHeadLimit: number };
   textures: { default: number; skin: number; maxSize: number; facialMaxSize: number };
   materials: { default: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];
@@ -115,7 +115,7 @@ export const AVATAR_CORE_BONE_NAMES: string[] = [
   "Avatar_RightUpLeg", "Avatar_RightLeg", "Avatar_RightFoot"
 ];
 
-/** effectiveLimit = base + Σ unique hides' budgets; hands_wear base bumps to 1,500 when hiding 'hands'. */
+/** effectiveLimit = base + Σ unique hides' budgets; hands_wear base bumps to 1,500 when hiding 'hands'; a helmet tops out at 4,000 however many head slots it hides (the docs' helmet rule). */
 export function effectiveTriangleLimit(category: string, hides: string[] = []): number {
   const uniqueHides = [...new Set(hides)];
   let base = manifest.triangles.perCategory[category] ?? manifest.triangles.default;
@@ -124,5 +124,5 @@ export function effectiveTriangleLimit(category: string, hides: string[] = []): 
   for (const hidden of uniqueHides) {
     limit += manifest.triangles.perCategory[hidden] ?? 0;
   }
-  return limit;
+  return category === "helmet" ? Math.min(limit, manifest.triangles.helmetHiddenHeadLimit) : limit;
 }

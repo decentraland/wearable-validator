@@ -24,6 +24,30 @@ describe("triangle-count (M-01)", () => {
     assert.equal(status(result, "triangle-count"), "passed");
   });
 
+  const representation = (overrideHides?: string[]) => [{ bodyShapes: ["urn:decentraland:off-chain:base-avatars:BaseMale"], mainFile: "model.glb", contents: ["model.glb"], ...(overrideHides ? { overrideHides } : {}) }];
+
+  it("reads a representation's overrideHides: a hands accessory hiding the base hand there gets 1,500", async () => {
+    const hidden = await validate(await wearableZip({ triangles: 1200 }, { category: "hands_wear", representations: representation(["hands"]) }), { checks: ["triangle-count"] });
+    assert.equal(status(hidden, "triangle-count"), "passed");
+    const shown = await validate(await wearableZip({ triangles: 1200 }, { category: "hands_wear", representations: representation() }), { checks: ["triangle-count"] });
+    assert.equal(found(shown, "triangle-count")[0]?.limit, 1000);
+  });
+
+  it("lets a representation's overrideHides replace the item's hides, as the engine does", async () => {
+    const zip = await wearableZip({ triangles: 2500 }, { category: "upper_body", hides: ["lower_body"], representations: representation(["mask"]) });
+    const [finding] = found(await validate(zip, { checks: ["triangle-count"] }), "triangle-count");
+    assert.equal(finding.limit, 2000, "1,500 + the mask's 500, not the item's lower_body");
+  });
+
+  it("caps a helmet at 4,000 however many head slots it hides", async () => {
+    const allHead = ["head", "earring", "eyewear", "tiara", "hat", "facial_hair", "hair", "top_head"];
+    const [over] = found(await validate(await wearableZip({ triangles: 4100 }, { category: "helmet", hides: allHead }), { checks: ["triangle-count"] }), "triangle-count");
+    assert.equal(over.limit, 4000);
+    assert.equal(status(await validate(await wearableZip({ triangles: 3900 }, { category: "helmet", hides: allHead }), { checks: ["triangle-count"] }), "triangle-count"), "passed");
+    const [hair] = found(await validate(await wearableZip({ triangles: 3100 }, { category: "helmet", hides: ["hair"] }), { checks: ["triangle-count"] }), "triangle-count");
+    assert.equal(hair.limit, 3000, "fewer hidden slots still pool below the cap");
+  });
+
   it("warns on TRIANGLE_STRIP/FAN primitives", async () => {
     const zip = await wearableZip({ stripVertices: 5 });
     const result = await validate(zip, { checks: ["triangle-count"] });
