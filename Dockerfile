@@ -2,7 +2,7 @@
 # the work queue once and exits (packages/job/.env.default lists what it reads).
 #
 #   docker build --platform linux/amd64 -t wearable-validator .
-#   docker run --rm --memory=4g -e WORK_QUEUE_URL=... -e BUILDER_CONTENT_URL=... -e BUILDER_CALLBACK_URL=... \
+#   docker run --rm --memory=4g -e WORK_QUEUE_URL=... -e BUILDER_API_URL=... \
 #     -e BUILDER_CALLBACK_SECRET=... -e ANTHROPIC_OAUTH_SETUP_TOKEN=... wearable-validator
 #
 # Stages: 1. render server download  2. the image (system, app, users, runtime)
