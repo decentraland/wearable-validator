@@ -18,6 +18,12 @@ const HEADER_MAX = 150;
 const SECTION_MAX = 3000;
 const MAX_BLOCKS = 50;
 const ALT_TXT_MAX = 1000;
+// Slack posts a shared file's message once it has processed the upload, a moment after the call returns: the next item
+// waits for it, so each item's message stays in order in the thread
+const SHARE_POLL_MS = 1000;
+const SHARE_WAIT_MAX_MS = 20_000;
+// without files:read the share cannot be looked up: a fixed pause that covers a few images
+const SHARE_SETTLE_MS = 5000;
 
 type Block = Record<string, unknown>;
 
@@ -177,6 +183,17 @@ export function itemMessage(item: ReviewItem, result: ItemResult): SlackMessage 
   return { text: `${name} — ${itemVerdict(result)} · ${counts(result)}`, blocks };
 }
 
+/** A message's blocks as one mrkdwn comment, so an upload carries the text above its pictures in a single message. */
+export function asComment(message: SlackMessage): string {
+  const parts = message.blocks.map((block) => {
+    const text = (block.text as { text?: string } | undefined)?.text ?? (block.elements as { text?: string }[] | undefined)?.[0]?.text ?? "";
+    if (block.type === "header") return `*${text}*`;
+    if (block.type === "context") return `_${text}_`;
+    return block.type === "divider" ? "" : text;
+  });
+  return parts.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
 /** One worn front view per body shape: the plain pose for a wearable, the middle of the clip for an emote; never a green-skin stress frame. */
 export function frontViews(captures: CaptureRecord[]): CaptureRecord[] {
   const front = captures.filter(({ request }) => request.view === "avatar" && request.azimuthDegrees === 0 && !request.skin);
@@ -262,14 +279,29 @@ export async function createSlackComponent(components: SlackComponents): Promise
     return { id: fileId, title: alt };
   }
 
-  /** The thumbnail and the worn front views, shared into the thread: the one way Slack shows a file an app uploaded. */
-  async function shareImages(ts: string, { item, thumbnail, captures }: ItemNotice): Promise<void> {
+  /** The item's pictures uploaded, not yet shared anywhere: the thumbnail and one worn front view per body shape. */
+  async function uploadImages({ item, thumbnail, captures }: ItemNotice): Promise<{ id: string; title: string }[]> {
     const name = itemName(item);
     const files: { id: string; title: string }[] = [];
     if (thumbnail) files.push(await upload("thumbnail.png", thumbnail, `${name} thumbnail`));
     for (const view of frontViews(captures)) files.push(await upload(`${view.request.id}.png`, view.bytes, `${name} worn, ${view.request.bodyShape}`));
-    if (files.length === 0) return;
-    await call("files.completeUploadExternal", { files, channel_id: channel, thread_ts: ts, initial_comment: `${name}: thumbnail and rendered views` });
+    return files;
+  }
+
+  /** Waits until Slack has posted a shared file's message, so the next message lands after it. */
+  async function shareLanded(fileId: string): Promise<void> {
+    for (let waited = 0; waited < SHARE_WAIT_MAX_MS; waited += SHARE_POLL_MS) {
+      let file: { shares?: { public?: object; private?: object } } | undefined;
+      try {
+        file = (await call("files.info", new URLSearchParams({ file: fileId }))).file as typeof file;
+      } catch {
+        // no files:read scope (or Slack hiccuped): a fixed pause instead of a lookup
+        return sleep(SHARE_SETTLE_MS);
+      }
+      const shares = { ...file?.shares?.public, ...file?.shares?.private };
+      if (Object.keys(shares).length > 0) return;
+      await sleep(SHARE_POLL_MS);
+    }
   }
 
   return {
@@ -287,14 +319,19 @@ export async function createSlackComponent(components: SlackComponents): Promise
       }
     },
     async itemValidated(ts, notice) {
+      const message = itemMessage(notice.item, notice.result);
       try {
-        const message = itemMessage(notice.item, notice.result);
-        await call("chat.postMessage", { channel, thread_ts: ts, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
+        const files = await uploadImages(notice);
+        if (files.length === 0) {
+          await call("chat.postMessage", { channel, thread_ts: ts, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
+          return;
+        }
+        // one message per item: its text as the upload's comment, its pictures right under it
+        await call("files.completeUploadExternal", { files, channel_id: channel, thread_ts: ts, initial_comment: asComment(message) });
+        await shareLanded(files[0].id);
       } catch (error) {
-        log.warn("slack item reply failed", { item: notice.item.itemId, reason: reason(error) });
-        return;
+        log.warn("slack item message failed", { item: notice.item.itemId, reason: reason(error) });
       }
-      await shareImages(ts, notice).catch((error: unknown) => log.warn("slack item images failed", { item: notice.item.itemId, reason: reason(error) }));
     },
     async collectionFinished(ts, request, body, ms) {
       try {

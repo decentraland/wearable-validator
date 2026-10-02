@@ -205,11 +205,13 @@ function fakeSlack(refuse = false) {
     if (!url.startsWith("https://slack.com/api/")) return new Response("OK");
     const method = url.slice("https://slack.com/api/".length);
     const raw = String(init?.body ?? "");
-    const body = method === "files.getUploadURLExternal" ? Object.fromEntries(new URLSearchParams(raw)) : (JSON.parse(raw) as Record<string, unknown>);
+    const body = method === "files.getUploadURLExternal" || method === "files.info" ? Object.fromEntries(new URLSearchParams(raw)) : (JSON.parse(raw) as Record<string, unknown>);
     calls.push({ method, body });
     if (refuse && method.startsWith("chat.")) return Response.json({ ok: false, error: "not_in_channel" });
     if (method === "files.getUploadURLExternal") return Response.json({ ok: true, upload_url: `https://files.slack.com/upload/${++files}`, file_id: `F${files}` });
     if (method === "chat.postMessage") return Response.json({ ok: true, ts: `1700000000.00000${calls.filter((call) => call.method === method).length}` });
+    // the share has landed: its message is in the channel
+    if (method === "files.info") return Response.json({ ok: true, file: { shares: { private: { C123: [{ ts: "1700000000.000009" }] } } } });
     return Response.json({ ok: true });
   };
   return { fetch, calls };
@@ -218,20 +220,20 @@ function fakeSlack(refuse = false) {
 describe("Slack", () => {
   const blocksText = (body: Record<string, unknown>): string => JSON.stringify(body.blocks);
 
-  it("posts the collection, one reply per item in its thread with its pictures, then edits the collection to its verdict", async () => {
+  it("posts the collection, then one message per item in its thread with its text above its pictures, in order, then the verdict", async () => {
     const slack = fakeSlack();
     const builder = fakeBuilder([clean, heavy]);
     const { reviewJob } = await job(builder, [], slack.fetch);
     assert.equal(await reviewJob.process(message(envelope(request([item(clean, ITEMS[0]), item(heavy, ITEMS[1])])))), "delete");
-    const chat = slack.calls.filter((call) => call.method.startsWith("chat.") || call.method === "files.completeUploadExternal");
-    assert.deepEqual(chat.map((call) => call.method), ["chat.postMessage", "chat.postMessage", "files.completeUploadExternal", "chat.postMessage", "files.completeUploadExternal", "chat.update"]);
-    const [collection, firstReply, firstShare, secondReply] = chat;
+    const chat = slack.calls.filter((call) => call.method.startsWith("chat.") || call.method === "files.completeUploadExternal" || call.method === "files.info");
+    assert.deepEqual(chat.map((call) => call.method), ["chat.postMessage", "files.completeUploadExternal", "files.info", "files.completeUploadExternal", "files.info", "chat.update"], "each item's message lands before the next one starts");
+    const [collection, firstItem, , secondItem] = chat;
     assert.equal(collection.body.thread_ts, undefined);
     assert.match(blocksText(collection.body), /Validating 2 items/);
-    for (const reply of [firstReply, secondReply]) assert.equal(reply.body.thread_ts, "1700000000.000001");
-    assert.deepEqual([firstShare.body.channel_id, firstShare.body.thread_ts], ["C123", "1700000000.000001"], "pictures shared into the thread, the one way Slack shows them");
-    assert.ok((firstShare.body.files as unknown[]).length >= 2, "the thumbnail and the worn front view");
-    assert.match(blocksText(secondReply.body), /triangle-count\* \(M-01\)/);
+    for (const share of [firstItem, secondItem]) assert.deepEqual([share.body.channel_id, share.body.thread_ts], ["C123", "1700000000.000001"]);
+    assert.ok((firstItem.body.files as unknown[]).length >= 2, "the thumbnail and the worn front view");
+    assert.match(String(firstItem.body.initial_comment), /^\*Test Wearable\*\n\*✅ Passed\*/, "the item's text is the upload's comment, above its pictures");
+    assert.match(String(secondItem.body.initial_comment), /triangle-count\* \(M-01\)/);
     const update = chat.at(-1)!;
     assert.equal(update.body.ts, "1700000000.000001");
     assert.match(blocksText(update.body), /Rejected/);
