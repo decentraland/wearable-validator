@@ -1,9 +1,8 @@
 node_modules
 **/node_modules
 **/dist
-packages/web
 tools
-packages/server/artifacts
+packages/job/artifacts
 .git
 
 # a local secret must never reach an image layer

@@ -47,7 +47,7 @@ The visual checks need three things next to the package:
    echo "99f4927a1f044ec3995f59b5610dc97ffaf8d1c4bbb68031fca25f2a4eb4ae76  render-server.tar.gz" | sha256sum -c -
    mkdir render-server && tar -xzf render-server.tar.gz -C render-server
    ```
-   It needs `libgl1 libglx-mesa0 libgl1-mesa-dri xvfb`. The repository's root `Dockerfile` is a working image, and on a laptop `packages/server/render-server-docker.sh` runs it in Docker.
+   It needs `libgl1 libglx-mesa0 libgl1-mesa-dri xvfb`. The repository's root `Dockerfile` is a working image, and on a laptop `packages/job/render-server-docker.sh` runs it in Docker.
 3. **A Claude setup token** (`claude setup-token`, `sk-ant-oat…`, valid about a year). API keys are refused.
 
 ```ts

@@ -1,5 +1,0 @@
-# Cloudflare Workers static assets read this file (it is never served). No script-src yet: the bundle needs eval and wasm.
-/*
-  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: same-origin

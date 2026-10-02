@@ -114,7 +114,6 @@ npx tsx src/cli.ts checks | grep my-check
 
 ## 7. Optional surfaces
 
-- **Website requirement label**: `packages/web/src/limits.ts` formats the enforced value per check name; add a case when there is a number to show.
 - **Samples**: `npm run samples` (repo root) regenerates the website's example zips if the check needs a new example.
 - **Catalyst regression**: `npm run catalyst -- --wearables 15 --emotes 10` (repo root) runs published items; a new rule that fails many committee-approved items is a warning candidate, not an error.
 

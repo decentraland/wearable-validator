@@ -10,16 +10,11 @@
     "tools"
   ],
   "scripts": {
-    "dev": "npm run dev -w wearable-validator-web",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "catalyst": "npm run catalyst -w wearable-validator-tools --",
-    "samples": "npm run samples -w wearable-validator-tools",
-    "serve": "npm run build -w wearable-validator-web && npm start -w wearable-validator-server --",
-    "review": "npm run review -w wearable-validator-server --"
-  },
-  "devDependencies": {
-    "wrangler": "4.136.0"
+    "job": "npm run job -w wearable-validator-job",
+    "poc": "npm run poc -w wearable-validator-job --"
   }
 }
