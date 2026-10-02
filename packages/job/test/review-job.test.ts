@@ -11,8 +11,7 @@ import { fakeRenderer, fakeReviewer, silentLogs, type RenderCalls } from "./fake
 import { syntheticEntity, type SyntheticEntity } from "../../wearable-validator/test/helpers/entity.js";
 import { pngBytes, syntheticGlb, syntheticZip } from "../../wearable-validator/test/helpers/synthetic.js";
 
-const CONTENT = "https://builder.example";
-const CALLBACK = "https://builder-callback.example";
+const API = "https://builder.example";
 const SECRET = "shh";
 const VALIDATION = "44444444-5555-4666-8777-888888888888";
 const COLLECTION = "99999999-8888-4777-8666-555555555555";
@@ -66,7 +65,7 @@ async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [
   const logs = silentLogs();
   const calls: RenderCalls = { started: 0 };
   const queue = fakeQueue(bodies);
-  const config = createConfigComponent({ BUILDER_CONTENT_URL: `${CONTENT}/`, BUILDER_CALLBACK_URL: CALLBACK, BUILDER_CALLBACK_SECRET: SECRET, ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "C123" } : {}) });
+  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, BUILDER_CALLBACK_SECRET: SECRET, ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "C123" } : {}) });
   const slack = await createSlackComponent({ config, logs, fetch: slackFetch });
   const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer(), slack });
   return { reviewJob, queue, calls };
@@ -134,7 +133,7 @@ describe("the review job", () => {
     assert.equal(await reviewJob.process(message(envelope(request([item(clean, ITEMS[0]), item(heavy, ITEMS[1])])))), "delete");
     assert.equal(calls.started, 2, "one render per item, the item with code errors included");
     const [post] = builder.posts;
-    assert.equal(post.url, `${CALLBACK}/v1/collections/${COLLECTION}/validation-result`);
+    assert.equal(post.url, `${API}/v1/collections/${COLLECTION}/validation-result`);
     assert.equal(post.headers[SIGNATURE_HEADER], signature(SECRET, post.headers[TIMESTAMP_HEADER], post.body), "the Builder can check it came from us");
     const body = builder.body();
     assert.deepEqual([body.validationId, body.verdict, body.rulesVersion], [VALIDATION, "rejected", manifest.version]);

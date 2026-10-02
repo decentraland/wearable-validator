@@ -88,7 +88,7 @@ step("Running the review job (it drains the queue and exits)");
 const started = Date.now();
 const job = spawn("npx", ["tsx", fileURLToPath(new URL("../job.ts", import.meta.url))], {
   stdio: "inherit",
-  env: { ...process.env, WORK_QUEUE_URL: queueUrl, AWS_ENDPOINT_URL_SQS: endpoint, AWS_REGION: "us-east-1", AWS_ACCESS_KEY_ID: "x", AWS_SECRET_ACCESS_KEY: "x", BUILDER_CONTENT_URL: builderUrl, BUILDER_CALLBACK_URL: builderUrl, BUILDER_CALLBACK_SECRET: SECRET, EMPTY_RECEIVES_TO_EXIT: "1" }
+  env: { ...process.env, WORK_QUEUE_URL: queueUrl, AWS_ENDPOINT_URL_SQS: endpoint, AWS_REGION: "us-east-1", AWS_ACCESS_KEY_ID: "x", AWS_SECRET_ACCESS_KEY: "x", BUILDER_API_URL: builderUrl, BUILDER_CALLBACK_SECRET: SECRET, EMPTY_RECEIVES_TO_EXIT: "1" }
 });
 const exitCode = await new Promise<number>((resolve) => job.on("exit", (code) => resolve(code ?? 1)));
 const result = await Promise.race([received, new Promise<undefined>((resolve) => setTimeout(resolve, 1000))]);

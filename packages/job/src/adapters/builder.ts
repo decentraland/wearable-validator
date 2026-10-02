@@ -1,7 +1,7 @@
 /**
  * The Builder side of a queued validation: each item's files from its content storage, and the result posted back
- * to its callback, signed. Both base URLs come from config, never from a request, so a message cannot point the job
- * at another host.
+ * to its callback, signed. The Builder's address comes from config, never from a request, so a message cannot point the
+ * job at another host.
  */
 import { createHmac } from "node:crypto";
 import type { IConfigComponent, ILoggerComponent } from "@well-known-components/interfaces";
@@ -44,8 +44,8 @@ export async function createBuilderComponent(components: BuilderComponents): Pro
   const fetchImpl = components.fetch ?? globalThis.fetch;
   const sleep = components.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const log = logs.getLogger("builder");
-  const contentUrl = (await config.requireString("BUILDER_CONTENT_URL")).replace(/\/+$/, "");
-  const callbackUrl = (await config.requireString("BUILDER_CALLBACK_URL")).replace(/\/+$/, "");
+  // builder-server serves both the items' files and the callback, e.g. https://builder-api.decentraland.org
+  const api = (await config.requireString("BUILDER_API_URL")).replace(/\/+$/, "");
   const secret = await config.requireString("BUILDER_CALLBACK_SECRET");
   const maxItemBytes = (await config.getNumber("MAX_UPLOAD_BYTES")) ?? DEFAULT_MAX_ITEM_BYTES;
 
@@ -59,7 +59,7 @@ export async function createBuilderComponent(components: BuilderComponents): Pro
       const worker = async (): Promise<void> => {
         for (let hash = queue.shift(); hash; hash = queue.shift()) {
           // the route redirects to the storage bucket; fetch follows it
-          const res = await fetchImpl(`${contentUrl}/v1/storage/contents/${hash}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+          const res = await fetchImpl(`${api}/v1/storage/contents/${hash}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
           if (!res.ok) throw new Error(`Builder storage answered ${res.status} for "${Object.keys(item.contents).find((file) => item.contents[file] === hash)}".`);
           const data = new Uint8Array(await res.arrayBuffer());
           bytes += data.byteLength;
@@ -73,7 +73,7 @@ export async function createBuilderComponent(components: BuilderComponents): Pro
 
     async postResult(collectionId, body) {
       const text = JSON.stringify(body);
-      const url = `${callbackUrl}/v1/collections/${collectionId}/validation-result`;
+      const url = `${api}/v1/collections/${collectionId}/validation-result`;
       for (let attempt = 0; ; attempt++) {
         const timestamp = String(Date.now());
         let res: Response | undefined;

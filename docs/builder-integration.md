@@ -42,13 +42,13 @@ Published on the events topic, one per collection and attempt:
   other events on the topic carry theirs: the queue's subscription filters on them.
 - 1 to 50 items; each lists 1 to 100 files as `path → hash`. Paths are relative and stay inside the item.
 - An emote is told by `metadata.emoteDataADR74`; anything else is a wearable.
-- Each file is downloaded from `<content url>/v1/storage/contents/<hash>`, at most 32 MB per item. The content URL is the
+- Each file is downloaded from `<builder api>/v1/storage/contents/<hash>`, at most 32 MB per item. The Builder's address is the
   job's own configuration, never taken from the request.
 - A request that does not match this shape is dropped and logged, not retried.
 
 ## 2. The callback
 
-`POST <callback url>/v1/collections/:collectionId/validation-result`:
+`POST <builder api>/v1/collections/:collectionId/validation-result`:
 
 ```json
 {
