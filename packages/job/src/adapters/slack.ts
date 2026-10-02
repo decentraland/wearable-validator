@@ -105,10 +105,25 @@ function collectionVerdict(body: CollectionResultBody): string {
   return body.reason === "unsupported" ? "🧑‍⚖️ Needs a curator — some items cannot be judged automatically" : "⚠️ Error — some items have no verdict; sending it again may decide them";
 }
 
+/** An item's findings as a curator reads them: male/female copies merged, then each check once with its messages under it. */
+function findingsByCheck(result: ItemResult) {
+  const byCheck = new Map<string, { severity: string; check: string; rule: string; entries: { message: string; shapes: string[]; count: number }[] }>();
+  for (const { finding, message, shapes, count } of groupFindings(result.findings)) {
+    const key = `${finding.severity}\n${finding.check}`;
+    const group = byCheck.get(key) ?? { severity: finding.severity, check: finding.check, rule: finding.rule, entries: [] };
+    group.entries.push({ message, shapes, count });
+    byCheck.set(key, group);
+  }
+  const groups = [...byCheck.values()];
+  return { errors: groups.filter((group) => group.severity === "error"), warnings: groups.filter((group) => group.severity !== "error") };
+}
+
+/** Problems counted as a curator reads them: one per distinct message, not one per body-shape copy. */
 const counts = (result: ItemResult): string => {
-  const errors = result.findings.filter((finding) => finding.severity === "error").length;
-  const warnings = result.findings.length - errors;
-  return `${errors} error${errors === 1 ? "" : "s"}, ${warnings} warning${warnings === 1 ? "" : "s"}`;
+  const { errors, warnings } = findingsByCheck(result);
+  const total = (groups: typeof errors) => groups.reduce((sum, group) => sum + group.entries.length, 0);
+  const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+  return `${plural(total(errors), "error")}, ${plural(total(warnings), "warning")}`;
 };
 
 /** The collection's message: in progress while the job works, then the verdict and one line per item. */
@@ -132,24 +147,34 @@ export function collectionMessage(request: ValidationRequest, finished?: { body:
   return { text: `${title} — ${verdict}`, blocks };
 }
 
-/** One item's reply: its verdict, what the model saw, and every finding, the ones both body shapes share told once. */
+/** One item's reply: its verdict, what the model saw, and its findings grouped by check, errors first. */
 export function itemMessage(item: ReviewItem, result: ItemResult): SlackMessage {
   const name = itemName(item);
   const blocks: Block[] = [{ type: "header", text: { type: "plain_text", text: cut(name, HEADER_MAX) } }];
-  const facts = [`*Verdict* ${itemVerdict(result)}`, `*Findings* ${counts(result)}`];
-  if (result.error) facts.push(`*Why* ${inertMrkdwn(result.error)}`);
-  blocks.push(section(facts.join("\n")));
-  if (result.visualSummary) blocks.push(section(`*What the model saw*\n${result.visualSummary.split("\n").map((line) => `• ${inertMrkdwn(line)}`).join("\n")}`));
-  const grouped = groupFindings(result.findings);
-  const ordered = [...grouped.filter(({ finding }) => finding.severity === "error"), ...grouped.filter(({ finding }) => finding.severity !== "error")];
-  const lines = ordered.map(({ finding, message, shapes, count }) => {
-    const mark = finding.severity === "error" ? "❌" : "⚠️";
-    const tail = shapes.length ? ` _(${escapeMrkdwn(shapes.join(", "))})_` : count > 1 ? ` _(×${count})_` : "";
-    return `${mark} *${escapeMrkdwn(finding.check)}* (${escapeMrkdwn(finding.rule)}) — ${inertMrkdwn(message)}${tail}`;
-  });
-  blocks.push(...sections(lines, MAX_BLOCKS - blocks.length - 1));
+  blocks.push(section(`*${itemVerdict(result)}* · ${counts(result)}${result.error ? `\n${inertMrkdwn(result.error)}` : ""}`));
+  if (result.visualSummary) {
+    blocks.push({ type: "divider" });
+    blocks.push(section(`*What the model saw*\n${result.visualSummary.split("\n").map((line) => `• ${inertMrkdwn(line)}`).join("\n")}`));
+  }
+  const { errors, warnings } = findingsByCheck(result);
+  for (const [title, mark, groups] of [["Errors", "❌", errors], ["Warnings", "⚠️", warnings]] as const) {
+    if (groups.length === 0) continue;
+    // one check, its body shapes, then each distinct message on its own indented line
+    const lines = groups.map((group) => {
+      const sameShapes = group.entries.every((entry) => entry.shapes.join() === group.entries[0].shapes.join());
+      const shapes = sameShapes && group.entries[0].shapes.length ? ` · ${escapeMrkdwn(group.entries[0].shapes.join(", "))}` : "";
+      const messages = group.entries.map((entry) => {
+        const tail = !sameShapes && entry.shapes.length ? ` _(${escapeMrkdwn(entry.shapes.join(", "))})_` : entry.count > 1 && !entry.shapes.length ? ` _(×${entry.count})_` : "";
+        return `\u2003${inertMrkdwn(entry.message)}${tail}`;
+      });
+      return [`${mark} *${escapeMrkdwn(group.check)}* (${escapeMrkdwn(group.rule)})${shapes}`, ...messages].join("\n");
+    });
+    blocks.push({ type: "divider" });
+    blocks.push(section(`*${title}*`));
+    blocks.push(...sections(lines, MAX_BLOCKS - blocks.length - 2));
+  }
   blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: cut(`item ${item.itemId} · content ${item.contentHash}`, SECTION_MAX) }] });
-  return { text: `${name} — ${itemVerdict(result)}`, blocks };
+  return { text: `${name} — ${itemVerdict(result)} · ${counts(result)}`, blocks };
 }
 
 /** One worn front view per body shape: the plain pose for a wearable, the middle of the clip for an emote; never a green-skin stress frame. */

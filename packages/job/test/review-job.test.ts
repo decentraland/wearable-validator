@@ -247,18 +247,30 @@ describe("Slack", () => {
     assert.deepEqual(slack.calls.map((call) => call.method), ["chat.postMessage"], "no thread to reply in, so nothing more is tried");
   });
 
-  it("lists every finding, errors first, the ones both body shapes share told once", () => {
-    const finding = (check: string, severity: "error" | "warning", message: string, where?: string) => ({ rule: "M-01", check, severity, message, ...(where ? { where } : {}), docs: "https://docs.example" });
+  const finding = (check: string, rule: string, severity: "error" | "warning", message: string, where?: string) => ({ rule, check, severity, message, ...(where ? { where } : {}), docs: "https://docs.example" });
+  const tropicalMask = { itemId: ITEMS[0], contentHash: "bafkreiabc", itemType: "wearable" as const, metadata: { name: "Tropical Mask" }, contents: {} };
+
+  it("groups an item's findings by check, errors first, a male/female pair told once with its shapes", () => {
+    const mesh = (shape: string) => finding("material-names", "M-07", "error", `Mesh "M_Mask_Eyebrows_Mesh.000" in "${shape}/TropicalMask.glb" contains the reserved token "_eyebrows". Rename the mesh.`, `"${shape}/TropicalMask.glb" › M_Mask_Eyebrows_Mesh.000`);
     const findings = [
-      ...Array.from({ length: 7 }, (_, n) => finding(`warning-${n}`, "warning", `Warning ${n}.`)),
-      finding("texture-size", "error", '"male/a.glb" › Hat is 1024×1024.', '"male/a.glb" › Hat'),
-      finding("texture-size", "error", '"female/a.glb" › Hat is 1024×1024.', '"female/a.glb" › Hat')
+      finding("thumbnail", "S-06", "warning", "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.", "thumbnail.png"),
+      finding("thumbnail", "S-06", "warning", "Thumbnail has no alpha channel. Export as RGBA PNG.", "thumbnail.png"),
+      mesh("male"),
+      mesh("female")
     ];
-    const reviewItem = { itemId: ITEMS[0], contentHash: "bafkreiabc", itemType: "wearable" as const, metadata: { name: "Red Hat" }, contents: {} };
-    const text = JSON.stringify(itemMessage(reviewItem, { itemId: ITEMS[0], contentHash: "bafkreiabc", passed: false, findings }).blocks);
-    for (let n = 0; n < 7; n++) assert.ok(text.includes(`Warning ${n}.`), `warning ${n} is shown`);
-    assert.equal(text.split("texture-size").length - 1, 1, "the male and female copies are one line");
-    assert.ok(text.includes("(male, female)"));
-    assert.ok(text.indexOf("texture-size") < text.indexOf("warning-0"), "errors first");
+    const message = itemMessage(tropicalMask, { itemId: ITEMS[0], contentHash: "bafkreiabc", passed: false, findings });
+    const text = JSON.stringify(message.blocks);
+    assert.match(message.text, /1 error, 2 warnings$/, "counted as a curator reads them, not per body-shape copy");
+    assert.equal(text.split("material-names").length - 1, 1, "the male and female copies are one line");
+    assert.match(text, /material-names\* \(M-07\) · male, female/);
+    assert.match(text, /in \\"TropicalMask\.\u200bglb\\"/, "the message names the file without its folder");
+    assert.equal(text.split("thumbnail* (S-06)").length - 1, 1, "two thumbnail findings under one check heading");
+    assert.ok(text.indexOf("*Errors*") < text.indexOf("*Warnings*"), "errors first");
+  });
+
+  it("shows every finding however many there are", () => {
+    const findings = Array.from({ length: 12 }, (_, n) => finding(`check-${n}`, "M-01", "warning", `Warning ${n}.`));
+    const text = JSON.stringify(itemMessage(tropicalMask, { itemId: ITEMS[0], contentHash: "bafkreiabc", passed: true, findings }).blocks);
+    for (let n = 0; n < 12; n++) assert.ok(text.includes(`Warning ${n}.`), `warning ${n} is shown`);
   });
 });

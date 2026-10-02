@@ -16,16 +16,22 @@ export interface FindingGroup<F extends GroupableFinding> {
   count: number;
 }
 
-// `"male/shirt.glb" › Albedo` or `male/shirt.glb`: the folder is the path's first segment, inside the quotes if any
-const FOLDER = /^("?)([^/"]+)\/(.*)$/s;
+// `"male/shirt.glb" › Albedo` or `male/shirt.glb`: the file is the path up to a closing quote or a " › " part, and its
+// folder is the path's first segment
+const FILE = /^"?([^"]+?)"?(?: › .*)?$/s;
 
-/** The finding with its `where` rid of the folder, in the message too; untouched when it names no folder. */
+/**
+ * The finding with its body-shape folder set aside: `male/shirt.glb` becomes `shirt.glb` in `where` and wherever the
+ * message names the file, however the check worded it. Untouched when it names no folder.
+ */
 function withoutFolder(finding: GroupableFinding): { folder?: string; where: string; message: string } {
   const where = finding.where ?? "";
-  const match = FOLDER.exec(where);
-  if (!match) return { where, message: finding.message };
-  const rest = `${match[1]}${match[3]}`;
-  return { folder: match[2], where: rest, message: finding.message.split(where).join(rest) };
+  const file = FILE.exec(where)?.[1];
+  const slash = file?.indexOf("/") ?? -1;
+  if (!file || slash <= 0) return { where, message: finding.message };
+  const folder = file.slice(0, slash);
+  const bare = file.slice(slash + 1);
+  return { folder, where: where.split(file).join(bare), message: finding.message.split(file).join(bare) };
 }
 
 /** Same check, severity, file and message once the folder is set aside: in order of first appearance. */
