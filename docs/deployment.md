@@ -15,6 +15,9 @@
   server runs as its own Linux user, `renderer` (`packages/job/render-server-user.sh` → `render-server.sh`), gets only the
   variables it needs, and is never handed a model that names a file outside the item; the job runs as `validator`. An
   exploit in the player reads neither the model token nor the callback secret.
+- **Slack** — with `SLACK_BOT_TOKEN` and `SLACK_CHANNEL`, one message per collection, edited to its verdict, and one
+  thread reply per item with every finding, the model's summary and the pictures. The job keeps nothing after it exits,
+  so this is the curators' record. A Slack failure only logs; it never changes the result sent to the Builder.
 - **Logs** — one JSON line per event on stdout: each collection and item, the render server's start and failures (with
   its last log lines), the model calls, the callback and its retries.
 

@@ -52,7 +52,8 @@ When a creator publishes a collection, the Builder publishes a validation reques
 wakes the job; for each item it downloads the files by hash from Builder storage, runs the code checks, renders on the
 native render server (the Unity avatar scene drawn on the CPU, no browser, no GPU) and runs the visual checks. One
 result for the collection goes to the Builder's callback, signed, and the job exits once the queue is empty, so it
-costs nothing between collections. The contract: [docs/builder-integration.md](docs/builder-integration.md). What it
+costs nothing between collections. With `SLACK_BOT_TOKEN` and `SLACK_CHANNEL` set, each collection is posted to a channel
+with one thread reply per item (every finding, the model's summary, the pictures): the only record the job leaves. The contract: [docs/builder-integration.md](docs/builder-integration.md). What it
 reads: `packages/job/.env.default`. How the visual checks work: [docs/visual-validation.md](docs/visual-validation.md).
 
 ## Deploy

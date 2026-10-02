@@ -5,9 +5,10 @@
  * the result, so a failure to reach the callback is retried by SQS.
  */
 import type { ILoggerComponent } from "@well-known-components/interfaces";
-import { fixes, manifest, registry, validate, type Finding, type Input, type Result, type Reviewer } from "@dcl-regenesislabs/wearable-validator";
+import { fixes, manifest, registry, validate, type CaptureRecord, type Finding, type Input, type Result, type Reviewer } from "@dcl-regenesislabs/wearable-validator";
 import type { IBuilderComponent } from "../adapters/builder.js";
 import type { IRendererComponent } from "../adapters/renderer.js";
+import type { ISlackComponent } from "../adapters/slack.js";
 import type { IWorkQueueComponent, QueueMessage } from "../adapters/work-queue.js";
 import { runCodeChecks } from "./code-checks.js";
 import { InvalidReviewRequest, parseReviewRequest, type ReviewItem, type ValidationRequest } from "./review-request.js";
@@ -68,6 +69,7 @@ export interface ReviewJobComponents {
   builder: IBuilderComponent;
   renderer: IRendererComponent;
   reviewer: Reviewer;
+  slack: ISlackComponent;
 }
 
 export interface DrainOptions {
@@ -101,6 +103,12 @@ function visualVerdict(visual: Result): boolean | null {
   return visual.checks.some((row) => row.status === "failed") ? false : null;
 }
 
+/** The item's thumbnail, as its metadata names it. */
+function thumbnailOf(item: ReviewItem, files: Map<string, Uint8Array>): Uint8Array | undefined {
+  const path = typeof item.metadata.thumbnail === "string" ? item.metadata.thumbnail : "thumbnail.png";
+  return files.get(path);
+}
+
 export function itemResult(item: ReviewItem, gate: Result, visual: Result): ItemResult {
   // no verdict from the code checks (a facial feature is PNGs: no model check can measure it) is no verdict for the item
   const passed = gate.passed === false ? false : gate.passed === null ? null : visualVerdict(visual);
@@ -129,7 +137,7 @@ export function collectionResult(request: ValidationRequest, items: ItemResult[]
 }
 
 export function createReviewJob(components: ReviewJobComponents) {
-  const { logs, queue, builder, renderer, reviewer } = components;
+  const { logs, queue, builder, renderer, reviewer, slack } = components;
   const log = logs.getLogger("review-job");
   let stopping = false;
 
@@ -143,20 +151,24 @@ export function createReviewJob(components: ReviewJobComponents) {
     }
   }
 
-  async function validateItem(item: ReviewItem): Promise<ItemResult> {
+  /** One item's result, with what Slack shows of it: the thumbnail and the rendered views. */
+  async function validateItem(item: ReviewItem): Promise<{ result: ItemResult; thumbnail?: Uint8Array; captures: CaptureRecord[] }> {
     const started = Date.now();
+    let files: Map<string, Uint8Array> | undefined;
     try {
+      files = await builder.fetchFiles(item);
       // the entity mode: metadata, the files, and the hash each file was published under, so content integrity is checked too
-      const input: Input = { files: await builder.fetchFiles(item), metadata: item.metadata, content: Object.entries(item.contents).map(([file, hash]) => ({ file, hash })) };
+      const input: Input = { files, metadata: item.metadata, content: Object.entries(item.contents).map(([file, hash]) => ({ file, hash })) };
       const gate = await runCodeChecks(input, { signal: new AbortController().signal, onProgress: () => {}, timeoutMs: CODE_CHECKS_TIMEOUT_MS });
       // curators look at the views whatever the code checks said, as a standalone run on the site does
-      const result = itemResult(item, gate, await renderAndReview(item, input));
+      const visual = await renderAndReview(item, input);
+      const result = itemResult(item, gate, visual);
       log.info("item validated", { item: item.itemId, passed: String(result.passed), ms: Date.now() - started });
-      return result;
+      return { result, thumbnail: thumbnailOf(item, files), captures: visual.captures };
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       log.warn("item could not be validated", { item: item.itemId, reason });
-      return { itemId: item.itemId, contentHash: item.contentHash, passed: null, findings: [], error: reason };
+      return { result: { itemId: item.itemId, contentHash: item.contentHash, passed: null, findings: [], error: reason }, thumbnail: files && thumbnailOf(item, files), captures: [] };
     }
   }
 
@@ -174,9 +186,16 @@ export function createReviewJob(components: ReviewJobComponents) {
     const heartbeat = setInterval(() => void queue.extend(message.receiptHandle).catch(() => {}), (queue.visibilityTimeout * 1000) / 3);
     try {
       const started = Date.now();
+      // nothing is kept after the job exits: the channel is where a curator sees each item, as it is validated
+      const ts = await slack.collectionStarted(request);
       const items: ItemResult[] = [];
-      for (const item of request.items) items.push(await validateItem(item));
+      for (const item of request.items) {
+        const { result, thumbnail, captures } = await validateItem(item);
+        items.push(result);
+        if (ts) await slack.itemValidated(ts, { item, result, thumbnail, captures });
+      }
       const body = collectionResult(request, items);
+      if (ts) await slack.collectionFinished(ts, request, body, Date.now() - started);
       await builder.postResult(request.collectionId, body);
       log.info("collection validated", { validation: request.validationId, collection: request.collectionId, items: items.length, verdict: body.verdict, ms: Date.now() - started });
       return "delete";

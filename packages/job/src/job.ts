@@ -8,6 +8,7 @@ import { createJsonLogComponent, createLogComponent } from "@well-known-componen
 import { createBuilderComponent } from "./adapters/builder.js";
 import { createRendererComponent } from "./adapters/renderer.js";
 import { createReviewer } from "./adapters/reviewer.js";
+import { createSlackComponent } from "./adapters/slack.js";
 import { createWorkQueueComponent } from "./adapters/work-queue.js";
 import { createReviewJob } from "./logic/review-job.js";
 
@@ -19,7 +20,8 @@ const job = createReviewJob({
   queue: await createWorkQueueComponent({ config }),
   builder: await createBuilderComponent({ config, logs }),
   renderer: await createRendererComponent({ config, logs }),
-  reviewer: await createReviewer({ config, logs })
+  reviewer: await createReviewer({ config, logs }),
+  slack: await createSlackComponent({ config, logs })
 });
 // ECS stops a task with SIGTERM: the collection in hand finishes, then the task exits and the rest wait for the next one
 process.once("SIGTERM", () => job.stop());

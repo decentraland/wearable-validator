@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createConfigComponent } from "@well-known-components/env-config-provider";
 import { manifest } from "@dcl-regenesislabs/wearable-validator";
 import { createBuilderComponent, SIGNATURE_HEADER, signature, TIMESTAMP_HEADER } from "../src/adapters/builder.js";
+import { createSlackComponent, itemMessage } from "../src/adapters/slack.js";
 import type { IWorkQueueComponent, QueueMessage } from "../src/adapters/work-queue.js";
 import { collectionResult, createReviewJob, type CollectionResultBody, type ItemResult } from "../src/logic/review-job.js";
 import { InvalidReviewRequest, parseReviewRequest, REVIEW_EVENT, type ValidationRequest } from "../src/logic/review-request.js";
@@ -60,12 +61,14 @@ function fakeQueue(bodies: string[]): IWorkQueueComponent & { deleted: string[] 
   return { deleted, visibilityTimeout: 1800, receive: async () => pending.shift(), delete: async (handle) => void deleted.push(handle), extend: async () => {} };
 }
 
-async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = []) {
+/** The job wired to fakes; Slack stays off unless a fake Slack is given. */
+async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch) {
   const logs = silentLogs();
   const calls: RenderCalls = { started: 0 };
   const queue = fakeQueue(bodies);
-  const config = createConfigComponent({ BUILDER_CONTENT_URL: `${CONTENT}/`, BUILDER_CALLBACK_URL: CALLBACK, BUILDER_CALLBACK_SECRET: SECRET });
-  const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer() });
+  const config = createConfigComponent({ BUILDER_CONTENT_URL: `${CONTENT}/`, BUILDER_CALLBACK_URL: CALLBACK, BUILDER_CALLBACK_SECRET: SECRET, ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "C123" } : {}) });
+  const slack = await createSlackComponent({ config, logs, fetch: slackFetch });
+  const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer(), slack });
   return { reviewJob, queue, calls };
 }
 
@@ -185,5 +188,77 @@ describe("the review job", () => {
     assert.equal(await reviewJob.drain({ maxRuntimeMs: 60_000, emptyReceivesToExit: 1 }), 3);
     assert.deepEqual(queue.deleted, ["r0", "r1"], "the collection whose callback failed stays for SQS to redeliver");
     assert.equal(builder.downloads.length > 0, true);
+  });
+});
+
+interface SlackCall {
+  method: string;
+  body: Record<string, unknown>;
+}
+
+/** Slack's Web API: records every call; `refuse` makes every chat call answer ok: false. */
+function fakeSlack(refuse = false) {
+  const calls: SlackCall[] = [];
+  let files = 0;
+  const fetch: typeof globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (!url.startsWith("https://slack.com/api/")) return new Response("OK");
+    const method = url.slice("https://slack.com/api/".length);
+    const raw = String(init?.body ?? "");
+    const body = method === "files.getUploadURLExternal" ? Object.fromEntries(new URLSearchParams(raw)) : (JSON.parse(raw) as Record<string, unknown>);
+    calls.push({ method, body });
+    if (refuse && method.startsWith("chat.")) return Response.json({ ok: false, error: "not_in_channel" });
+    if (method === "files.getUploadURLExternal") return Response.json({ ok: true, upload_url: `https://files.slack.com/upload/${++files}`, file_id: `F${files}` });
+    if (method === "chat.postMessage") return Response.json({ ok: true, ts: `1700000000.00000${calls.filter((call) => call.method === method).length}` });
+    return Response.json({ ok: true });
+  };
+  return { fetch, calls };
+}
+
+describe("Slack", () => {
+  const blocksText = (body: Record<string, unknown>): string => JSON.stringify(body.blocks);
+
+  it("posts the collection, one reply per item in its thread with its pictures, then edits the collection to its verdict", async () => {
+    const slack = fakeSlack();
+    const builder = fakeBuilder([clean, heavy]);
+    const { reviewJob } = await job(builder, [], slack.fetch);
+    assert.equal(await reviewJob.process(message(envelope(request([item(clean, ITEMS[0]), item(heavy, ITEMS[1])])))), "delete");
+    const chat = slack.calls.filter((call) => call.method.startsWith("chat.") || call.method === "files.completeUploadExternal");
+    assert.deepEqual(chat.map((call) => call.method), ["chat.postMessage", "chat.postMessage", "files.completeUploadExternal", "chat.postMessage", "files.completeUploadExternal", "chat.update"]);
+    const [collection, firstReply, firstShare, secondReply] = chat;
+    assert.equal(collection.body.thread_ts, undefined);
+    assert.match(blocksText(collection.body), /Validating 2 items/);
+    for (const reply of [firstReply, secondReply]) assert.equal(reply.body.thread_ts, "1700000000.000001");
+    assert.deepEqual([firstShare.body.channel_id, firstShare.body.thread_ts], ["C123", "1700000000.000001"], "pictures shared into the thread, the one way Slack shows them");
+    assert.ok((firstShare.body.files as unknown[]).length >= 2, "the thumbnail and the worn front view");
+    assert.match(blocksText(secondReply.body), /triangle-count\* \(M-01\)/);
+    const update = chat.at(-1)!;
+    assert.equal(update.body.ts, "1700000000.000001");
+    assert.match(blocksText(update.body), /Rejected/);
+    assert.equal(builder.posts.length, 1, "and the Builder still gets its result");
+  });
+
+  it("never lets Slack decide the job: refused messages leave the callback and the delete as they were", async () => {
+    const slack = fakeSlack(true);
+    const builder = fakeBuilder([clean]);
+    const { reviewJob } = await job(builder, [], slack.fetch);
+    assert.equal(await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])])))), "delete");
+    assert.equal(builder.posts.length, 1);
+    assert.deepEqual(slack.calls.map((call) => call.method), ["chat.postMessage"], "no thread to reply in, so nothing more is tried");
+  });
+
+  it("lists every finding, errors first, the ones both body shapes share told once", () => {
+    const finding = (check: string, severity: "error" | "warning", message: string, where?: string) => ({ rule: "M-01", check, severity, message, ...(where ? { where } : {}), docs: "https://docs.example" });
+    const findings = [
+      ...Array.from({ length: 7 }, (_, n) => finding(`warning-${n}`, "warning", `Warning ${n}.`)),
+      finding("texture-size", "error", '"male/a.glb" › Hat is 1024×1024.', '"male/a.glb" › Hat'),
+      finding("texture-size", "error", '"female/a.glb" › Hat is 1024×1024.', '"female/a.glb" › Hat')
+    ];
+    const reviewItem = { itemId: ITEMS[0], contentHash: "bafkreiabc", itemType: "wearable" as const, metadata: { name: "Red Hat" }, contents: {} };
+    const text = JSON.stringify(itemMessage(reviewItem, { itemId: ITEMS[0], contentHash: "bafkreiabc", passed: false, findings }).blocks);
+    for (let n = 0; n < 7; n++) assert.ok(text.includes(`Warning ${n}.`), `warning ${n} is shown`);
+    assert.equal(text.split("texture-size").length - 1, 1, "the male and female copies are one line");
+    assert.ok(text.includes("(male, female)"));
+    assert.ok(text.indexOf("texture-size") < text.indexOf("warning-0"), "errors first");
   });
 });
