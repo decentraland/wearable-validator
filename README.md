@@ -1,5 +1,6 @@
 # wearable-validator
 
+
 The Decentraland wearable and emote rule book as code, and the job that applies it to collections published in the
 Builder. It checks each item's files together with the metadata, representations and content list the Builder
 supplies, renders it on both body shapes and asks a vision model to judge what it sees.
