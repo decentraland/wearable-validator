@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
+  "version": "0.5.0",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -18,8 +18,9 @@
       "feet": 1500,
       "skin": 5000
     },
-    "handsWearHiddenHandsLimit": 1500,
-    "helmetHiddenHeadLimit": 4000
+    "hiddenHandsBudget": 500,
+    "headSlots": ["mask", "eyewear", "earring", "tiara", "top_head", "facial_hair", "hat", "helmet", "hair"],
+    "hiddenHeadLimit": 4000
   },
   "textures": {
     "default": 2,
@@ -49,7 +50,6 @@
     "modelHeadroomBytes": 1048576,
     "thumbnailBytes": 1048576,
     "thumbnailMaxSize": 1024,
-    "thumbnailRecommendedSize": 256,
     "smartWearableVideoBytes": 262144000,
     "audioBytes": 3145728,
     "maxInputBytes": 272629760,
@@ -160,7 +160,7 @@
     "minHandWeightRatio": 0.5
   },
   "thumbnail": {
-    "minTransparentPixelRatio": 0.01,
+    "minTransparentBorderRatio": 0.9,
     "alphaThreshold": 8
   },
   "rendering": {

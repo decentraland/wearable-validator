@@ -13,7 +13,7 @@
   },
   "bone-targets": {
     "file": "src/checks/emote/bone-targets/index.ts",
-    "line": 8
+    "line": 9
   },
   "clip-names": {
     "file": "src/checks/emote/clip-names/index.ts",

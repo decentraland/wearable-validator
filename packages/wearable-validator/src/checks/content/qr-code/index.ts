@@ -1,7 +1,7 @@
 /** F-04 QR codes — a scannable code's target can change after review, so any readable one is rejected. */
 import jsQR from "jsqr";
 import { decode as decodeJpeg } from "jpeg-js";
-import { decodePngSafe, imageDimensions, isJpegBytes, isPngBytes } from "../../../logic/images.js";
+import { decodePngSafe, imageDimensions, isJpegBytes, isPngBytes, pngToRgba } from "../../../logic/images.js";
 import { textureLabel } from "../../../logic/materials.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { POLICY } from "../../docs.js";
@@ -20,33 +20,8 @@ function toRgba(bytes: Uint8Array, maxPixels: number): RgbaImage | undefined {
     if (isPngBytes(bytes)) {
       const png = decodePngSafe(bytes, maxPixels);
       if (!png) return undefined;
-      const { width, height, channels, depth, palette } = png;
-      if (depth !== 8 && depth !== 16) return undefined;
-      const src = png.data;
-      const to8 = (v: number): number => (depth === 16 ? v >> 8 : v);
-      const pixels = width * height;
-      const out = new Uint8ClampedArray(pixels * 4);
-      if (palette && channels === 1) {
-        for (let i = 0; i < pixels; i++) {
-          const entry = palette[src[i]] ?? [0, 0, 0];
-          out[i * 4] = entry[0]; out[i * 4 + 1] = entry[1]; out[i * 4 + 2] = entry[2];
-          out[i * 4 + 3] = entry.length > 3 ? entry[3] : 255;
-        }
-        return { data: out, width, height };
-      }
-      for (let i = 0; i < pixels; i++) {
-        const o = i * channels;
-        let r = 0, g = 0, b = 0, a = 255;
-        switch (channels) {
-          case 1: r = g = b = to8(src[o]); break;
-          case 2: r = g = b = to8(src[o]); a = to8(src[o + 1]); break;
-          case 3: r = to8(src[o]); g = to8(src[o + 1]); b = to8(src[o + 2]); break;
-          case 4: r = to8(src[o]); g = to8(src[o + 1]); b = to8(src[o + 2]); a = to8(src[o + 3]); break;
-          default: return undefined;
-        }
-        out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b; out[i * 4 + 3] = a;
-      }
-      return { data: out, width, height };
+      const data = pngToRgba(png);
+      return data ? { data, width: png.width, height: png.height } : undefined;
     }
     if (isJpegBytes(bytes)) {
       // jpeg-js keeps its own bound too, in case its parser reads the frame differently from the header walk

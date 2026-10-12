@@ -1,6 +1,7 @@
 {
   "name": "@dcl-regenesislabs/wearable-validator",
   "version": "0.4.0",
+  "license": "Apache-2.0",
   "description": "The Decentraland wearable & emote rule book as code — every check runnable separately, in node and the browser.",
   "type": "module",
   "engines": {
@@ -46,7 +47,7 @@
     "gen:sources": "tsx generate-source-links.ts"
   },
   "dependencies": {
-    "@dcl/schemas": "^16.11.1",
+    "@dcl/schemas": "^27.2.0",
     "@gltf-transform/core": "^4.2.1",
     "@gltf-transform/extensions": "^4.2.1",
     "commander": "^12.1.0",
@@ -60,11 +61,11 @@
   },
   "devDependencies": {
     "@dcl/hashing": "3.0.4",
+    "@earendil-works/pi-ai": "0.84.1",
     "@types/node": "^22.0.0",
     "@types/pako": "2.0.4",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.3",
-    "@earendil-works/pi-ai": "0.84.1"
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "0.84.1"

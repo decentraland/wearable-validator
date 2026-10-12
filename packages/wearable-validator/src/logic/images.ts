@@ -94,6 +94,8 @@ export interface DecodedPng {
   depth: number;
   data: Uint8Array | Uint16Array;
   palette?: number[][];
+  /** tRNS colour key of a grey or RGB PNG: the raw sample values drawn fully transparent. */
+  transparency?: Uint16Array;
 }
 
 /** Full PNG decode that never throws and never decodes an unreadable header or one above the pixel budget; the data view is always indexable as bytes or 16-bit samples. */
@@ -104,8 +106,50 @@ export function decodePngSafe(bytes: Uint8Array, maxPixels = manifest.images.max
     const img = decodePng(safe);
     // fast-png may hand back a Uint8ClampedArray — view it as Uint8Array (same buffer, same indexing).
     const data = img.data instanceof Uint16Array ? img.data : new Uint8Array(img.data.buffer, img.data.byteOffset, img.data.byteLength);
-    return { width: img.width, height: img.height, channels: img.channels, depth: img.depth, data, palette: img.palette };
+    return { width: img.width, height: img.height, channels: img.channels, depth: img.depth, data, palette: img.palette, transparency: img.transparency };
   } catch {
     return undefined;
   }
+}
+
+/**
+ * 8-bit RGBA pixels of a decoded PNG, whatever its colour type: palette entries with their tRNS alpha, a grey or RGB
+ * tRNS colour key, packed 1/2/4-bit rows, 16-bit samples. Undefined for a channel layout no PNG has.
+ */
+export function pngToRgba(img: DecodedPng): Uint8ClampedArray | undefined {
+  const { width, height, channels, depth, data, palette, transparency } = img;
+  if (channels < 1 || channels > 4) return undefined;
+  // rows below 8 bits are packed; 8 and 16 bits are one array element per sample
+  const stride = depth < 8 ? Math.ceil((width * channels * depth) / 8) : width * channels;
+  const mask = (1 << Math.min(depth, 8)) - 1;
+  const sample = (x: number, y: number, c: number): number => {
+    if (depth >= 8) return data[y * stride + x * channels + c];
+    const bit = (x * channels + c) * depth;
+    return (data[y * stride + (bit >> 3)] >> (8 - depth - (bit & 7))) & mask;
+  };
+  const to8 = (v: number): number => (depth === 16 ? v >> 8 : depth < 8 ? Math.round((v * 255) / mask) : v);
+  const out = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4;
+      if (palette && channels === 1) {
+        const entry = palette[sample(x, y, 0)] ?? [0, 0, 0];
+        out[o] = entry[0]; out[o + 1] = entry[1]; out[o + 2] = entry[2];
+        out[o + 3] = entry.length > 3 ? entry[3] : 255;
+        continue;
+      }
+      const r = sample(x, y, 0);
+      const g = channels >= 3 ? sample(x, y, 1) : r;
+      const b = channels >= 3 ? sample(x, y, 2) : r;
+      out[o] = to8(r); out[o + 1] = to8(g); out[o + 2] = to8(b);
+      if (channels === 2 || channels === 4) out[o + 3] = to8(sample(x, y, channels - 1));
+      else out[o + 3] = isColourKey(transparency, channels, r, g, b) ? 0 : 255;
+    }
+  }
+  return out;
+}
+
+function isColourKey(key: Uint16Array | undefined, channels: number, r: number, g: number, b: number): boolean {
+  if (!key || key.length !== channels) return false;
+  return channels === 1 ? key[0] === r : key[0] === r && key[1] === g && key[2] === b;
 }

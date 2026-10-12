@@ -318,6 +318,25 @@ export function pngBytes(width: number, height: number, opaque = false, channels
   return encodePng({ width, height, data, channels });
 }
 
+/** An 8-bit palette PNG whose transparency lives in a tRNS chunk, as the Builder exports thumbnails: a transparent border ring unless `opaque`. */
+export function palettePngBytes(width: number, height: number, opaque = false): Uint8Array {
+  const data = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const border = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+      data[y * width + x] = !opaque && border ? 0 : 1;
+    }
+  }
+  return encodePng({ width, height, data, channels: 1, depth: 8, palette: [[0, 0, 0, 0], [200, 60, 90, 255]] });
+}
+
+/** An RGBA PNG transparent only in its middle: the border, where a background shows, is opaque. */
+export function pngWithOpaqueBorder(width: number, height: number): Uint8Array {
+  const data = new Uint8Array(width * height * 4).fill(255);
+  for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) data[(y * width + x) * 4 + 3] = 0;
+  return encodePng({ width, height, data, channels: 4 });
+}
+
 /** Only a PNG signature and IHDR claiming `width`×`height` RGBA — what a decode bomb's header looks like; there is no pixel data behind it. */
 export function pngHeaderBytes(width: number, height: number): Uint8Array {
   const bytes = new Uint8Array(33);

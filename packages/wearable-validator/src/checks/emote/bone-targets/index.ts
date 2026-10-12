@@ -1,6 +1,7 @@
 /** E-03 Bone targets — tracks that target anything but the avatar's (or prop's) bones never play in-world. */
 import type { Node } from "@gltf-transform/core";
 import { emoteOnly, parentNode } from "../../../logic/animation.js";
+import { listSome } from "../../../logic/format.js";
 import { AVATAR_BONE_NAME_SET } from "../../../manifest/index.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { EMOTES } from "../../docs.js";
@@ -34,10 +35,11 @@ export const boneTargets: CheckDefinition = {
     const springToken = ctx.manifest.skeleton.springBoneToken.toLowerCase();
     const propArmatureName = ctx.manifest.skeleton.propArmatureName;
     for (const model of ctx.models) {
-      const seen = new Set<string>();
       for (const anim of model.doc.getRoot().listAnimations()) {
         const clipName = anim.getName();
         const isPropClip = clipName.endsWith("_Prop");
+        // one finding per clip and kind, naming every node: a clip retargeted from another rig misses dozens of bones
+        const offending = { mesh: new Set<string>(), prop: new Set<string>(), unknown: new Set<string>() };
         for (const channel of anim.listChannels()) {
           const target = channel.getTargetNode();
           if (!target) continue;
@@ -46,33 +48,24 @@ export const boneTargets: CheckDefinition = {
           if (name.toLowerCase().includes(springToken)) continue;
           const underProp = isUnderNodeNamed(target, propArmatureName);
           if (underProp && isPropClip) continue;
-          const key = `${clipName}::${name}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const where = `${model.mainFile} › ${name}`;
-          if (target.getMesh()) {
-            findings.push(
-              finding(meta, "error", `Clip "${clipName}" animates the mesh node "${name}" — emotes may only animate avatar bones, never meshes or objects. Remove the object animation and animate the skeleton instead.`, {
-                where,
-                data: { clip: clipName, node: name }
-              })
-            );
-          } else if (underProp) {
-            findings.push(
-              finding(meta, "error", `Clip "${clipName}" animates the prop bone "${name}" — bones under "${propArmatureName}" may only be animated from a clip ending in "_Prop". Move those keys to the prop clip.`, {
-                where,
-                data: { clip: clipName, node: name }
-              })
-            );
-          } else {
-            findings.push(
-              finding(meta, "error", `Clip "${clipName}" animates "${name}", which is not a canonical Avatar_* bone. Retarget the animation to the Decentraland skeleton (check the bone name's exact casing).`, {
-                where,
-                data: { clip: clipName, node: name }
-              })
-            );
-          }
+          offending[target.getMesh() ? "mesh" : underProp ? "prop" : "unknown"].add(name);
         }
+        const report = (names: Set<string>, message: (list: string, one: boolean) => string) => {
+          if (names.size === 0) return;
+          const nodes = [...names];
+          findings.push(
+            finding(meta, "error", message(listSome(nodes.map((n) => `"${n}"`)), nodes.length === 1), {
+              where: nodes.length === 1 ? `${model.mainFile} › ${nodes[0]}` : model.mainFile,
+              data: { clip: clipName, nodes }
+            })
+          );
+        };
+        report(offending.mesh, (list, one) =>
+          `Clip "${clipName}" animates the mesh ${one ? "node" : "nodes"} ${list} — emotes may only animate avatar bones, never meshes or objects. Remove the object animation and animate the skeleton instead.`);
+        report(offending.prop, (list, one) =>
+          `Clip "${clipName}" animates the prop ${one ? "bone" : "bones"} ${list} — bones under "${propArmatureName}" may only be animated from a clip ending in "_Prop". Move those keys to the prop clip.`);
+        report(offending.unknown, (list, one) =>
+          `Clip "${clipName}" animates ${list}, which ${one ? "is not a canonical Avatar_* bone" : "are not canonical Avatar_* bones"}. Retarget the animation to the Decentraland skeleton (check the bone names' exact casing).`);
       }
     }
     return findings;

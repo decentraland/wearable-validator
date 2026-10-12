@@ -23,9 +23,9 @@ export const triangleCount: CheckDefinition = {
   ...meta,
   title: "Triangle count",
   describe: "Triangle count stays within the per-category budget, including hidden-slot pooling.",
-  explanation: "Each category has a triangle budget (for example 1,500 for upper body, 500 for eyewear). Hiding other categories adds their budget to yours, up to 4,000 for a helmet that hides the whole head.",
+  explanation: "Each category has a triangle budget (for example 1,500 for upper body, 500 for eyewear). Hiding other categories adds their budget to yours: hiding the base hands adds 500, and an item that hides the whole head may reach 4,000.",
   fix: "Reduce geometry in Blender: add a Decimate modifier, delete faces that are never visible (inside the body), and merge tiny details into textures. Hiding other slots adds their budget to yours.",
-  details: "Counts triangles per representation from the mesh data (indices ÷ 3; collider nodes excluded) and compares against the effective budget: the category's base plus every hidden slot's budget, the hidden slots being the representation's overrideHides when it sets them, else the item's hides; a helmet tops out at 4,000 however many head slots it hides.",
+  details: "Counts triangles per representation from the mesh data (indices ÷ 3; collider nodes excluded) and compares against the effective budget: the category's base plus every hidden slot's budget, the hidden slots being the representation's overrideHides when it sets them, else the item's hides. Hiding the base hands adds 500; hiding the head counts as hiding every head slot; a helmet, or anything hiding the head, tops out at 4,000.",
   categoryDependent: true,
   appliesTo: wearableGeometryOnly,
   measure: (ctx) => {
