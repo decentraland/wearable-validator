@@ -8,7 +8,7 @@ export interface Manifest {
   facialCategories: string[];
   fileSize: {
     wearableBytes: number; skinBytes: number; emoteBytes: number; modelHeadroomBytes: number;
-    thumbnailBytes: number; thumbnailMaxSize: number; thumbnailRecommendedSize: number;
+    thumbnailBytes: number; thumbnailMaxSize: number;
     smartWearableVideoBytes: number; audioBytes: number; maxInputBytes: number;
     /** Zip bounds, checked against the declared sizes before inflating and against the real bytes while inflating. */
     maxEntries: number; maxUncompressedBytes: number; maxEntryUncompressedBytes: number;
@@ -43,7 +43,7 @@ export interface Manifest {
     maxUnpackedBytes: number;
   };
   hands: { minHandWeightRatio: number };
-  thumbnail: { minTransparentPixelRatio: number; alphaThreshold: number };
+  thumbnail: { minTransparentBorderRatio: number; alphaThreshold: number };
   /** The renderer, shared by every visual rule — read by /native and captures.ts. */
   rendering: {
     imageSizePx: number;

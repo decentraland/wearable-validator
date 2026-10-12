@@ -254,7 +254,7 @@ describe("Slack", () => {
   it("groups an item's findings by check, errors first, a male/female pair told once with its shapes", () => {
     const mesh = (shape: string) => finding("material-names", "M-07", "error", `Mesh "M_Mask_Eyebrows_Mesh.000" in "${shape}/TropicalMask.glb" contains the reserved token "_eyebrows". Rename the mesh.`, `"${shape}/TropicalMask.glb" › M_Mask_Eyebrows_Mesh.000`);
     const findings = [
-      finding("thumbnail", "S-06", "warning", "Thumbnail is 1024×1024 — a square 256×256 PNG is recommended.", "thumbnail.png"),
+      finding("thumbnail", "S-06", "warning", "Thumbnail is 1024×512 — it should be square.", "thumbnail.png"),
       finding("thumbnail", "S-06", "warning", "Thumbnail has no alpha channel. Export as RGBA PNG.", "thumbnail.png"),
       mesh("male"),
       mesh("female")
