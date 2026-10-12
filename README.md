@@ -74,3 +74,7 @@ release deploys prd. A merge that touches the library publishes a `next` snapsho
   settings) and `packages/wearable-validator/test/metadata-schema.test.ts` (full platform schema validation).
 - Content hashes support legacy `Qm…` and UnixFS CIDv1 hashes, computed with Web Crypto; tests compare them with
   `@dcl/hashing` across empty files, chunk boundaries and a two-level tree.
+
+## License
+
+[Apache-2.0](LICENSE)
