@@ -2,7 +2,7 @@ import manifestJson from "./manifest.json" with { type: "json" };
 
 export interface Manifest {
   version: string;
-  triangles: { default: number; perCategory: Record<string, number>; handsWearHiddenHandsLimit: number; helmetHiddenHeadLimit: number };
+  triangles: { default: number; perCategory: Record<string, number>; hiddenHandsBudget: number; headSlots: string[]; hiddenHeadLimit: number };
   textures: { default: number; skin: number; maxSize: number; facialMaxSize: number };
   materials: { default: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];
@@ -115,14 +115,17 @@ export const AVATAR_CORE_BONE_NAMES: string[] = [
   "Avatar_RightUpLeg", "Avatar_RightLeg", "Avatar_RightFoot"
 ];
 
-/** effectiveLimit = base + Σ unique hides' budgets; hands_wear base bumps to 1,500 when hiding 'hands'; a helmet tops out at 4,000 however many head slots it hides (the docs' helmet rule). */
+/**
+ * effectiveLimit = base + Σ unique hides' budgets. Hiding the base hands adds their 500 (the docs' hands_wear
+ * 1,000 → 1,500); hiding the head counts as hiding every head slot. A helmet, or anything hiding the head, tops out at
+ * 4,000 (the docs' helmet rule).
+ */
 export function effectiveTriangleLimit(category: string, hides: string[] = []): number {
-  const uniqueHides = [...new Set(hides)];
-  let base = manifest.triangles.perCategory[category] ?? manifest.triangles.default;
-  if (category === "hands_wear" && uniqueHides.includes("hands")) base = manifest.triangles.handsWearHiddenHandsLimit;
-  let limit = base;
-  for (const hidden of uniqueHides) {
-    limit += manifest.triangles.perCategory[hidden] ?? 0;
-  }
-  return category === "helmet" ? Math.min(limit, manifest.triangles.helmetHiddenHeadLimit) : limit;
+  const { perCategory, hiddenHandsBudget, headSlots, hiddenHeadLimit } = manifest.triangles;
+  const hidesHead = hides.includes("head");
+  const hidden = new Set(hidesHead ? [...hides, ...headSlots] : hides);
+  hidden.delete(category);
+  let limit = perCategory[category] ?? manifest.triangles.default;
+  for (const slot of hidden) limit += slot === "hands" ? hiddenHandsBudget : perCategory[slot] ?? 0;
+  return category === "helmet" || hidesHead ? Math.min(limit, hiddenHeadLimit) : limit;
 }
