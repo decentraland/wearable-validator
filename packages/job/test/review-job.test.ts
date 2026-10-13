@@ -61,11 +61,11 @@ function fakeQueue(bodies: string[]): IWorkQueueComponent & { deleted: string[] 
 }
 
 /** The job wired to fakes; Slack stays off unless a fake Slack is given. */
-async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch) {
+async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET) {
   const logs = silentLogs();
   const calls: RenderCalls = { started: 0 };
   const queue = fakeQueue(bodies);
-  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, BUILDER_CALLBACK_SECRET: SECRET, ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "C123" } : {}) });
+  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, ...(secret ? { BUILDER_CALLBACK_SECRET: secret } : {}), ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "C123" } : {}) });
   const slack = await createSlackComponent({ config, logs, fetch: slackFetch });
   const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer(), slack });
   return { reviewJob, queue, calls };
@@ -187,6 +187,13 @@ describe("the review job", () => {
     assert.equal(await reviewJob.drain({ maxRuntimeMs: 60_000, emptyReceivesToExit: 1 }), 3);
     assert.deepEqual(queue.deleted, ["r0", "r1"], "the collection whose callback failed stays for SQS to redeliver");
     assert.equal(builder.downloads.length > 0, true);
+  });
+
+  it("without a callback secret validates and deletes the message without calling the Builder back", async () => {
+    const builder = fakeBuilder([clean], [500]);
+    const { reviewJob, queue } = await job(builder, [envelope(request([item(clean, ITEMS[0])]))], undefined, "");
+    assert.equal(await reviewJob.drain({ maxRuntimeMs: 60_000, emptyReceivesToExit: 1 }), 1);
+    assert.deepEqual([builder.posts.length, queue.deleted], [0, ["r0"]]);
   });
 });
 
