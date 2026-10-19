@@ -61,11 +61,11 @@ function fakeQueue(bodies: string[]): IWorkQueueComponent & { deleted: string[] 
 }
 
 /** The job wired to fakes; Slack stays off unless a fake Slack is given. */
-async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET) {
+async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET, slackChannel = "C123") {
   const logs = silentLogs();
   const calls: RenderCalls = { started: 0 };
   const queue = fakeQueue(bodies);
-  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, ...(secret ? { BUILDER_CALLBACK_SECRET: secret } : {}), ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "C123" } : {}) });
+  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, ...(secret ? { BUILDER_CALLBACK_SECRET: secret } : {}), ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: slackChannel } : {}) });
   const slack = await createSlackComponent({ config, logs, fetch: slackFetch });
   const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer(), slack });
   return { reviewJob, queue, calls };
@@ -215,7 +215,7 @@ function fakeSlack(refuse = false) {
     calls.push({ method, body });
     if (refuse && method.startsWith("chat.")) return Response.json({ ok: false, error: "not_in_channel" });
     if (method === "files.getUploadURLExternal") return Response.json({ ok: true, upload_url: `https://files.slack.com/upload/${++files}`, file_id: `F${files}` });
-    if (method === "chat.postMessage") return Response.json({ ok: true, ts: `1700000000.00000${calls.filter((call) => call.method === method).length}` });
+    if (method === "chat.postMessage") return Response.json({ ok: true, channel: "C123", ts: `1700000000.00000${calls.filter((call) => call.method === method).length}` });
     // the share has landed: its message is in the channel
     if (method === "files.info") return Response.json({ ok: true, file: { shares: { private: { C123: [{ ts: "1700000000.000009" }] } } } });
     return Response.json({ ok: true });
@@ -244,6 +244,16 @@ describe("Slack", () => {
     assert.equal(update.body.ts, "1700000000.000001");
     assert.match(blocksText(update.body), /Rejected/);
     assert.equal(builder.posts.length, 1, "and the Builder still gets its result");
+  });
+
+  it("takes a channel name: uploads and the verdict go to the id Slack answers with", async () => {
+    const slack = fakeSlack();
+    const { reviewJob } = await job(fakeBuilder([clean]), [], slack.fetch, SECRET, "curation-notifications");
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    const byMethod = (method: string) => slack.calls.find((call) => call.method === method)!.body;
+    assert.equal(byMethod("chat.postMessage").channel, "curation-notifications");
+    assert.equal(byMethod("files.completeUploadExternal").channel_id, "C123");
+    assert.equal(byMethod("chat.update").channel, "C123");
   });
 
   it("never lets Slack decide the job: refused messages leave the callback and the delete as they were", async () => {
