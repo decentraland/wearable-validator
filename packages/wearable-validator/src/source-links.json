@@ -133,7 +133,7 @@
   },
   "texture-size": {
     "file": "src/checks/model/texture-size/index.ts",
-    "line": 8
+    "line": 9
   },
   "triangle-count": {
     "file": "src/checks/model/triangle-count/index.ts",

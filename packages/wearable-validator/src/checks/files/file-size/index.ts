@@ -11,7 +11,7 @@ export const fileSize: CheckDefinition = {
   title: "File size",
   describe: "total size within the category limit (thumbnail + rarity image included)",
   explanation: "The full item — model, thumbnail and rarity image included — must stay under 3 MB (9 MB for skins) so it loads fast in-world.",
-  fix: "Shrink textures first (biggest win): resize to 512×512 and re-bake. Then remove unused geometry and merge duplicated meshes. The thumbnail and rarity image count toward the limit too.",
+  fix: "Shrink textures first (biggest win): halve them (1024×1024 → 512×512) and re-bake. Then remove unused geometry and merge duplicated meshes. The thumbnail and rarity image count toward the limit too.",
   details:
     "Sums the actual file bytes — model, thumbnail and rarity image included (ADR-246), each identical file once, as the catalyst counts a deployment by unique content hash — against the per-category ceiling, plus the model-alone headroom rule so nothing passes here and fails at deploy.",
   measure: (ctx) => `${mb(uniqueBytesTotal(ctx.files.values()))} MB total`,
