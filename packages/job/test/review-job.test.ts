@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { createConfigComponent } from "@well-known-components/env-config-provider";
 import { manifest } from "@dcl-regenesislabs/wearable-validator";
 import { createBuilderComponent, SIGNATURE_HEADER, signature, TIMESTAMP_HEADER } from "../src/adapters/builder.js";
-import { createSlackComponent, itemMessage } from "../src/adapters/slack.js";
+import { asComment, createSlackComponent, itemMessage } from "../src/adapters/slack.js";
 import type { IWorkQueueComponent, QueueMessage } from "../src/adapters/work-queue.js";
 import { collectionResult, createReviewJob, type CollectionResultBody, type ItemResult } from "../src/logic/review-job.js";
-import { InvalidReviewRequest, parseReviewRequest, REVIEW_EVENT, type ValidationRequest } from "../src/logic/review-request.js";
+import { InvalidReviewRequest, parseReviewRequest, REVIEW_EVENT, type ReviewItem, type ValidationRequest } from "../src/logic/review-request.js";
 import { fakeRenderer, fakeReviewer, silentLogs, type RenderCalls } from "./fakes.js";
+import { dinoSkin, dinoSkinResult } from "./fixtures/curated-items.js";
 import { syntheticEntity, type SyntheticEntity } from "../../wearable-validator/test/helpers/entity.js";
 import { pngBytes, syntheticGlb, syntheticZip } from "../../wearable-validator/test/helpers/synthetic.js";
 
@@ -240,7 +241,7 @@ describe("Slack", () => {
     for (const share of [firstItem, secondItem]) assert.deepEqual([share.body.channel_id, share.body.thread_ts], ["C123", "1700000000.000001"]);
     assert.ok((firstItem.body.files as unknown[]).length >= 2, "the thumbnail and the worn front view");
     assert.match(String(firstItem.body.initial_comment), /^\*Test Wearable\*\n\*✅ Passed\*/, "the item's text is the upload's comment, above its pictures");
-    assert.match(String(secondItem.body.initial_comment), /triangle-count\* \(M-01\)/);
+    assert.match(String(secondItem.body.initial_comment), /❌ \*Triangle count\* · M-01/);
     const update = chat.at(-1)!;
     assert.deepEqual([update.body.channel, update.body.ts], ["C123", "1700000000.000001"]);
     assert.match(blocksText(update.body), /Rejected/);
@@ -258,23 +259,30 @@ describe("Slack", () => {
 
   const finding = (check: string, rule: string, severity: "error" | "warning", message: string, where?: string) => ({ rule, check, severity, message, ...(where ? { where } : {}), docs: "https://docs.example" });
   const tropicalMask = { itemId: ITEMS[0], contentHash: "bafkreiabc", itemType: "wearable" as const, metadata: { name: "Tropical Mask" }, contents: {} };
+  const comment = (item: ReviewItem, result: ItemResult): string => asComment(itemMessage(item, result)).replace(/\u200b/g, "");
 
-  it("groups an item's findings by check, errors first, a male/female pair told once with its shapes", () => {
-    const mesh = (shape: string) => finding("material-names", "M-07", "error", `Mesh "M_Mask_Eyebrows_Mesh.000" in "${shape}/TropicalMask.glb" contains the reserved token "_eyebrows". Rename the mesh.`, `"${shape}/TropicalMask.glb" › M_Mask_Eyebrows_Mesh.000`);
-    const findings = [
-      finding("thumbnail", "S-06", "warning", "Thumbnail is 1024×512 — it should be square.", "thumbnail.png"),
-      finding("thumbnail", "S-06", "warning", "Thumbnail has no alpha channel. Export as RGBA PNG.", "thumbnail.png"),
-      mesh("male"),
-      mesh("female")
-    ];
-    const message = itemMessage(tropicalMask, { itemId: ITEMS[0], contentHash: "bafkreiabc", passed: false, findings });
-    const text = JSON.stringify(message.blocks);
-    assert.match(message.text, /1 error, 2 warnings$/, "counted as a curator reads them, not per body-shape copy");
-    assert.equal(text.split("material-names").length - 1, 1, "the male and female copies are one line");
-    assert.match(text, /material-names\* \(M-07\) · male, female/);
-    assert.match(text, /in \\"TropicalMask\.\u200bglb\\"/, "the message names the file without its folder");
-    assert.equal(text.split("thumbnail* (S-06)").length - 1, 1, "two thumbnail findings under one check heading");
-    assert.ok(text.indexOf("*Errors*") < text.indexOf("*Warnings*"), "errors first");
+  it("lists each check once, its male/female copies as one line, the hashed model file as \"the model\" and the shared fix once", () => {
+    const text = comment(dinoSkin, dinoSkinResult);
+    assert.match(text, /^\*Dino Skin\*\n\*❌ Failed\* · 3 to fix\n/);
+    assert.equal(text.split("*Texture size*").length - 1, 1, "the size error and the power-of-two warning under one heading");
+    assert.equal(text.split("Image_0 is 2048×2048").length - 1, 1, "male and female told once");
+    assert.ok(!text.includes("bafybei"), "no content-hash file name");
+    assert.equal(text.split("Resize it to 512×512 or smaller").length - 1, 1, "the fix every texture shares, said once");
+    assert.match(text, /• Image_0 is 2048×2048\n• Image_1 is 1024×1024\n/);
+    assert.match(text, /• The model uses 11 materials/);
+    assert.ok(!text.includes("QR"), "a texture too large to scan already fails the size check");
+    assert.ok(text.indexOf("*Model review*") > text.indexOf("*Material count*"), "the model's review comes after what to fix");
+    assert.match(text, /\*Model review\* ✅ Thumbnail honesty · ✅ Visual quality/);
+  });
+
+  it("puts what fails the item before what is worth a look, and marks a finding that only one body shape has", () => {
+    const female = finding("material-names", "M-07", "error", `Mesh "M_Mask_Eyebrows_Mesh.000" in "female/TropicalMask.glb" contains the reserved token "_eyebrows". Rename the mesh.`, `"female/TropicalMask.glb" › M_Mask_Eyebrows_Mesh.000`);
+    const findings = [finding("thumbnail", "S-06", "warning", "Thumbnail has no alpha channel. Export as RGBA PNG.", "thumbnail.png"), { ...female, bodyShape: "female" as const }];
+    const item = { ...tropicalMask, contents: { "male/TropicalMask.glb": "bafy1", "female/TropicalMask.glb": "bafy2" } };
+    const text = comment(item, { itemId: ITEMS[0], contentHash: "bafkreiabc", passed: false, findings });
+    assert.match(text, /· 1 to fix, 1 to check/);
+    assert.ok(text.indexOf("*To fix*") < text.indexOf("*Worth a look*"));
+    assert.match(text, /in the model contains the reserved token "_eyebrows"\. Rename the mesh\. _\(female only\)_/);
   });
 
   it("shows every finding however many there are", () => {
