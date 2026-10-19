@@ -3,9 +3,12 @@ import { imageDimensions, isJpegBytes, isPngBytes, pngHasAlpha } from "../../../
 import { textureLabel } from "../../../logic/materials.js";
 import { wearableMaterialsOnly } from "../../../logic/wearable-only.js";
 import { finding, type CheckContext, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
+import { manifest } from "../../../manifest/index.js";
 import { WEARABLES } from "../../docs.js";
 
 const meta: CheckMeta = { name: "texture-size", group: "model", rule: "M-03", docs: `${WEARABLES}#base-materials-and-textures` };
+
+const { maxSize: MAX, facialMaxSize: FACIAL_MAX } = manifest.textures;
 
 const isPowerOfTwo = (n: number): boolean => n > 0 && (n & (n - 1)) === 0;
 
@@ -28,7 +31,7 @@ function dimensionFindings(where: string, dims: { width: number; height: number 
   } else if (!isPowerOfTwo(dims.width)) {
     findings.push(
       finding(meta, "warning",
-        `${where} is ${measured}, which is not a power of two — GPUs handle 256×256 or 512×512 far better. Resize to the nearest power of two.`,
+        `${where} is ${measured}, which is not a power of two — GPUs handle sizes like 512×512 or 1024×1024 far better. Resize to the nearest power of two.`,
         { where, measured })
     );
   }
@@ -52,9 +55,9 @@ function textureSizes(ctx: CheckContext): [number, number][] {
 export const textureSize: CheckDefinition = {
   ...meta,
   title: "Texture size",
-  describe: "textures are square, within the size limit (512², facial features 256² with alpha), and warn when not power-of-two",
-  explanation: "Textures must be square and at most 512×512 pixels (256×256 for facial features).",
-  fix: "Resize the texture to 512×512 or smaller (256×256 for facial features) and make it square — re-bake or scale it in any image editor.",
+  describe: `textures are square, within the size limit (${MAX}², facial features ${FACIAL_MAX}² with alpha), and warn when not power-of-two`,
+  explanation: `Textures must be square and at most ${MAX}×${MAX} pixels (${FACIAL_MAX}×${FACIAL_MAX} for facial features).`,
+  fix: `Resize the texture to ${MAX}×${MAX} or smaller (${FACIAL_MAX}×${FACIAL_MAX} for facial features) and make it square — re-bake or scale it in any image editor.`,
   details: "Reads each image's dimensions from its header: over the limit or non-square fails; non-power-of-two dimensions warn.",
   categoryDependent: true,
   appliesTo: wearableMaterialsOnly,

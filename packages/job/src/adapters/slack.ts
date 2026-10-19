@@ -5,7 +5,7 @@
  */
 import type { IConfigComponent, ILoggerComponent } from "@well-known-components/interfaces";
 import type { CaptureRecord } from "@dcl-regenesislabs/wearable-validator";
-import { groupFindings } from "../logic/group-findings.js";
+import { itemReport, type ReportCheck, type ReportLine } from "../logic/item-report.js";
 import type { CollectionResultBody, ItemResult } from "../logic/review-job.js";
 import type { ReviewItem, ValidationRequest } from "../logic/review-request.js";
 
@@ -111,25 +111,11 @@ function collectionVerdict(body: CollectionResultBody): string {
   return body.reason === "unsupported" ? "🧑‍⚖️ Needs a curator — some items cannot be judged automatically" : "⚠️ Error — some items have no verdict; sending it again may decide them";
 }
 
-/** An item's findings as a curator reads them: male/female copies merged, then each check once with its messages under it. */
-function findingsByCheck(result: ItemResult) {
-  const byCheck = new Map<string, { severity: string; check: string; rule: string; entries: { message: string; shapes: string[]; count: number }[] }>();
-  for (const { finding, message, shapes, count } of groupFindings(result.findings)) {
-    const key = `${finding.severity}\n${finding.check}`;
-    const group = byCheck.get(key) ?? { severity: finding.severity, check: finding.check, rule: finding.rule, entries: [] };
-    group.entries.push({ message, shapes, count });
-    byCheck.set(key, group);
-  }
-  const groups = [...byCheck.values()];
-  return { errors: groups.filter((group) => group.severity === "error"), warnings: groups.filter((group) => group.severity !== "error") };
-}
-
-/** Problems counted as a curator reads them: one per distinct message, not one per body-shape copy. */
-const counts = (result: ItemResult): string => {
-  const { errors, warnings } = findingsByCheck(result);
-  const total = (groups: typeof errors) => groups.reduce((sum, group) => sum + group.entries.length, 0);
-  const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
-  return `${plural(total(errors), "error")}, ${plural(total(warnings), "warning")}`;
+/** Checks counted as a curator acts on them: the ones that fail the item, then the ones worth a look. */
+const counts = (item: ReviewItem, result: ItemResult): string => {
+  const { toFix, toCheck } = itemReport(item, result);
+  const parts = [toFix ? `${toFix} to fix` : "", toCheck ? `${toCheck} to check` : ""].filter(Boolean);
+  return parts.join(", ") || "nothing to fix";
 };
 
 /** The collection's message: in progress while the job works, then the verdict and one line per item. */
@@ -145,42 +131,51 @@ export function collectionMessage(request: ValidationRequest, finished?: { body:
   const { body, ms } = finished;
   const verdict = collectionVerdict(body);
   blocks.push(section(`*Verdict* ${verdict}`));
-  const names = new Map(request.items.map((item) => [item.itemId, itemName(item)]));
-  const lines = body.items.map((result) => `• *${inertMrkdwn(names.get(result.itemId) ?? result.itemId)}* — ${itemVerdict(result)} · ${counts(result)}`);
+  const items = new Map(request.items.map((item) => [item.itemId, item]));
+  const lines = body.items.map((result) => {
+    const item = items.get(result.itemId);
+    return `• *${inertMrkdwn(item ? itemName(item) : result.itemId)}* — ${itemVerdict(result)}${item ? ` · ${counts(item, result)}` : ""}`;
+  });
   blocks.push(...sections(lines, MAX_BLOCKS - 4));
   context.push(`rules v${body.rulesVersion}`, `${Math.round(ms / 1000)} s`);
   blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: cut(context.join(" · "), SECTION_MAX) }] });
   return { text: `${title} — ${verdict}`, blocks };
 }
 
-/** One item's reply: its verdict, what the model saw, and its findings grouped by check, errors first. */
+const MARK = { error: "❌", warning: "⚠️", passed: "✅" } as const;
+
+/** One check: its title, a line per problem (the file named once, as "the model"), and what they share said once. */
+function checkLines(entry: ReportCheck): string {
+  const bullet = (line: ReportLine): string => {
+    const mark = line.severity !== entry.severity ? `${MARK[line.severity]} ` : "";
+    return `• ${mark}${inertMrkdwn(line.text)}${line.only ? ` _(${escapeMrkdwn(line.only)} only)_` : ""}`;
+  };
+  // the note belongs to the lines of the check's own severity, so it sits right under them
+  const own = entry.lines.filter((line) => line.severity === entry.severity).map(bullet);
+  const other = entry.lines.filter((line) => line.severity !== entry.severity).map(bullet);
+  const note = entry.note ? [`↳ _${inertMrkdwn(entry.note)}_`] : [];
+  return [`${MARK[entry.severity]} *${escapeMrkdwn(entry.title)}* · ${escapeMrkdwn(entry.rule)}`, ...own, ...note, ...other].join("\n");
+}
+
+/** One item's reply: its verdict, what to fix, what to look at, then the model's review in one line. */
 export function itemMessage(item: ReviewItem, result: ItemResult): SlackMessage {
   const name = itemName(item);
+  const report = itemReport(item, result);
   const blocks: Block[] = [{ type: "header", text: { type: "plain_text", text: cut(name, HEADER_MAX) } }];
-  blocks.push(section(`*${itemVerdict(result)}* · ${counts(result)}${result.error ? `\n${inertMrkdwn(result.error)}` : ""}`));
-  if (result.visualSummary) {
-    blocks.push({ type: "divider" });
-    blocks.push(section(`*What the model saw*\n${result.visualSummary.split("\n").map((line) => `• ${inertMrkdwn(line)}`).join("\n")}`));
-  }
-  const { errors, warnings } = findingsByCheck(result);
-  for (const [title, mark, groups] of [["Errors", "❌", errors], ["Warnings", "⚠️", warnings]] as const) {
-    if (groups.length === 0) continue;
-    // one check, its body shapes, then each distinct message on its own indented line
-    const lines = groups.map((group) => {
-      const sameShapes = group.entries.every((entry) => entry.shapes.join() === group.entries[0].shapes.join());
-      const shapes = sameShapes && group.entries[0].shapes.length ? ` · ${escapeMrkdwn(group.entries[0].shapes.join(", "))}` : "";
-      const messages = group.entries.map((entry) => {
-        const tail = !sameShapes && entry.shapes.length ? ` _(${escapeMrkdwn(entry.shapes.join(", "))})_` : entry.count > 1 && !entry.shapes.length ? ` _(×${entry.count})_` : "";
-        return `\u2003${inertMrkdwn(entry.message)}${tail}`;
-      });
-      return [`${mark} *${escapeMrkdwn(group.check)}* (${escapeMrkdwn(group.rule)})${shapes}`, ...messages].join("\n");
-    });
+  blocks.push(section(`*${itemVerdict(result)}* · ${counts(item, result)}${result.error ? `\n${inertMrkdwn(result.error)}` : ""}`));
+  for (const [title, severity] of [["To fix", "error"], ["Worth a look", "warning"]] as const) {
+    const entries = report.checks.filter((entry) => entry.severity === severity);
+    if (entries.length === 0) continue;
     blocks.push({ type: "divider" });
     blocks.push(section(`*${title}*`));
-    blocks.push(...sections(lines, MAX_BLOCKS - blocks.length - 2));
+    blocks.push(...sections(entries.map(checkLines), MAX_BLOCKS - blocks.length - 3));
+  }
+  if (report.modelReview.length > 0) {
+    blocks.push({ type: "divider" });
+    blocks.push(section(`*Model review* ${report.modelReview.map((review) => `${MARK[review.outcome]} ${escapeMrkdwn(review.title)}`).join(" · ")}`));
   }
   blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: cut(`item ${item.itemId} · content ${item.contentHash}`, SECTION_MAX) }] });
-  return { text: `${name} — ${itemVerdict(result)} · ${counts(result)}`, blocks };
+  return { text: `${name} — ${itemVerdict(result)} · ${counts(item, result)}`, blocks };
 }
 
 /** A message's blocks as one mrkdwn comment, so an upload carries the text above its pictures in a single message. */
