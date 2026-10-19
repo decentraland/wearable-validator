@@ -61,11 +61,11 @@ function fakeQueue(bodies: string[]): IWorkQueueComponent & { deleted: string[] 
 }
 
 /** The job wired to fakes; Slack stays off unless a fake Slack is given. */
-async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch) {
+async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET) {
   const logs = silentLogs();
   const calls: RenderCalls = { started: 0 };
   const queue = fakeQueue(bodies);
-  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, BUILDER_CALLBACK_SECRET: SECRET, ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "C123" } : {}) });
+  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, ...(secret ? { BUILDER_CALLBACK_SECRET: secret } : {}), ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "curation-notifications" } : {}) });
   const slack = await createSlackComponent({ config, logs, fetch: slackFetch });
   const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer(), slack });
   return { reviewJob, queue, calls };
@@ -188,6 +188,13 @@ describe("the review job", () => {
     assert.deepEqual(queue.deleted, ["r0", "r1"], "the collection whose callback failed stays for SQS to redeliver");
     assert.equal(builder.downloads.length > 0, true);
   });
+
+  it("without a callback secret validates and deletes the message without calling the Builder back", async () => {
+    const builder = fakeBuilder([clean], [500]);
+    const { reviewJob, queue } = await job(builder, [envelope(request([item(clean, ITEMS[0])]))], undefined, "");
+    assert.equal(await reviewJob.drain({ maxRuntimeMs: 60_000, emptyReceivesToExit: 1 }), 1);
+    assert.deepEqual([builder.posts.length, queue.deleted], [0, ["r0"]]);
+  });
 });
 
 interface SlackCall {
@@ -208,7 +215,7 @@ function fakeSlack(refuse = false) {
     calls.push({ method, body });
     if (refuse && method.startsWith("chat.")) return Response.json({ ok: false, error: "not_in_channel" });
     if (method === "files.getUploadURLExternal") return Response.json({ ok: true, upload_url: `https://files.slack.com/upload/${++files}`, file_id: `F${files}` });
-    if (method === "chat.postMessage") return Response.json({ ok: true, ts: `1700000000.00000${calls.filter((call) => call.method === method).length}` });
+    if (method === "chat.postMessage") return Response.json({ ok: true, channel: "C123", ts: `1700000000.00000${calls.filter((call) => call.method === method).length}` });
     // the share has landed: its message is in the channel
     if (method === "files.info") return Response.json({ ok: true, file: { shares: { private: { C123: [{ ts: "1700000000.000009" }] } } } });
     return Response.json({ ok: true });
@@ -227,14 +234,15 @@ describe("Slack", () => {
     const chat = slack.calls.filter((call) => call.method.startsWith("chat.") || call.method === "files.completeUploadExternal" || call.method === "files.info");
     assert.deepEqual(chat.map((call) => call.method), ["chat.postMessage", "files.completeUploadExternal", "files.info", "files.completeUploadExternal", "files.info", "chat.update"], "each item's message lands before the next one starts");
     const [collection, firstItem, , secondItem] = chat;
-    assert.equal(collection.body.thread_ts, undefined);
+    assert.deepEqual([collection.body.channel, collection.body.thread_ts], ["curation-notifications", undefined]);
     assert.match(blocksText(collection.body), /Validating 2 items/);
+    // uploads and the edit take the id Slack answered the channel name with
     for (const share of [firstItem, secondItem]) assert.deepEqual([share.body.channel_id, share.body.thread_ts], ["C123", "1700000000.000001"]);
     assert.ok((firstItem.body.files as unknown[]).length >= 2, "the thumbnail and the worn front view");
     assert.match(String(firstItem.body.initial_comment), /^\*Test Wearable\*\n\*✅ Passed\*/, "the item's text is the upload's comment, above its pictures");
     assert.match(String(secondItem.body.initial_comment), /triangle-count\* \(M-01\)/);
     const update = chat.at(-1)!;
-    assert.equal(update.body.ts, "1700000000.000001");
+    assert.deepEqual([update.body.channel, update.body.ts], ["C123", "1700000000.000001"]);
     assert.match(blocksText(update.body), /Rejected/);
     assert.equal(builder.posts.length, 1, "and the Builder still gets its result");
   });

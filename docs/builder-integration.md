@@ -9,6 +9,9 @@ builder-server ──request──▶ topic ──▶ queue ──▶ validation
                                                      └── GET …/v1/storage/contents/:hash   (each item's files)
 ```
 
+The callback is optional: without `BUILDER_CALLBACK_SECRET` the job posts nothing back and deletes each message once
+it is validated, so the Builder only publishes the request and forgets it; the Slack channel is the result.
+
 The job sleeps between collections: the queue wakes it, it drains the queue and exits. A message is deleted only once
 the callback answers 2xx; if the callback cannot be reached the whole collection is retried by the queue (three tries,
 then a dead-letter queue).

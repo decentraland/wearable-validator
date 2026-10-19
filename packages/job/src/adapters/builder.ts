@@ -1,7 +1,7 @@
 /**
  * The Builder side of a queued validation: each item's files from its content storage, and the result posted back
- * to its callback, signed. The Builder's address comes from config, never from a request, so a message cannot point the
- * job at another host.
+ * to its callback, signed. Without BUILDER_CALLBACK_SECRET the request is fire-and-forget: Slack is the only output.
+ * The Builder's address comes from config, never from a request, so a message cannot point the job at another host.
  */
 import { createHmac } from "node:crypto";
 import type { IConfigComponent, ILoggerComponent } from "@well-known-components/interfaces";
@@ -19,7 +19,7 @@ export const TIMESTAMP_HEADER = "x-wearable-validator-timestamp";
 export interface IBuilderComponent {
   /** The item's files by path; rejects past the per-item cap or when storage does not answer. */
   fetchFiles(item: ReviewItem): Promise<Map<string, Uint8Array>>;
-  /** Rejects unless the callback answered 2xx within its retries. */
+  /** Rejects unless the callback answered 2xx within its retries; resolves at once when no callback is configured. */
   postResult(collectionId: string, body: unknown): Promise<void>;
 }
 
@@ -46,7 +46,8 @@ export async function createBuilderComponent(components: BuilderComponents): Pro
   const log = logs.getLogger("builder");
   // builder-server serves both the items' files and the callback, e.g. https://builder-api.decentraland.org
   const api = (await config.requireString("BUILDER_API_URL")).replace(/\/+$/, "");
-  const secret = await config.requireString("BUILDER_CALLBACK_SECRET");
+  const secret = await config.getString("BUILDER_CALLBACK_SECRET");
+  if (!secret) log.info("no BUILDER_CALLBACK_SECRET: results are not posted back to the Builder");
   const maxItemBytes = (await config.getNumber("MAX_UPLOAD_BYTES")) ?? DEFAULT_MAX_ITEM_BYTES;
 
   return {
@@ -72,6 +73,7 @@ export async function createBuilderComponent(components: BuilderComponents): Pro
     },
 
     async postResult(collectionId, body) {
+      if (!secret) return;
       const text = JSON.stringify(body);
       const url = `${api}/v1/collections/${collectionId}/validation-result`;
       for (let attempt = 0; ; attempt++) {

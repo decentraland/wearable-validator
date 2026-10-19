@@ -209,7 +209,7 @@ export function frontViews(captures: CaptureRecord[]): CaptureRecord[] {
 export function slackError(method: string, code: string): Error {
   switch (code) {
     case "not_in_channel": return new Error("Invite the Slack app to the channel (/invite @app) or grant chat:write.public.");
-    case "channel_not_found": return new Error("SLACK_CHANNEL is not a channel id the app can see.");
+    case "channel_not_found": return new Error("SLACK_CHANNEL is not a channel name the app can see.");
     case "invalid_auth":
     case "not_authed":
     case "token_expired": return new Error("SLACK_BOT_TOKEN is not a valid bot token.");
@@ -232,11 +232,13 @@ export async function createSlackComponent(components: SlackComponents): Promise
   const log = logs.getLogger("slack");
   const token = await config.getString("SLACK_BOT_TOKEN");
   const channel = await config.getString("SLACK_CHANNEL");
+  // SLACK_CHANNEL is a name, but uploads and chat.update take only an id: the one chat.postMessage answers with
+  let channelId = channel;
   if (!token) {
     log.info("slack notifications disabled: set SLACK_BOT_TOKEN and SLACK_CHANNEL to post every validated collection to a channel");
     return { enabled: false, collectionStarted: async () => undefined, itemValidated: async () => {}, collectionFinished: async () => {} };
   }
-  if (!channel) throw new Error("SLACK_CHANNEL must be the id of the channel (C…) the validations go to when SLACK_BOT_TOKEN is set.");
+  if (!channel) throw new Error("SLACK_CHANNEL must be the name of the channel the validations go to (e.g. curation-notifications) when SLACK_BOT_TOKEN is set.");
   const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
   async function send(url: string, init: RequestInit, retried = false): Promise<Response> {
@@ -309,7 +311,9 @@ export async function createSlackComponent(components: SlackComponents): Promise
     async collectionStarted(request) {
       try {
         const message = collectionMessage(request);
-        const ts = (await call("chat.postMessage", { channel, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks })).ts;
+        const answer = await call("chat.postMessage", { channel: channelId, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
+        if (typeof answer.channel === "string") channelId = answer.channel;
+        const ts = answer.ts;
         if (typeof ts !== "string") throw new Error("Slack answered chat.postMessage without a ts.");
         log.info("slack collection posted", { validation: request.validationId, ts });
         return ts;
@@ -323,11 +327,11 @@ export async function createSlackComponent(components: SlackComponents): Promise
       try {
         const files = await uploadImages(notice);
         if (files.length === 0) {
-          await call("chat.postMessage", { channel, thread_ts: ts, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
+          await call("chat.postMessage", { channel: channelId, thread_ts: ts, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
           return;
         }
         // one message per item: its text as the upload's comment, its pictures right under it
-        await call("files.completeUploadExternal", { files, channel_id: channel, thread_ts: ts, initial_comment: asComment(message) });
+        await call("files.completeUploadExternal", { files, channel_id: channelId, thread_ts: ts, initial_comment: asComment(message) });
         await shareLanded(files[0].id);
       } catch (error) {
         log.warn("slack item message failed", { item: notice.item.itemId, reason: reason(error) });
@@ -336,7 +340,7 @@ export async function createSlackComponent(components: SlackComponents): Promise
     async collectionFinished(ts, request, body, ms) {
       try {
         const message = collectionMessage(request, { body, ms });
-        await call("chat.update", { channel, ts, text: message.text, blocks: message.blocks });
+        await call("chat.update", { channel: channelId, ts, text: message.text, blocks: message.blocks });
       } catch (error) {
         log.warn("slack collection verdict failed", { validation: request.validationId, reason: reason(error) });
       }
