@@ -267,8 +267,8 @@ describe("Slack", () => {
     assert.equal(text.split("*Texture size*").length - 1, 1, "the size error and the power-of-two warning under one heading");
     assert.equal(text.split("Image_0 is 2048×2048").length - 1, 1, "male and female told once");
     assert.ok(!text.includes("bafybei"), "no content-hash file name");
-    assert.equal(text.split("Resize it to 512×512 or smaller").length - 1, 1, "the fix every texture shares, said once");
-    assert.match(text, /• Image_0 is 2048×2048\n• Image_1 is 1024×1024\n/);
+    assert.equal(text.split("Resize it to 1024×1024 or smaller").length - 1, 1, "the fix every texture shares, said once");
+    assert.match(text, /• Image_0 is 2048×2048\n• lips2 is 2048×2048\n/);
     assert.match(text, /• The model uses 11 materials/);
     assert.ok(!text.includes("QR"), "a texture too large to scan already fails the size check");
     assert.ok(text.indexOf("*Model review*") > text.indexOf("*Material count*"), "the model's review comes after what to fix");

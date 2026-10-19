@@ -1,4 +1,4 @@
-/** An item as the dev job reported it on 2026-10-19 (both body shapes), for the Slack message tests. */
+/** An item as the dev job reported it on 2026-10-19 (both body shapes), worded for the 1024×1024 texture limit, for the Slack message tests. */
 import type { ItemResult } from "../../src/logic/review-job.js";
 import type { ReviewItem } from "../../src/logic/review-request.js";
 
@@ -15,7 +15,7 @@ export const dinoSkin: ReviewItem = {
 };
 
 const tooLarge = (texture: string, size: number) =>
-  both((shape) => ({ rule: "M-03", check: "texture-size", severity: "error" as const, message: `"${shape}/${GLB}" › ${texture} is ${size}×${size}; the maximum texture size is 512×512. Resize it to 512×512 or smaller.`, where: `"${shape}/${GLB}" › ${texture}`, bodyShape: shape, docs }));
+  both((shape) => ({ rule: "M-03", check: "texture-size", severity: "error" as const, message: `"${shape}/${GLB}" › ${texture} is ${size}×${size}; the maximum texture size is 1024×1024. Resize it to 1024×1024 or smaller.`, where: `"${shape}/${GLB}" › ${texture}`, bodyShape: shape, docs }));
 
 export const dinoSkinResult: ItemResult = {
   itemId: dinoSkin.itemId,
@@ -25,11 +25,9 @@ export const dinoSkinResult: ItemResult = {
   findings: [
     ...both((shape) => ({ rule: "M-02", check: "texture-count", severity: "error" as const, message: `"${shape}/${GLB}" references 5 texture images; the limit is 2. Merge the images into a texture atlas so the model uses at most 2.`, where: `${shape}/${GLB}`, bodyShape: shape, measured: 5, limit: 2, docs })),
     ...tooLarge("Image_0", 2048),
-    ...tooLarge("Image_1", 1024),
-    ...tooLarge("Image_2", 1024),
-    ...tooLarge("lips2", 1024),
+    ...tooLarge("lips2", 2048),
     ...tooLarge("PETAVERSE_ICON_BLACK_FF", 5001),
-    ...both((shape) => ({ rule: "M-03", check: "texture-size", severity: "warning" as const, message: `"${shape}/${GLB}" › PETAVERSE_ICON_BLACK_FF is 5001×5001, which is not a power of two — GPUs handle 256×256 or 512×512 far better. Resize to the nearest power of two.`, where: `"${shape}/${GLB}" › PETAVERSE_ICON_BLACK_FF`, bodyShape: shape, docs })),
+    ...both((shape) => ({ rule: "M-03", check: "texture-size", severity: "warning" as const, message: `"${shape}/${GLB}" › PETAVERSE_ICON_BLACK_FF is 5001×5001, which is not a power of two — GPUs handle sizes like 512×512 or 1024×1024 far better. Resize to the nearest power of two.`, where: `"${shape}/${GLB}" › PETAVERSE_ICON_BLACK_FF`, bodyShape: shape, docs })),
     ...both((shape) => ({ rule: "M-06", check: "material-count", severity: "error" as const, message: `"${shape}/${GLB}" uses 11 materials; the limit is 2 (AvatarSkin_MAT excluded). Merge meshes so they share at most 2 materials.`, where: `${shape}/${GLB}`, bodyShape: shape, measured: 11, limit: 2, docs })),
     ...both((shape) => ({ rule: "F-04", check: "qr-code", severity: "warning" as const, message: `Texture "PETAVERSE_ICON_BLACK_FF" in "${shape}/${GLB}" is 5001×5001 — too large to scan for QR codes (the scanner reads images up to 16.8 megapixels). Shrink it to the texture and thumbnail size limits so it can be checked.`, where: `"${shape}/${GLB}" › PETAVERSE_ICON_BLACK_FF`, bodyShape: shape, docs }))
   ]
