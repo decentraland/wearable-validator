@@ -61,11 +61,11 @@ function fakeQueue(bodies: string[]): IWorkQueueComponent & { deleted: string[] 
 }
 
 /** The job wired to fakes; Slack stays off unless a fake Slack is given. */
-async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET, slackChannel = "C123") {
+async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET) {
   const logs = silentLogs();
   const calls: RenderCalls = { started: 0 };
   const queue = fakeQueue(bodies);
-  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, ...(secret ? { BUILDER_CALLBACK_SECRET: secret } : {}), ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: slackChannel } : {}) });
+  const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, ...(secret ? { BUILDER_CALLBACK_SECRET: secret } : {}), ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "curation-notifications" } : {}) });
   const slack = await createSlackComponent({ config, logs, fetch: slackFetch });
   const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer(), slack });
   return { reviewJob, queue, calls };
@@ -234,26 +234,17 @@ describe("Slack", () => {
     const chat = slack.calls.filter((call) => call.method.startsWith("chat.") || call.method === "files.completeUploadExternal" || call.method === "files.info");
     assert.deepEqual(chat.map((call) => call.method), ["chat.postMessage", "files.completeUploadExternal", "files.info", "files.completeUploadExternal", "files.info", "chat.update"], "each item's message lands before the next one starts");
     const [collection, firstItem, , secondItem] = chat;
-    assert.equal(collection.body.thread_ts, undefined);
+    assert.deepEqual([collection.body.channel, collection.body.thread_ts], ["curation-notifications", undefined]);
     assert.match(blocksText(collection.body), /Validating 2 items/);
+    // uploads and the edit take the id Slack answered the channel name with
     for (const share of [firstItem, secondItem]) assert.deepEqual([share.body.channel_id, share.body.thread_ts], ["C123", "1700000000.000001"]);
     assert.ok((firstItem.body.files as unknown[]).length >= 2, "the thumbnail and the worn front view");
     assert.match(String(firstItem.body.initial_comment), /^\*Test Wearable\*\n\*✅ Passed\*/, "the item's text is the upload's comment, above its pictures");
     assert.match(String(secondItem.body.initial_comment), /triangle-count\* \(M-01\)/);
     const update = chat.at(-1)!;
-    assert.equal(update.body.ts, "1700000000.000001");
+    assert.deepEqual([update.body.channel, update.body.ts], ["C123", "1700000000.000001"]);
     assert.match(blocksText(update.body), /Rejected/);
     assert.equal(builder.posts.length, 1, "and the Builder still gets its result");
-  });
-
-  it("takes a channel name: uploads and the verdict go to the id Slack answers with", async () => {
-    const slack = fakeSlack();
-    const { reviewJob } = await job(fakeBuilder([clean]), [], slack.fetch, SECRET, "curation-notifications");
-    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
-    const byMethod = (method: string) => slack.calls.find((call) => call.method === method)!.body;
-    assert.equal(byMethod("chat.postMessage").channel, "curation-notifications");
-    assert.equal(byMethod("files.completeUploadExternal").channel_id, "C123");
-    assert.equal(byMethod("chat.update").channel, "C123");
   });
 
   it("never lets Slack decide the job: refused messages leave the callback and the delete as they were", async () => {
