@@ -7,6 +7,7 @@ supplies, renders it on both body shapes and asks a vision model to judge what i
 
 Mandated by [DAO proposal e2a13c58](https://decentraland.org/governance/proposal/?id=e2a13c58-d66d-412d-802f-83190d063636): automate the objective half of wearable curation.
 
+
 ## What's here
 
 | | |
