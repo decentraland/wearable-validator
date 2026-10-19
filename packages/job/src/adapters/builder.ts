@@ -1,7 +1,7 @@
 /**
  * The Builder side of a queued validation: each item's files from its content storage, and the result posted back
- * to its callback, signed. Without BUILDER_CALLBACK_SECRET the request is fire-and-forget: Slack is the only output. The Builder's address comes from config, never from a request, so a message cannot point the
- * job at another host.
+ * to its callback, signed. Without BUILDER_CALLBACK_SECRET the request is fire-and-forget: Slack is the only output.
+ * The Builder's address comes from config, never from a request, so a message cannot point the job at another host.
  */
 import { createHmac } from "node:crypto";
 import type { IConfigComponent, ILoggerComponent } from "@well-known-components/interfaces";
