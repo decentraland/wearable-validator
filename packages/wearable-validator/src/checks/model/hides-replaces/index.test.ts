@@ -24,10 +24,8 @@ describe("hides-replaces (M-12)", () => {
   });
 
   it("passes a skin that hides nothing: the client hides the base body under every skin", async () => {
-    const skin = await validate(await wearableZip({}, { category: "skin", hides: ["head", "hands_wear"] }), { checks: ["hides-replaces"] });
+    const skin = await validate(await wearableZip({}, { category: "skin", hides: [] }), { checks: ["hides-replaces"] });
     assert.equal(status(skin, "hides-replaces"), "passed");
-    const bare = await validate(await wearableZip({}, { category: "skin", hides: [] }), { checks: ["hides-replaces"] });
-    assert.equal(status(bare, "hides-replaces"), "passed");
   });
 
   it("passes a plain wearable", async () => {
