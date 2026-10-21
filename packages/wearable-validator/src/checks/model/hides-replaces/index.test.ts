@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validate, manifest } from "../../../index.js";
+import { validate } from "../../../index.js";
 import { found, status } from "#test/helpers/findings.js";
 import { syntheticGlb } from "#test/helpers/synthetic.js";
 import { wearableZip } from "#test/helpers/wearable-zip.js";
@@ -23,18 +23,12 @@ describe("hides-replaces (M-12)", () => {
     assert.equal(findings[0].severity, "warning");
   });
 
-  it("warns when a skin doesn't hide the full ADR-60 set", async () => {
-    const zip = await wearableZip({}, { category: "skin", hides: [] });
-    const result = await validate(zip, { checks: ["hides-replaces"] });
-    const findings = found(result, "hides-replaces");
-    assert.equal(findings.length, 1);
-    assert.equal(findings[0].severity, "warning");
-    assert.deepEqual(findings[0].data?.missing, manifest.skinAutoHideSet);
+  it("passes a skin that hides nothing: the client hides the base body under every skin", async () => {
+    const skin = await validate(await wearableZip({}, { category: "skin", hides: [] }), { checks: ["hides-replaces"] });
+    assert.equal(status(skin, "hides-replaces"), "passed");
   });
 
-  it("passes a skin hiding the full set, and a plain wearable", async () => {
-    const skin = await validate(await wearableZip({}, { category: "skin", hides: manifest.skinAutoHideSet }), { checks: ["hides-replaces"] });
-    assert.equal(status(skin, "hides-replaces"), "passed");
+  it("passes a plain wearable", async () => {
     const hat = await validate(await wearableZip({}, { hides: ["mask"] }), { checks: ["hides-replaces"] });
     assert.equal(status(hat, "hides-replaces"), "passed");
   });

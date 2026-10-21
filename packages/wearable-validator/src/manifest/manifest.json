@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
+  "version": "0.6.1",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -67,18 +67,6 @@
     "height": 2.42,
     "depth": 1.4
   },
-  "skinAutoHideSet": [
-    "head",
-    "hair",
-    "facial_hair",
-    "mouth",
-    "eyebrows",
-    "eyes",
-    "upper_body",
-    "lower_body",
-    "feet",
-    "hands_wear"
-  ],
   "text": {
     "nameMax": 32,
     "descriptionMax": 64,
