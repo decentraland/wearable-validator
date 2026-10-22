@@ -13,6 +13,8 @@ const API = "https://slack.com/api";
 const TIMEOUT_MS = 15_000;
 // Slack's own 429 comes with retry-after in seconds; one wait is honoured, never a long stall
 const MAX_RETRY_WAIT_MS = 60_000;
+// calls that post nothing when sent twice; posting calls are never repeated, or a slow success would post twice
+const REPEATABLE = new Set(["files.getUploadURLExternal", "the file upload", "files.info"]);
 // Block Kit limits (api.slack.com/reference/block-kit): a message over them is refused whole
 const HEADER_MAX = 150;
 const SECTION_MAX = 3000;
@@ -241,8 +243,14 @@ export async function createSlackComponent(components: SlackComponents): Promise
     try {
       res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
     } catch (error) {
-      if (error instanceof Error && error.name === "TimeoutError") throw new Error(`Slack did not answer ${what} within ${TIMEOUT_MS / 1000} s.`);
-      throw error;
+      if (!(error instanceof Error && error.name === "TimeoutError")) throw error;
+      // on prd a call after a minute's idle (an item rendering) went unanswered while the next one, on a new
+      // connection, went through: a call that only reads or prepares an upload is safe to send once more
+      if (!retried && REPEATABLE.has(what)) {
+        log.info("slack timed out, sending once more", { call: what });
+        return send(what, url, init, true);
+      }
+      throw new Error(`Slack did not answer ${what} within ${TIMEOUT_MS / 1000} s.`);
     }
     if (res.status === 429 && !retried) {
       const seconds = Number(res.headers.get("retry-after") ?? "1");
