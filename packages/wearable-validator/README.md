@@ -4,6 +4,7 @@ Decentraland's wearable and emote rule book as code. Hand it a Builder zip, a `.
 
 - **35 code checks** (files, model, emote, content) run anywhere: browser or Node.
 - **4 visual checks** render the item and ask Claude to judge it. They run on a Node server only (a native Unity render server).
+- **1 code review** (`smart-wearable-code`, group `code`) has Claude read a smart wearable's scene and bundle as text, never running it: it says what the code does, and malicious or spam code fails the item. It needs only the `/ai` reviewer.
 
 ```sh
 npm i @dcl-regenesislabs/wearable-validator
@@ -76,7 +77,7 @@ await renderer.stop(); // on shutdown
 | Option | What it does |
 | --- | --- |
 | `checks` | Run only these checks by name (`"triangle-count"`; rule ids like `"M-01"` work too). The verdict becomes `null`. |
-| `groups` | `files`, `model`, `emote`, `content` (the default set) and `rendering`. |
+| `groups` | `files`, `model`, `emote`, `content` (the default set), `rendering` and `code`. |
 | `category`, `itemType` | Hints for a bare `.glb`, which carries no metadata. |
 | `onProgress` | Called as each check starts and finishes, for a live UI. |
 | `signal` | An `AbortSignal` to cancel the run. |

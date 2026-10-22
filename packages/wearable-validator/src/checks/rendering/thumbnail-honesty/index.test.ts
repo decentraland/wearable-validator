@@ -288,13 +288,13 @@ describe("thumbnail-honesty prompt", () => {
     assert.equal(thumbnailPrompt.version, 4);
   });
 
-  it("every check with a prompt is a rendering check whose prompt version matches its manifest block", () => {
+  it("every check with a prompt is an opt-in model check whose prompt version matches its manifest block", () => {
     const camelCase = (name: string): string => name.replace(/-(\w)/g, (_match, letter: string) => letter.toUpperCase());
     const blocks = manifest as unknown as Record<string, { promptVersion?: number } | undefined>;
     const withPrompt = registry.filter((check) => check.prompt);
-    assert.deepEqual(withPrompt.map((check) => check.name), ["thumbnail-honesty", "visual-quality", "emote-quality"]);
+    assert.deepEqual(withPrompt.map((check) => check.name), ["thumbnail-honesty", "visual-quality", "emote-quality", "smart-wearable-code"]);
     for (const check of withPrompt) {
-      assert.equal(check.group, "rendering", check.name);
+      assert.ok(check.group === "rendering" || check.group === "code", check.name);
       assert.equal(check.prompt?.version, blocks[camelCase(check.name)]?.promptVersion, check.name);
     }
   });

@@ -1,5 +1,5 @@
 {
-  "version": "0.6.1",
+  "version": "0.7.0",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -284,6 +284,12 @@
   "emoteQuality": {
     "promptVersion": 2,
     "maxFindings": 8
+  },
+  "smartWearableCode": {
+    "promptVersion": 1,
+    "maxFindings": 8,
+    "maxCodeBytes": 1048576,
+    "maxInputTokens": 400000
   },
   "receipts": {
     "trianglesAndBones": "builder src/lib/glbValidation/constants.ts",

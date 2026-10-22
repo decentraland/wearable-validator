@@ -4,7 +4,7 @@
  * Previous hop: checks/rendering/<rule>/index.ts. Next hop: the injected Reviewer (/ai in production).
  */
 import { digestJson } from "./captures.js";
-import type { CheckContext, CheckExecution, Prompt, ReviewImage, ReviewMetadata } from "../types.js";
+import type { CheckContext, CheckExecution, Prompt, ReviewImage, ReviewMetadata, ReviewText } from "../types.js";
 
 export const skipped = (reason: string): CheckExecution => ({ status: "skipped", coverage: "missing", findings: [], reason });
 export const errored = (reason: string, review?: ReviewMetadata): CheckExecution => ({ status: "errored", coverage: "missing", findings: [], reason, review });
@@ -16,10 +16,10 @@ export function isExecution(value: ReviewOutcome): value is CheckExecution {
 }
 
 /** One call; a missing reviewer is skipped, a refusal or a mismatched prompt is errored — never a pass. */
-export async function askReviewer(ctx: CheckContext, check: string, prompt: Prompt, images: ReviewImage[]): Promise<ReviewOutcome> {
+export async function askReviewer(ctx: CheckContext, check: string, prompt: Prompt, images: ReviewImage[], text?: { texts: ReviewText[]; maxInputTokens: number }): Promise<ReviewOutcome> {
   const reviewer = ctx.services?.reviewer;
   if (!reviewer) return skipped("Configure services.reviewer to run this review. Use the optional /ai adapter for Pi with OAuth.");
-  const request = { check, prompt, promptDigest: await digestJson(prompt), images };
+  const request = { check, prompt, promptDigest: await digestJson(prompt), images, ...text };
   const result = await reviewer.review(request, ctx.signal);
   ctx.signal?.throwIfAborted();
   if (!result.ok) return errored(result.reason || "The reviewer did not answer.", result.metadata);

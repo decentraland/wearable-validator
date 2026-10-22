@@ -189,6 +189,10 @@ export function itemMessage(item: ReviewItem, result: ItemResult): SlackMessage 
     blocks.push(section(`*${title}*`));
     blocks.push(...sections(entries.map(checkLines), MAX_BLOCKS - blocks.length - 3));
   }
+  if (report.codeSummary) {
+    blocks.push({ type: "divider" });
+    blocks.push(section(cut(`*What the code does* ${inertMrkdwn(report.codeSummary)}`, SECTION_MAX)));
+  }
   if (report.modelReview.length > 0) {
     blocks.push({ type: "divider" });
     blocks.push(section(`*Model review* ${report.modelReview.map((review) => `${MARK[review.outcome]} ${escapeMrkdwn(review.title)}`).join(" · ")}`));

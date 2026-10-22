@@ -271,6 +271,18 @@ describe("Slack", () => {
     assert.equal(builder.downloads.length, 0);
   });
 
+  it("reviews a smart wearable's code and tells the curators what it does", async () => {
+    const scene = new TextEncoder().encode(JSON.stringify({ main: "bin/game.js", requiredPermissions: [] }));
+    const zip = await syntheticZip({ extraFiles: { "scene.json": scene, "bin/game.js": new TextEncoder().encode("playSound('beat.mp3')") } });
+    const smart = await syntheticEntity(zip, `urn:decentraland:amoy:collections-v2:0x${"cd".repeat(20)}:0`);
+    const slack = fakeSlack();
+    const { reviewJob } = await job(fakeBuilder([smart]), [], slack.fetch);
+    assert.equal(await reviewJob.process(message(envelope(request([item(smart, ITEMS[0])])))), "delete");
+    const reply = slack.calls.find((call) => call.method === "files.completeUploadExternal")!;
+    assert.match(String(reply.body.initial_comment), /\*What the code does\* Plays a beat when the wearer dances\./);
+    assert.match(String(reply.body.initial_comment), /✅ Smart wearable code/);
+  });
+
   it("never lets Slack decide the job: refused messages leave the callback and the delete as they were", async () => {
     const slack = fakeSlack(true);
     const builder = fakeBuilder([clean]);

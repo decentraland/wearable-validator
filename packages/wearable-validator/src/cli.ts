@@ -13,7 +13,7 @@ program.name("wearable-validator").description("The Decentraland wearable & emot
 program
   .command("validate")
   .argument("<file>", "wearable/emote .zip, bare .glb, or facial-feature .png")
-  .option("--groups <groups>", "comma-separated: files,model,emote,content,rendering")
+  .option("--groups <groups>", "comma-separated: files,model,emote,content,rendering,code")
   .option("--checks <checks>", "comma-separated check names (rule IDs like M-01 work as aliases)")
   .option("--category <category>", "category hint for bare GLBs (e.g. upper_body)")
   .option("--item-type <type>", "wearable | emote — overrides inference on bare GLBs")

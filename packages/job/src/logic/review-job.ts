@@ -16,7 +16,8 @@ import { InvalidReviewRequest, parseReviewRequest, summarizeRequest, type Review
 const CODE_CHECKS_TIMEOUT_MS = 120_000;
 // a transient SQS error must not end the drain: nothing relaunches this task until the next collection
 const MAX_CONSECUTIVE_RECEIVE_FAILURES = 5;
-const VISUAL_CHECKS = registry.filter((check) => check.group === "rendering").map((check) => check.name);
+// the checks that need the renderer or the model: run after the code checks, with both
+const MODEL_CHECKS = registry.filter((check) => check.group === "rendering" || check.group === "code").map((check) => check.name);
 // the file an item's finding points at starts with its body shape's folder: `male/shirt.glb` or `"male/shirt.glb" › Albedo`
 const BODY_SHAPE = /^"?(male|female)\//i;
 
@@ -145,7 +146,7 @@ export function createReviewJob(components: ReviewJobComponents) {
   async function renderAndReview(item: ReviewItem, input: Input): Promise<Result> {
     const drawer = await renderer.forItem(item.itemId);
     try {
-      return await validate(input, { checks: VISUAL_CHECKS, services: { renderer: drawer, reviewer } });
+      return await validate(input, { checks: MODEL_CHECKS, services: { renderer: drawer, reviewer } });
     } finally {
       await drawer.stop().catch(() => {});
     }

@@ -1,32 +1,13 @@
 /** S-11 Smart wearable — a scene bundle runs code on every wearer's client, so it must be complete, permission-scoped and within the video cap. */
 import { RequiredPermission } from "@dcl/schemas";
 import { mb } from "../../../logic/bytes.js";
-import { finding, type CheckContext, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
+import { isSmartWearable, readScene, resolveMain, sceneFiles } from "../../../logic/smart-wearable.js";
+import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { SMART } from "../../docs.js";
 
 const meta: CheckMeta = { name: "smart-wearable", group: "files", rule: "S-11", docs: SMART };
 
 const PERMISSION_VALUES: Set<string> = new Set(Object.values(RequiredPermission));
-
-// the Builder keeps a scene bundle per body shape (male/scene.json, female/scene.json); a zip may keep one at its root
-const SCENE = /(^|\/)scene\.json$/;
-
-const sceneFiles = (ctx: CheckContext): string[] => [...ctx.files.keys()].filter((path) => SCENE.test(path));
-
-/** A scene's main script, resolved from the scene file's own folder; undefined when it would leave the item. */
-function resolveMain(scenePath: string, main: string): string | undefined {
-  const parts = [...scenePath.split("/").slice(0, -1), ...main.split("/")].filter((part) => part !== "" && part !== ".");
-  return parts.includes("..") ? undefined : parts.join("/");
-}
-
-function isSmartWearable(ctx: CheckContext): boolean {
-  if (sceneFiles(ctx).length > 0) return true;
-  if ((ctx.item.requiredPermissions ?? []).length > 0) return true;
-  for (const path of ctx.files.keys()) {
-    if (/(^|\/)game\.js$/.test(path)) return true;
-  }
-  return false;
-}
 
 export const smartWearable: CheckDefinition = {
   ...meta,
@@ -51,17 +32,12 @@ export const smartWearable: CheckDefinition = {
     if (scenes.length === 0) findings.push(finding(meta, "error", "The item looks like a smart wearable but has no scene.json — include the scene definition."));
     const scenePermissions: string[] = [];
     for (const scenePath of scenes) {
-      let scene: unknown;
-      try {
-        scene = JSON.parse(new TextDecoder().decode(ctx.files.get(scenePath)));
-      } catch {
-        scene = undefined;
-      }
-      if (typeof scene !== "object" || scene === null || Array.isArray(scene)) {
+      const scene = readScene(ctx, scenePath);
+      if (!scene) {
         findings.push(finding(meta, "error", `"${scenePath}" is not a valid scene definition (a JSON object) — re-export the smart wearable.`, { where: scenePath }));
         continue;
       }
-      const { main, requiredPermissions } = scene as { main?: unknown; requiredPermissions?: unknown };
+      const { main, requiredPermissions } = scene;
       const mainPath = typeof main === "string" && main !== "" ? resolveMain(scenePath, main) : undefined;
       if (typeof main !== "string" || main === "") {
         findings.push(finding(meta, "error", `"${scenePath}" declares no main script — set "main" to the compiled JS bundle.`, { where: scenePath }));

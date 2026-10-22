@@ -82,6 +82,8 @@ export interface Manifest {
   visualQuality: { promptVersion: number; maxFindings: number };
   /** V-07 over the emote captures. */
   emoteQuality: { promptVersion: number; maxFindings: number };
+  /** S-12: one model call reads a smart wearable's code; its own input budget, since a bundle carries the SDK. */
+  smartWearableCode: { promptVersion: number; maxFindings: number; maxCodeBytes: number; maxInputTokens: number };
   receipts: Record<string, string>;
 }
 
