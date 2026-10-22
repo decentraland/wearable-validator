@@ -203,8 +203,8 @@ interface SlackCall {
   body: Record<string, unknown>;
 }
 
-/** Slack's Web API: records every call; `refuse` makes every chat call answer ok: false. */
-function fakeSlack(refuse = false) {
+/** Slack's Web API: records every call; `refuse` makes every chat call answer ok: false, `stall` times out the uploads. */
+function fakeSlack(refuse = false, stall = false) {
   const calls: SlackCall[] = [];
   let files = 0;
   const fetch: typeof globalThis.fetch = async (input, init) => {
@@ -214,6 +214,7 @@ function fakeSlack(refuse = false) {
     const raw = String(init?.body ?? "");
     const body = method === "files.getUploadURLExternal" || method === "files.info" ? Object.fromEntries(new URLSearchParams(raw)) : (JSON.parse(raw) as Record<string, unknown>);
     calls.push({ method, body });
+    if (stall && method === "files.getUploadURLExternal") throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
     if (refuse && method.startsWith("chat.")) return Response.json({ ok: false, error: "not_in_channel" });
     if (method === "files.getUploadURLExternal") return Response.json({ ok: true, upload_url: `https://files.slack.com/upload/${++files}`, file_id: `F${files}` });
     if (method === "chat.postMessage") return Response.json({ ok: true, channel: "C123", ts: `1700000000.00000${calls.filter((call) => call.method === method).length}` });
@@ -255,6 +256,15 @@ describe("Slack", () => {
     assert.equal(await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])])))), "delete");
     assert.equal(builder.posts.length, 1);
     assert.deepEqual(slack.calls.map((call) => call.method), ["chat.postMessage"], "no thread to reply in, so nothing more is tried");
+  });
+
+  it("still posts an item's findings in the thread when its pictures cannot be uploaded", async () => {
+    const slack = fakeSlack(false, true);
+    const { reviewJob } = await job(fakeBuilder([heavy]), [], slack.fetch);
+    assert.equal(await reviewJob.process(message(envelope(request([item(heavy, ITEMS[0])])))), "delete");
+    const replies = slack.calls.filter((call) => call.method === "chat.postMessage" && call.body.thread_ts);
+    assert.equal(replies.length, 1);
+    assert.match(blocksText(replies[0].body), /Triangle count/);
   });
 
   const finding = (check: string, rule: string, severity: "error" | "warning", message: string, where?: string) => ({ rule, check, severity, message, ...(where ? { where } : {}), docs: "https://docs.example" });

@@ -236,12 +236,18 @@ export async function createSlackComponent(components: SlackComponents): Promise
   if (!channel) throw new Error("SLACK_CHANNEL must be the name of the channel the validations go to (e.g. curation-notifications) when SLACK_BOT_TOKEN is set.");
   const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-  async function send(url: string, init: RequestInit, retried = false): Promise<Response> {
-    const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  async function send(what: string, url: string, init: RequestInit, retried = false): Promise<Response> {
+    let res: Response;
+    try {
+      res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError") throw new Error(`Slack did not answer ${what} within ${TIMEOUT_MS / 1000} s.`);
+      throw error;
+    }
     if (res.status === 429 && !retried) {
       const seconds = Number(res.headers.get("retry-after") ?? "1");
       await sleep(Math.min(Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 1000, MAX_RETRY_WAIT_MS));
-      return send(url, init, true);
+      return send(what, url, init, true);
     }
     return res;
   }
@@ -249,7 +255,7 @@ export async function createSlackComponent(components: SlackComponents): Promise
   /** One Web API method; JSON unless a URLSearchParams body is given (the file upload handshake is form-encoded). */
   async function call(method: string, body: Record<string, unknown> | URLSearchParams): Promise<SlackAnswer> {
     const form = body instanceof URLSearchParams;
-    const res = await send(`${API}/${method}`, {
+    const res = await send(method, `${API}/${method}`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": form ? "application/x-www-form-urlencoded" : "application/json; charset=utf-8" },
       body: form ? body.toString() : JSON.stringify(body)
@@ -271,7 +277,7 @@ export async function createSlackComponent(components: SlackComponents): Promise
     // a fresh Uint8Array sits on a plain ArrayBuffer, which is what fetch's BodyInit accepts
     const body = new Uint8Array(bytes.byteLength);
     body.set(bytes);
-    const put = await send(uploadUrl, { method: "POST", headers: { "content-type": "application/octet-stream" }, body });
+    const put = await send("the file upload", uploadUrl, { method: "POST", headers: { "content-type": "application/octet-stream" }, body });
     if (!put.ok) throw new Error(`Slack answered HTTP ${put.status} to the file upload.`);
     return { id: fileId, title: alt };
   }
@@ -320,7 +326,11 @@ export async function createSlackComponent(components: SlackComponents): Promise
     async itemValidated(ts, notice) {
       const message = itemMessage(notice.item, notice.result);
       try {
-        const files = await uploadImages(notice);
+        // the findings are the record: pictures that cannot be uploaded leave a text-only reply, never none
+        const files = await uploadImages(notice).catch((error: unknown) => {
+          log.warn("slack item pictures failed: posting the item without them", { item: notice.item.itemId, reason: reason(error) });
+          return [];
+        });
         if (files.length === 0) {
           await call("chat.postMessage", { channel: channelId, thread_ts: ts, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
           return;
