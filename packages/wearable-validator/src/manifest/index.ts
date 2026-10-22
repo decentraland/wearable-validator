@@ -82,7 +82,7 @@ export interface Manifest {
   visualQuality: { promptVersion: number; maxFindings: number };
   /** V-07 over the emote captures. */
   emoteQuality: { promptVersion: number; maxFindings: number };
-  /** S-12: one model call reads a smart wearable's code; its own input budget, since a bundle carries the SDK. */
+  /** S-12: one model call reads a smart wearable's code; its own input budget, since a bundle carries the SDK. Minified JS runs near 1.7 characters a token (DJ Cat: 372 KB, 219k tokens), so 1.5 MB fills most of the model's 1M-token context. */
   smartWearableCode: { promptVersion: number; maxFindings: number; maxCodeBytes: number; maxInputTokens: number };
   receipts: Record<string, string>;
 }

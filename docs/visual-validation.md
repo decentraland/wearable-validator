@@ -86,7 +86,7 @@ Twelve files carry the phase (5 with logic, 5 tests, 1 launcher pair, 1 doc). Ev
 },
 "ai": {                             // the one call, shared by every AI-backed rule — read only by ai.ts (+ maxTextLength by parsers)
   "model": "claude-sonnet-5",
-  "maxInputTokens": 40000, "maxImages": 21, "timeoutMs": 120000, "maxRetries": 0,
+  "maxInputTokens": 40000, "maxImages": 21, "timeoutMs": 300000, "maxRetries": 0,
   "thinkingBudgetTokens": 1024, "imagePixelsPerToken": 750, "textCharactersPerToken": 3, "maxTextLength": 1200
 },
 "thumbnailHonesty": {               // V-05 only — a flat per-topic block beside thumbnail / hands / emote, HEAD style
