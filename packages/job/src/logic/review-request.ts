@@ -24,6 +24,13 @@ export interface ValidationRequest {
   items: ReviewItem[];
 }
 
+/** What a message says about itself before it is checked, for the log and the curators: only well-formed ids are kept. */
+export interface RequestSummary {
+  collectionId?: string;
+  validationId?: string;
+  items?: number;
+}
+
 /** A message the job can never act on: deleted, not retried. */
 export class InvalidReviewRequest extends Error {}
 
@@ -64,6 +71,26 @@ function parseItem(value: unknown): ReviewItem {
     itemType: isRecord(metadata.emoteDataADR74) ? "emote" : "wearable",
     metadata,
     contents: contents as Record<string, string>
+  };
+}
+
+/** Never throws: whatever of the collection, the attempt and the item count the message names. */
+export function summarizeRequest(body: string): RequestSummary {
+  let event: unknown;
+  try {
+    event = JSON.parse(body);
+    if (isRecord(event) && typeof event.Message === "string") event = JSON.parse(event.Message);
+  } catch {
+    return {};
+  }
+  const request = isRecord(event) && isRecord(event.metadata) ? event.metadata : {};
+  const id = (value: unknown): string | undefined => (typeof value === "string" && UUID.test(value) ? value : undefined);
+  const collectionId = id(request.collectionId);
+  const validationId = id(request.validationId);
+  return {
+    ...(collectionId ? { collectionId } : {}),
+    ...(validationId ? { validationId } : {}),
+    ...(Array.isArray(request.items) ? { items: request.items.length } : {})
   };
 }
 

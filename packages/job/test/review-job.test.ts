@@ -250,6 +250,20 @@ describe("Slack", () => {
     assert.equal(builder.posts.length, 1, "and the Builder still gets its result");
   });
 
+  it("tells the channel when a request cannot be validated, with the collection and why, and drops nothing unseen", async () => {
+    const slack = fakeSlack();
+    const builder = fakeBuilder([clean]);
+    const { reviewJob } = await job(builder, [], slack.fetch);
+    const tooMany = Array.from({ length: 51 }, () => item(clean, ITEMS[0]));
+    assert.equal(await reviewJob.process(message(envelope(request(tooMany)))), "delete");
+    assert.deepEqual(slack.calls.map((call) => call.method), ["chat.postMessage"]);
+    const text = blocksText(slack.calls[0].body);
+    assert.ok(text.includes(`Collection ${COLLECTION}`));
+    assert.match(text, /Not validated — The request has more than 50 items\./);
+    assert.match(text, /validation [0-9a-f-]{36} · 51 items/);
+    assert.equal(builder.downloads.length, 0);
+  });
+
   it("never lets Slack decide the job: refused messages leave the callback and the delete as they were", async () => {
     const slack = fakeSlack(true);
     const builder = fakeBuilder([clean]);
