@@ -96,6 +96,13 @@ describe("parseReviewRequest", () => {
     assert.equal(emote.items[0].itemType, "emote", "an emote is told by its emoteDataADR74");
   });
 
+  it("takes a smart wearable's many files, up to the rule book's entry cap", () => {
+    const files = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, n) => [`male/images/key-${n}.png`, `bafkrei${n}`]));
+    // DJ Cat, a published smart wearable, ships 137 files
+    assert.equal(Object.keys(parseReviewRequest(JSON.stringify(request([item(clean, ITEMS[0], { contents: files(137) })]))).items[0].contents).length, 137);
+    assert.throws(() => parseReviewRequest(JSON.stringify(request([item(clean, ITEMS[0], { contents: files(manifest.fileSize.maxEntries + 1) })]))), InvalidReviewRequest);
+  });
+
   it("refuses anything it could not act on safely", () => {
     const refused = (value: unknown) => assert.throws(() => parseReviewRequest(typeof value === "string" ? value : JSON.stringify(value)), InvalidReviewRequest);
     refused("not json");
