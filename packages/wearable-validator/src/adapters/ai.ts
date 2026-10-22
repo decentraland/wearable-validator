@@ -10,7 +10,7 @@ import { imageSize } from "image-size";
 import { digest } from "../logic/captures.js";
 import { isJpegBytes, isPngBytes } from "../logic/images.js";
 import { manifest } from "../manifest/index.js";
-import type { ReviewImage, ReviewMetadata, ReviewRequest, ReviewResult, Reviewer } from "../types.js";
+import type { ReviewImage, ReviewMetadata, ReviewRequest, ReviewResult, ReviewText, Reviewer } from "../types.js";
 
 // a `claude setup-token` (sk-ant-oat…) lives about a year and is itself the bearer, not a refresh token
 const SETUP_TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
@@ -73,17 +73,19 @@ export function createPiReviewer(options: PiReviewerOptions): Reviewer {
       model: model.id,
       promptVersion: request.prompt.version,
       promptDigest: request.promptDigest,
-      images: await Promise.all(request.images.map(async (image) => ({ id: image.id, sha256: await digest(image.bytes) })))
+      images: await Promise.all(request.images.map(async (image) => ({ id: image.id, sha256: await digest(image.bytes) }))),
+      ...(request.texts?.length ? { texts: await Promise.all(request.texts.map(async (text) => ({ id: text.id, sha256: await digest(new TextEncoder().encode(text.text)) }))) } : {})
     };
     const failure = (reason: string): ReviewResult => ({ ok: false, reason, metadata });
 
     const gate = await requireOAuth(options.credentials, signal);
     if (gate !== true) return failure(gate);
     signal?.throwIfAborted();
+    const budget = request.maxInputTokens ?? ai.maxInputTokens;
     const estimated = estimateTokens(request);
     if (typeof estimated === "string") return failure(estimated);
-    if (estimated > ai.maxInputTokens) {
-      return failure(`The review needs about ${estimated} input tokens; the budget is ${ai.maxInputTokens}. Reduce the evidence size.`);
+    if (estimated > budget) {
+      return failure(`The review needs about ${estimated} input tokens; the budget is ${budget}. Reduce the evidence size.`);
     }
 
     const controller = new AbortController();
@@ -113,7 +115,7 @@ export function createPiReviewer(options: PiReviewerOptions): Reviewer {
     }
     signal?.throwIfAborted();
     if (response.stopReason === "aborted") return failure(`The model did not answer within ${ai.timeoutMs} ms. Run the review again.`);
-    return parseResponse(response, metadata);
+    return parseResponse(response, metadata, budget);
   }
   return { review };
 }
@@ -133,13 +135,14 @@ async function requireOAuth(credentials: CredentialStore, signal?: AbortSignal):
   return true;
 }
 
-/** Pre-call budget: ceil(chars/3) + Σ ceil(w·h/750) ≤ maxInputTokens, 1..maxImages images — or the reason it cannot be sent. */
+/** Pre-call budget: ceil(chars/3) + Σ ceil(w·h/750), up to maxImages images and something to review — or the reason it cannot be sent. */
 function estimateTokens(request: ReviewRequest): number | string {
   const ai = manifest.ai;
-  if (!request.images.length || request.images.length > ai.maxImages) {
+  const texts = request.texts ?? [];
+  if ((!request.images.length && !texts.length) || request.images.length > ai.maxImages) {
     return `The review sends ${request.images.length} images; the budget is 1 to ${ai.maxImages}.`;
   }
-  const text = request.prompt.system + request.prompt.instructions + request.images.map(imageText).join("");
+  const text = request.prompt.system + request.prompt.instructions + request.images.map(imageText).join("") + texts.map(textBlock).join("");
   let tokens = Math.ceil(text.length / ai.textCharactersPerToken);
   for (const image of request.images) {
     if (!isPngBytes(image.bytes) && !isJpegBytes(image.bytes)) return `Provide PNG or JPEG evidence for the review (${image.id}).`;
@@ -153,13 +156,18 @@ function imageText(image: ReviewImage): string {
   return `Image ID: ${image.id}\n${image.label}`;
 }
 
-/** The exact Context sent: "Image ID" + label before each image, the rule instructions last. */
+function textBlock(text: ReviewText): string {
+  return `File ID: ${text.id}\n${text.label}\n<file>\n${text.text}\n</file>`;
+}
+
+/** The exact Context sent: "Image ID" + label before each image, then each file as text, the rule instructions last. */
 export function reviewMessages(request: ReviewRequest): Context {
   const content: (TextContent | ImageContent)[] = [];
   for (const image of request.images) {
     content.push({ type: "text", text: imageText(image) });
     content.push({ type: "image", data: Buffer.from(image.bytes).toString("base64"), mimeType: image.mimeType });
   }
+  for (const text of request.texts ?? []) content.push({ type: "text", text: textBlock(text) });
   content.push({ type: "text", text: request.prompt.instructions });
   return { systemPrompt: request.prompt.system, messages: [{ role: "user", content, timestamp: Date.now() }] };
 }
@@ -185,7 +193,7 @@ export function configurePayload(body: unknown, schema: Record<string, unknown>,
 }
 
 /** Narrows the one response; provenance (usage, stopReason, raw text) survives every failure. */
-function parseResponse(response: AssistantMessage, base: ReviewMetadata): ReviewResult {
+function parseResponse(response: AssistantMessage, base: ReviewMetadata, maxInputTokens: number): ReviewResult {
   const { input, output, cacheRead, cacheWrite, cost } = response.usage;
   const text = response.content.filter((block) => block.type === "text").map((block) => block.text).join("");
   const metadata: ReviewMetadata = {
@@ -198,7 +206,6 @@ function parseResponse(response: AssistantMessage, base: ReviewMetadata): Review
   if (response.stopReason !== "stop" || response.rawStopReason === "refusal" || response.content.some((block) => block.type === "toolCall")) {
     return failure(failureText(response));
   }
-  const maxInputTokens = manifest.ai.maxInputTokens;
   if (input + cacheRead + cacheWrite > maxInputTokens) {
     return failure(`The review used ${input + cacheRead + cacheWrite} input tokens; the budget is ${maxInputTokens}. Reduce the evidence size before retrying.`);
   }

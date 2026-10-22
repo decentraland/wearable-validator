@@ -43,7 +43,7 @@ Published on the events topic, one per collection and attempt:
 
 - Publish it with the SNS message attributes `type` = `builder` and `subType` = `collection-validation-requested`, as the
   other events on the topic carry theirs: the queue's subscription filters on them.
-- 1 to 50 items; each lists 1 to 100 files as `path → hash`. Paths are relative and stay inside the item.
+- 1 to 50 items; each lists 1 to 256 files as `path → hash` (the rule book's `fileSize.maxEntries`). Paths are relative and stay inside the item.
 - An emote is told by `metadata.emoteDataADR74`; anything else is a wearable.
 - Each file is downloaded from `<builder api>/v1/storage/contents/<hash>`, at most 32 MB per item. The Builder's address is the
   job's own configuration, never taken from the request.

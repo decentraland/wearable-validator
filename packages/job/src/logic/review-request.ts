@@ -2,7 +2,7 @@
  * The Builder's validation request as it arrives from the work queue, checked before anything acts on it: one job per
  * collection, every item carrying its entity metadata and the hash of each file.
  */
-import { assertItemPath } from "@dcl-regenesislabs/wearable-validator";
+import { assertItemPath, manifest } from "@dcl-regenesislabs/wearable-validator";
 
 export const REVIEW_EVENT = { type: "builder", subType: "collection-validation-requested" } as const;
 
@@ -38,7 +38,8 @@ export class InvalidReviewRequest extends Error {}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HASH = /^[A-Za-z0-9]{1,128}$/;
 export const MAX_ITEMS = 50;
-const MAX_FILES = 100;
+// the rule book's own cap on an item's entries; the download size cap bounds the bytes
+const MAX_FILES = manifest.fileSize.maxEntries;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 

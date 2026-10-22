@@ -12,7 +12,7 @@ Mandated by [DAO proposal e2a13c58](https://decentraland.org/governance/proposal
 
 | | |
 |---|---|
-| `packages/wearable-validator` | the published package: 35 deterministic checks (files · model · emote · content) plus four visual checks (render-valid, thumbnail-honesty, visual-quality, emote-quality), the rules manifest and a CLI. One folder per check under `src/checks/<group>/<name>/`; shared algorithms in `src/logic/`; Node-only adapters in `src/adapters/` (`/native` drives the render server, `/ai` calls the model). The root entry is isomorphic |
+| `packages/wearable-validator` | the published package: 35 deterministic checks (files · model · emote · content) plus four visual checks (render-valid, thumbnail-honesty, visual-quality, emote-quality) and one code review (smart-wearable-code: a model reads a smart wearable's code), the rules manifest and a CLI. One folder per check under `src/checks/<group>/<name>/`; shared algorithms in `src/logic/`; Node-only adapters in `src/adapters/` (`/native` drives the render server, `/ai` calls the model). The root entry is isomorphic |
 | `packages/job` | the validation job (`wearable-validator-job`) and its Docker image (`Dockerfile`): wakes on the queue, validates every item of a collection, posts one result to the Builder and exits |
 | `tools` | the catalyst runner: validate real published items |
 

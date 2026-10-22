@@ -1,7 +1,7 @@
 import type { Document } from "@gltf-transform/core";
 import type { Manifest } from "./manifest/index.js";
 
-export type Group = "files" | "model" | "emote" | "rendering" | "content";
+export type Group = "files" | "model" | "emote" | "rendering" | "content" | "code";
 export type Severity = "error" | "warning";
 export type CheckStatus = "passed" | "failed" | "warning" | "skipped" | "errored";
 export type ItemType = "wearable" | "emote";
@@ -250,12 +250,22 @@ export interface ReviewImage {
   mimeType: "image/png" | "image/jpeg";
 }
 
+/** A file read as text, never run: a smart wearable's code. */
+export interface ReviewText {
+  id: string;
+  label: string;
+  text: string;
+}
+
 export interface ReviewRequest {
   check: string;
   prompt: Prompt;
   /** sha256 of the canonical prompt — stamped on every answer so a verdict can be re-checked. */
   promptDigest: string;
   images: ReviewImage[];
+  texts?: ReviewText[];
+  /** The rule's own input budget when it is not manifest.ai.maxInputTokens: reading code takes far more than images. */
+  maxInputTokens?: number;
 }
 
 export interface ReviewMetadata {
@@ -266,6 +276,7 @@ export interface ReviewMetadata {
   stopReason?: string;
   usage?: { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number };
   images?: { id: string; sha256: string }[];
+  texts?: { id: string; sha256: string }[];
   /** Raw model text — the run folder alone reproduces the review. */
   answer?: string;
 }

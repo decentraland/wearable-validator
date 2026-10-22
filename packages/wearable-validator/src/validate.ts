@@ -115,7 +115,7 @@ export async function validate(input: Input, options: Options = {}): Promise<Res
 
 function validateOptions(options: Options): void {
   for (const group of options.groups ?? []) {
-    if (![...CORE_GROUPS, "rendering"].includes(group)) throw new Error(`Unknown group "${group}". Valid: files, model, emote, content, rendering.`);
+    if (![...CORE_GROUPS, "rendering", "code"].includes(group)) throw new Error(`Unknown group "${group}". Valid: files, model, emote, content, rendering, code.`);
   }
   for (const name of options.checks ?? []) {
     if (!resolveCheck(name)) throw new Error(`Unknown check "${name}". Run \`wearable-validator checks\` to list them.`);

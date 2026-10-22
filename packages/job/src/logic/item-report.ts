@@ -32,7 +32,11 @@ export interface ItemReport {
   toCheck: number;
   /** The visual checks the model answered, by title, with how they came out. */
   modelReview: { title: string; outcome: "passed" | ItemFinding["severity"] }[];
+  /** What a smart wearable's code does, as the model read it: the one review a curator needs in words. */
+  codeSummary?: string;
 }
+
+const CODE_REVIEW = "smart-wearable-code: ";
 
 const SHAPES = ["male", "female"];
 const MODEL_FILE = /\.(glb|gltf)$/i;
@@ -102,11 +106,14 @@ export function itemReport(item: ReviewItem, result: ItemResult): ItemReport {
   }
 
   const ordered = [...byCheck.values()].sort((a, b) => Number(b.severity === "error") - Number(a.severity === "error"));
-  const reviewed = (result.visualSummary ?? "").split("\n").map((line) => line.split(":")[0].trim()).filter(Boolean);
+  const summaries = (result.visualSummary ?? "").split("\n");
+  const reviewed = summaries.map((line) => line.split(":")[0].trim()).filter(Boolean);
+  const codeSummary = summaries.find((line) => line.startsWith(CODE_REVIEW))?.slice(CODE_REVIEW.length);
   return {
     checks: ordered,
     toFix: ordered.filter((entry) => entry.severity === "error").length,
     toCheck: ordered.filter((entry) => entry.severity !== "error").length,
-    modelReview: reviewed.map((check) => ({ title: titleOf(check), outcome: byCheck.get(check)?.severity ?? "passed" }))
+    modelReview: reviewed.map((check) => ({ title: titleOf(check), outcome: byCheck.get(check)?.severity ?? "passed" })),
+    ...(codeSummary ? { codeSummary } : {})
   };
 }

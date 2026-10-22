@@ -136,6 +136,22 @@ describe("ai", () => {
     assert.match(result.reason, /budget/);
   });
 
+  it("sends code as text with no images under the rule's own budget, which a code request over the shared budget needs", async () => {
+    const credentials = await oauthCredentials();
+    const code = "x".repeat(manifest.ai.maxInputTokens * manifest.ai.textCharactersPerToken);
+    const texts = [{ id: "male/bin/game.js", label: "The bundle.", text: code }];
+    let sent: { messages: { content: { type: string; text?: string }[] }[] } | undefined;
+    const reviewer = createPiReviewer({ credentials, fetch: async (_url, options) => ((sent = JSON.parse(String(options?.body))), streamResponse('{"verdict":"ok"}')) });
+    const shared = await reviewer.review({ ...request, images: [], texts });
+    assert.equal(shared.ok, false, "the shared budget is for images");
+    assert.equal(sent, undefined);
+    const own = await reviewer.review({ ...request, images: [], texts, maxInputTokens: manifest.smartWearableCode.maxInputTokens });
+    assert.equal(own.ok, true);
+    assert.deepEqual(sent?.messages[0].content.map((block) => block.type), ["text", "text"]);
+    assert.ok(sent?.messages[0].content[0].text?.startsWith("File ID: male/bin/game.js\nThe bundle.\n<file>\n"));
+    assert.equal(own.metadata.texts?.[0].id, "male/bin/game.js");
+  });
+
   it("resolves ok:false for truncation and non-JSON after exactly one call, keeping usage", async () => {
     const credentials = await oauthCredentials();
     for (const [text, stop, pattern] of [

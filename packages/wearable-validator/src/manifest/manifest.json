@@ -1,5 +1,5 @@
 {
-  "version": "0.6.1",
+  "version": "0.7.0",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -262,7 +262,7 @@
     "model": "claude-sonnet-5",
     "maxInputTokens": 40000,
     "maxImages": 21,
-    "timeoutMs": 120000,
+    "timeoutMs": 300000,
     "maxRetries": 0,
     "thinkingBudgetTokens": 1024,
     "imagePixelsPerToken": 750,
@@ -284,6 +284,12 @@
   "emoteQuality": {
     "promptVersion": 2,
     "maxFindings": 8
+  },
+  "smartWearableCode": {
+    "promptVersion": 1,
+    "maxFindings": 8,
+    "maxCodeBytes": 1572864,
+    "maxInputTokens": 950000
   },
   "receipts": {
     "trianglesAndBones": "builder src/lib/glbValidation/constants.ts",

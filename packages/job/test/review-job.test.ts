@@ -96,6 +96,13 @@ describe("parseReviewRequest", () => {
     assert.equal(emote.items[0].itemType, "emote", "an emote is told by its emoteDataADR74");
   });
 
+  it("takes a smart wearable's many files, up to the rule book's entry cap", () => {
+    const files = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, n) => [`male/images/key-${n}.png`, `bafkrei${n}`]));
+    // DJ Cat, a published smart wearable, ships 137 files
+    assert.equal(Object.keys(parseReviewRequest(JSON.stringify(request([item(clean, ITEMS[0], { contents: files(137) })]))).items[0].contents).length, 137);
+    assert.throws(() => parseReviewRequest(JSON.stringify(request([item(clean, ITEMS[0], { contents: files(manifest.fileSize.maxEntries + 1) })]))), InvalidReviewRequest);
+  });
+
   it("refuses anything it could not act on safely", () => {
     const refused = (value: unknown) => assert.throws(() => parseReviewRequest(typeof value === "string" ? value : JSON.stringify(value)), InvalidReviewRequest);
     refused("not json");
@@ -262,6 +269,18 @@ describe("Slack", () => {
     assert.match(text, /Not validated — The request has more than 50 items\./);
     assert.match(text, /validation [0-9a-f-]{36} · 51 items/);
     assert.equal(builder.downloads.length, 0);
+  });
+
+  it("reviews a smart wearable's code and tells the curators what it does", async () => {
+    const scene = new TextEncoder().encode(JSON.stringify({ main: "bin/game.js", requiredPermissions: [] }));
+    const zip = await syntheticZip({ extraFiles: { "scene.json": scene, "bin/game.js": new TextEncoder().encode("playSound('beat.mp3')") } });
+    const smart = await syntheticEntity(zip, `urn:decentraland:amoy:collections-v2:0x${"cd".repeat(20)}:0`);
+    const slack = fakeSlack();
+    const { reviewJob } = await job(fakeBuilder([smart]), [], slack.fetch);
+    assert.equal(await reviewJob.process(message(envelope(request([item(smart, ITEMS[0])])))), "delete");
+    const reply = slack.calls.find((call) => call.method === "files.completeUploadExternal")!;
+    assert.match(String(reply.body.initial_comment), /\*What the code does\* Plays a beat when the wearer dances\./);
+    assert.match(String(reply.body.initial_comment), /✅ Smart wearable code/);
   });
 
   it("never lets Slack decide the job: refused messages leave the callback and the delete as they were", async () => {

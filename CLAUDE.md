@@ -1,7 +1,7 @@
 # wearable-validator
 
 The Decentraland wearable/emote rule book as code (DAO proposal e2a13c58), and the job that applies it to collections published in the Builder. npm monorepo:
-`packages/wearable-validator` (published package: 35 deterministic checks + 4 visual checks, manifest, CLI) ·
+`packages/wearable-validator` (published package: 35 deterministic checks + 4 visual checks + 1 code review, manifest, CLI) ·
 `packages/job` (the validation job: SQS request → validate every item → signed callback to the Builder; Docker image) ·
 `tools` (catalyst runner; `tools/corpus/` holds downloaded catalyst data, blobs gitignored).
 Boundary: the job imports the library only by package name (`@dcl-regenesislabs/wearable-validator`, `/native`, `/ai`) — never a relative path into its `src/`. Its tests may import the library's fixtures relatively (`../../wearable-validator/test/helpers/...`): those are not a published surface.

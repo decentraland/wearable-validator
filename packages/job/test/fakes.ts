@@ -40,7 +40,12 @@ export function fakeReviewer(): Reviewer {
   return {
     review: async (request) => ({
       ok: true,
-      answer: { verdict: request.check === "thumbnail-honesty" ? "matches" : "ok", summary: "Same shirt.", reviewedCaptureIds: request.images.map((image) => image.id), findings: [] },
+      answer: {
+        verdict: request.check === "thumbnail-honesty" ? "matches" : "ok",
+        summary: request.check === "smart-wearable-code" ? "Plays a beat when the wearer dances." : "Same shirt.",
+        reviewedCaptureIds: request.images.map((image) => image.id),
+        findings: []
+      },
       metadata: { provider: "fake", model: "fixture", promptVersion: request.prompt.version, promptDigest: request.promptDigest }
     })
   };
