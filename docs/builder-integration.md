@@ -47,7 +47,7 @@ Published on the events topic, one per collection and attempt:
 - An emote is told by `metadata.emoteDataADR74`; anything else is a wearable.
 - Each file is downloaded from `<builder api>/v1/storage/contents/<hash>`, at most 32 MB per item. The Builder's address is the
   job's own configuration, never taken from the request.
-- A request that does not match this shape is dropped and logged, not retried.
+- A request that does not match this shape is not retried: it is logged, and the curators' channel gets a "not validated" message naming the collection (when the request names one) and the reason.
 
 ## 2. The callback
 

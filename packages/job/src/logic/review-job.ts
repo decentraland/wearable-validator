@@ -11,7 +11,7 @@ import type { IRendererComponent } from "../adapters/renderer.js";
 import type { ISlackComponent } from "../adapters/slack.js";
 import type { IWorkQueueComponent, QueueMessage } from "../adapters/work-queue.js";
 import { runCodeChecks } from "./code-checks.js";
-import { InvalidReviewRequest, parseReviewRequest, type ReviewItem, type ValidationRequest } from "./review-request.js";
+import { InvalidReviewRequest, parseReviewRequest, summarizeRequest, type ReviewItem, type ValidationRequest } from "./review-request.js";
 
 const CODE_CHECKS_TIMEOUT_MS = 120_000;
 // a transient SQS error must not end the drain: nothing relaunches this task until the next collection
@@ -174,12 +174,17 @@ export function createReviewJob(components: ReviewJobComponents) {
 
   /** "delete" once the Builder has the result or the message can never be acted on; "retry" leaves it for SQS to redeliver. */
   async function process(message: QueueMessage): Promise<"delete" | "retry"> {
+    const summary = summarizeRequest(message.body);
+    const named = { id: message.id, collection: summary.collectionId ?? "unknown", validation: summary.validationId ?? "unknown", items: summary.items ?? 0 };
+    log.info("request received", named);
     let request: ValidationRequest;
     try {
       request = parseReviewRequest(message.body);
     } catch (error) {
       if (!(error instanceof InvalidReviewRequest)) throw error;
-      log.error("dropping a message that is not a validation request", { id: message.id, reason: error.message });
+      // never dropped unseen: the curators are told this collection gets no automatic review, and why
+      log.error("request refused: not validated", { ...named, reason: error.message });
+      await slack.requestRefused(summary, error.message);
       return "delete";
     }
     // a collection of many items outlasts one visibility timeout: keep it hidden from other tasks while it is in hand

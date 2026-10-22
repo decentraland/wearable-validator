@@ -203,10 +203,11 @@ interface SlackCall {
   body: Record<string, unknown>;
 }
 
-/** Slack's Web API: records every call; `refuse` makes every chat call answer ok: false. */
-function fakeSlack(refuse = false) {
+/** Slack's Web API: records every call; `refuse` makes every chat call answer ok: false, `stalls` times out that many upload requests. */
+function fakeSlack(refuse = false, stalls = 0) {
   const calls: SlackCall[] = [];
   let files = 0;
+  let stalled = 0;
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = String(input);
     if (!url.startsWith("https://slack.com/api/")) return new Response("OK");
@@ -214,6 +215,7 @@ function fakeSlack(refuse = false) {
     const raw = String(init?.body ?? "");
     const body = method === "files.getUploadURLExternal" || method === "files.info" ? Object.fromEntries(new URLSearchParams(raw)) : (JSON.parse(raw) as Record<string, unknown>);
     calls.push({ method, body });
+    if (method === "files.getUploadURLExternal" && stalled++ < stalls) throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
     if (refuse && method.startsWith("chat.")) return Response.json({ ok: false, error: "not_in_channel" });
     if (method === "files.getUploadURLExternal") return Response.json({ ok: true, upload_url: `https://files.slack.com/upload/${++files}`, file_id: `F${files}` });
     if (method === "chat.postMessage") return Response.json({ ok: true, channel: "C123", ts: `1700000000.00000${calls.filter((call) => call.method === method).length}` });
@@ -248,6 +250,20 @@ describe("Slack", () => {
     assert.equal(builder.posts.length, 1, "and the Builder still gets its result");
   });
 
+  it("tells the channel when a request cannot be validated, with the collection and why, and drops nothing unseen", async () => {
+    const slack = fakeSlack();
+    const builder = fakeBuilder([clean]);
+    const { reviewJob } = await job(builder, [], slack.fetch);
+    const tooMany = Array.from({ length: 51 }, () => item(clean, ITEMS[0]));
+    assert.equal(await reviewJob.process(message(envelope(request(tooMany)))), "delete");
+    assert.deepEqual(slack.calls.map((call) => call.method), ["chat.postMessage"]);
+    const text = blocksText(slack.calls[0].body);
+    assert.ok(text.includes(`Collection ${COLLECTION}`));
+    assert.match(text, /Not validated — The request has more than 50 items\./);
+    assert.match(text, /validation [0-9a-f-]{36} · 51 items/);
+    assert.equal(builder.downloads.length, 0);
+  });
+
   it("never lets Slack decide the job: refused messages leave the callback and the delete as they were", async () => {
     const slack = fakeSlack(true);
     const builder = fakeBuilder([clean]);
@@ -255,6 +271,24 @@ describe("Slack", () => {
     assert.equal(await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])])))), "delete");
     assert.equal(builder.posts.length, 1);
     assert.deepEqual(slack.calls.map((call) => call.method), ["chat.postMessage"], "no thread to reply in, so nothing more is tried");
+  });
+
+  it("asks for the upload once more when Slack does not answer, and posts the item with its pictures", async () => {
+    const slack = fakeSlack(false, 1);
+    const { reviewJob } = await job(fakeBuilder([heavy]), [], slack.fetch);
+    assert.equal(await reviewJob.process(message(envelope(request([item(heavy, ITEMS[0])])))), "delete");
+    const shares = slack.calls.filter((call) => call.method === "files.completeUploadExternal");
+    assert.equal(shares.length, 1);
+    assert.match(String(shares[0].body.initial_comment), /Triangle count/);
+  });
+
+  it("still posts an item's findings in the thread when its pictures cannot be uploaded", async () => {
+    const slack = fakeSlack(false, Infinity);
+    const { reviewJob } = await job(fakeBuilder([heavy]), [], slack.fetch);
+    assert.equal(await reviewJob.process(message(envelope(request([item(heavy, ITEMS[0])])))), "delete");
+    const replies = slack.calls.filter((call) => call.method === "chat.postMessage" && call.body.thread_ts);
+    assert.equal(replies.length, 1);
+    assert.match(blocksText(replies[0].body), /Triangle count/);
   });
 
   const finding = (check: string, rule: string, severity: "error" | "warning", message: string, where?: string) => ({ rule, check, severity, message, ...(where ? { where } : {}), docs: "https://docs.example" });

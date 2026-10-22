@@ -7,12 +7,14 @@ import type { IConfigComponent, ILoggerComponent } from "@well-known-components/
 import type { CaptureRecord } from "@dcl-regenesislabs/wearable-validator";
 import { itemReport, type ReportCheck, type ReportLine } from "../logic/item-report.js";
 import type { CollectionResultBody, ItemResult } from "../logic/review-job.js";
-import type { ReviewItem, ValidationRequest } from "../logic/review-request.js";
+import type { RequestSummary, ReviewItem, ValidationRequest } from "../logic/review-request.js";
 
 const API = "https://slack.com/api";
 const TIMEOUT_MS = 15_000;
 // Slack's own 429 comes with retry-after in seconds; one wait is honoured, never a long stall
 const MAX_RETRY_WAIT_MS = 60_000;
+// calls that post nothing when sent twice; posting calls are never repeated, or a slow success would post twice
+const REPEATABLE = new Set(["files.getUploadURLExternal", "the file upload", "files.info"]);
 // Block Kit limits (api.slack.com/reference/block-kit): a message over them is refused whole
 const HEADER_MAX = 150;
 const SECTION_MAX = 3000;
@@ -47,6 +49,8 @@ export interface ISlackComponent {
   itemValidated(ts: string, notice: ItemNotice): Promise<void>;
   /** Edits the collection's message to its verdict and one line per item. */
   collectionFinished(ts: string, request: ValidationRequest, body: CollectionResultBody, ms: number): Promise<void>;
+  /** A request the job cannot act on: one message saying the collection is not validated, and why. */
+  requestRefused(summary: RequestSummary, reason: string): Promise<void>;
 }
 
 export interface SlackComponents {
@@ -142,6 +146,21 @@ export function collectionMessage(request: ValidationRequest, finished?: { body:
   return { text: `${title} — ${verdict}`, blocks };
 }
 
+/** A request the job cannot act on, said in the channel so no collection goes unreviewed without anyone knowing. */
+export function refusedMessage(summary: RequestSummary, reason: string): SlackMessage {
+  const title = `Collection ${summary.collectionId ?? "(unknown)"}`;
+  const context = [
+    ...(summary.validationId ? [`validation ${summary.validationId}`] : []),
+    ...(summary.items !== undefined ? [`${summary.items} item${summary.items === 1 ? "" : "s"}`] : [])
+  ];
+  const blocks: Block[] = [
+    { type: "header", text: { type: "plain_text", text: cut(title, HEADER_MAX) } },
+    section(cut(`*Verdict* 🚫 Not validated — ${inertMrkdwn(reason)} A curator reviews it by hand.`, SECTION_MAX))
+  ];
+  if (context.length > 0) blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: context.join(" · ") }] });
+  return { text: `${title} — not validated: ${reason}`, blocks };
+}
+
 const MARK = { error: "❌", warning: "⚠️", passed: "✅" } as const;
 
 /** One check: its title, a line per problem (the file named once, as "the model"), and what they share said once. */
@@ -231,17 +250,29 @@ export async function createSlackComponent(components: SlackComponents): Promise
   let channelId = channel;
   if (!token) {
     log.info("slack notifications disabled: set SLACK_BOT_TOKEN and SLACK_CHANNEL to post every validated collection to a channel");
-    return { enabled: false, collectionStarted: async () => undefined, itemValidated: async () => {}, collectionFinished: async () => {} };
+    return { enabled: false, collectionStarted: async () => undefined, itemValidated: async () => {}, collectionFinished: async () => {}, requestRefused: async () => {} };
   }
   if (!channel) throw new Error("SLACK_CHANNEL must be the name of the channel the validations go to (e.g. curation-notifications) when SLACK_BOT_TOKEN is set.");
   const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-  async function send(url: string, init: RequestInit, retried = false): Promise<Response> {
-    const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  async function send(what: string, url: string, init: RequestInit, retried = false): Promise<Response> {
+    let res: Response;
+    try {
+      res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "TimeoutError")) throw error;
+      // on prd a call after a minute's idle (an item rendering) went unanswered while the next one, on a new
+      // connection, went through: a call that only reads or prepares an upload is safe to send once more
+      if (!retried && REPEATABLE.has(what)) {
+        log.info("slack timed out, sending once more", { call: what });
+        return send(what, url, init, true);
+      }
+      throw new Error(`Slack did not answer ${what} within ${TIMEOUT_MS / 1000} s.`);
+    }
     if (res.status === 429 && !retried) {
       const seconds = Number(res.headers.get("retry-after") ?? "1");
       await sleep(Math.min(Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 1000, MAX_RETRY_WAIT_MS));
-      return send(url, init, true);
+      return send(what, url, init, true);
     }
     return res;
   }
@@ -249,7 +280,7 @@ export async function createSlackComponent(components: SlackComponents): Promise
   /** One Web API method; JSON unless a URLSearchParams body is given (the file upload handshake is form-encoded). */
   async function call(method: string, body: Record<string, unknown> | URLSearchParams): Promise<SlackAnswer> {
     const form = body instanceof URLSearchParams;
-    const res = await send(`${API}/${method}`, {
+    const res = await send(method, `${API}/${method}`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": form ? "application/x-www-form-urlencoded" : "application/json; charset=utf-8" },
       body: form ? body.toString() : JSON.stringify(body)
@@ -271,7 +302,7 @@ export async function createSlackComponent(components: SlackComponents): Promise
     // a fresh Uint8Array sits on a plain ArrayBuffer, which is what fetch's BodyInit accepts
     const body = new Uint8Array(bytes.byteLength);
     body.set(bytes);
-    const put = await send(uploadUrl, { method: "POST", headers: { "content-type": "application/octet-stream" }, body });
+    const put = await send("the file upload", uploadUrl, { method: "POST", headers: { "content-type": "application/octet-stream" }, body });
     if (!put.ok) throw new Error(`Slack answered HTTP ${put.status} to the file upload.`);
     return { id: fileId, title: alt };
   }
@@ -320,7 +351,11 @@ export async function createSlackComponent(components: SlackComponents): Promise
     async itemValidated(ts, notice) {
       const message = itemMessage(notice.item, notice.result);
       try {
-        const files = await uploadImages(notice);
+        // the findings are the record: pictures that cannot be uploaded leave a text-only reply, never none
+        const files = await uploadImages(notice).catch((error: unknown) => {
+          log.warn("slack item pictures failed: posting the item without them", { item: notice.item.itemId, reason: reason(error) });
+          return [];
+        });
         if (files.length === 0) {
           await call("chat.postMessage", { channel: channelId, thread_ts: ts, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
           return;
@@ -330,6 +365,14 @@ export async function createSlackComponent(components: SlackComponents): Promise
         await shareLanded(files[0].id);
       } catch (error) {
         log.warn("slack item message failed", { item: notice.item.itemId, reason: reason(error) });
+      }
+    },
+    async requestRefused(summary, why) {
+      try {
+        const message = refusedMessage(summary, why);
+        await call("chat.postMessage", { channel: channelId, text: message.text, unfurl_links: false, unfurl_media: false, blocks: message.blocks });
+      } catch (error) {
+        log.warn("slack refused-request message failed", { collection: summary.collectionId ?? "unknown", reason: reason(error) });
       }
     },
     async collectionFinished(ts, request, body, ms) {
