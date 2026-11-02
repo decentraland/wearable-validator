@@ -46,7 +46,7 @@ export function emptyCaptures(ctx: CheckContext, captures: CaptureRecord[]): { c
   return empty;
 }
 
-const percent = (ratio: number): string => `${(ratio * 100).toFixed(1)}%`;
+const percent = (ratio: number): string => `${(ratio * 100).toFixed(ratio < 0.01 ? 2 : 1)}%`;
 
 function skipped(reason: string): CheckExecution {
   return { status: "skipped", coverage: "missing", findings: [], reason };
@@ -57,8 +57,8 @@ export const renderValid: CheckDefinition = {
   title: "Renders at all",
   describe: "the item draws something visible on every declared body shape",
   explanation: "Before anything else is judged, the item has to show up: a model that loads but draws nothing (missing textures, broken materials, wrong scale) is broken for everyone who equips it.",
-  fix: "Open the exported GLB in the Builder preview or Blender's glTF import. If it shows nothing, re-export with textures embedded, materials assigned, and the mesh at avatar scale (about 2 m tall).",
-  details: "Renders the item alone (wearables) or the avatar at the clip start (emotes) for each declared body shape, then measures how much of the frame is not backdrop: pixels farther than the manifest tolerance from their row's median. Below the manifest floor the view counts as empty.",
+  fix: "Open the exported GLB in the Builder preview or Blender's glTF import. If it shows nothing, re-export with textures embedded, materials assigned, and the mesh at avatar scale (about 2 m tall). If it shows but tiny, check its scale against the avatar.",
+  details: "Renders the item alone (wearables) or the avatar at the clip start (emotes) for each declared body shape, then measures how much of the frame is not backdrop: pixels whose red, green or blue sits farther than the manifest tolerance from that channel's median in their row. Below renderValid.minSubjectRatio the view counts as empty and fails; below renderValid.warnSubjectRatio it draws something but little, which small accessories and thin bands do, so it is a warning to check scale and that every part shows.",
   appliesTo: (ctx) =>
     ctx.category && ctx.manifest.facialCategories.includes(ctx.category) ? "facial textures are not rendered on the avatar yet" : true,
   run: async (ctx) => {
@@ -69,17 +69,27 @@ export const renderValid: CheckDefinition = {
     if (typeof requests === "string") return skipped(requests);
     const captures = await resolveCaptures(ctx, requests);
     if (typeof captures === "string") return skipped(captures);
-    const { minSubjectRatio } = ctx.manifest.renderValid;
-    const findings: Finding[] = emptyCaptures(ctx, captures).map(({ capture, ratio }) => {
+    const { minSubjectRatio, warnSubjectRatio, backgroundTolerance } = ctx.manifest.renderValid;
+    const findings: Finding[] = [];
+    const ratios: number[] = [];
+    for (const capture of captures) {
+      const ratio = subjectRatio(capture.bytes, backgroundTolerance) ?? 0;
+      ratios.push(ratio);
       const shape = capture.request.bodyShape.split(":").pop() ?? capture.request.bodyShape;
-      return finding(meta, "error",
-        `"${capture.request.mainFile}" renders as nothing visible on ${shape}: ${percent(ratio)} of the frame is drawn, the floor is ${percent(minSubjectRatio)}. Re-export with textures embedded and materials assigned, at avatar scale.`,
-        { where: capture.request.mainFile, measured: percent(ratio), limit: `≥ ${percent(minSubjectRatio)}`, evidence: [{ captureId: capture.request.id }] });
-    });
-    const ratios = captures.map((capture) => subjectRatio(capture.bytes, ctx.manifest.renderValid.backgroundTolerance) ?? 0);
+      const evidence = { where: capture.request.mainFile, measured: percent(ratio), evidence: [{ captureId: capture.request.id }] };
+      if (ratio < minSubjectRatio) {
+        findings.push(finding(meta, "error",
+          `"${capture.request.mainFile}" renders as nothing visible on ${shape}: ${percent(ratio)} of the frame is drawn, the floor is ${percent(minSubjectRatio)}. Re-export with textures embedded and materials assigned, at avatar scale.`,
+          { ...evidence, limit: `≥ ${percent(minSubjectRatio)}` }));
+      } else if (ratio < warnSubjectRatio) {
+        findings.push(finding(meta, "warning",
+          `"${capture.request.mainFile}" draws only ${percent(ratio)} of the frame on ${shape}. Small accessories and thin bands can; check that it is at avatar scale and that every part shows.`,
+          { ...evidence, limit: `≥ ${percent(warnSubjectRatio)}` }));
+      }
+    }
     const measured = `${captures.length} views · ${percent(Math.min(...ratios))} drawn at least`;
-    return findings.length
-      ? { status: "failed", coverage: "complete", findings, measured }
-      : { status: "passed", coverage: "complete", findings: [], measured };
+    if (findings.some((f) => f.severity === "error")) return { status: "failed", coverage: "complete", findings, measured };
+    if (findings.length) return { status: "warning", coverage: "complete", findings, measured };
+    return { status: "passed", coverage: "complete", findings: [], measured };
   }
 };

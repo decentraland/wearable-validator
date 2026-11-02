@@ -75,7 +75,14 @@ export interface Manifest {
     thinkingBudgetTokens: number; imagePixelsPerToken: number; textCharactersPerToken: number; maxTextLength: number;
   };
   /** V-01: how much of a capture must be something drawn. */
-  renderValid: { minSubjectRatio: number; backgroundTolerance: number };
+  renderValid: {
+    /** Below this share of the frame a view counts as empty: the item draws nothing (an error, and the model checks skip it). */
+    minSubjectRatio: number;
+    /** Below this share an item that does draw is flagged to check (a small accessory, a thin band, or a model at the wrong scale). */
+    warnSubjectRatio: number;
+    /** Per channel: how far a pixel's red, green or blue may sit from its row's backdrop and still count as backdrop. */
+    backgroundTolerance: number;
+  };
   /** V-05. */
   thumbnailHonesty: { promptVersion: number; maxFindings: number };
   /** V-02/V-03/V-04/V-06 in one review of the wearable captures. */
