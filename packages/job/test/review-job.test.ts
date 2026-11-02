@@ -7,7 +7,8 @@ import { asComment, createSlackComponent, itemMessage } from "../src/adapters/sl
 import type { IWorkQueueComponent, QueueMessage } from "../src/adapters/work-queue.js";
 import { collectionResult, createReviewJob, type CollectionResultBody, type ItemResult } from "../src/logic/review-job.js";
 import { InvalidReviewRequest, parseReviewRequest, REVIEW_EVENT, type ReviewItem, type ValidationRequest } from "../src/logic/review-request.js";
-import { fakeRenderer, fakeReviewer, silentLogs, type RenderCalls } from "./fakes.js";
+import { fakeRenderer, fakeReviewer, flakyReviewer, silentLogs, type RenderCalls } from "./fakes.js";
+import type { Reviewer } from "@dcl-regenesislabs/wearable-validator";
 import { dinoSkin, dinoSkinResult } from "./fixtures/curated-items.js";
 import { syntheticEntity, type SyntheticEntity } from "../../wearable-validator/test/helpers/entity.js";
 import { pngBytes, syntheticGlb, syntheticZip } from "../../wearable-validator/test/helpers/synthetic.js";
@@ -62,13 +63,13 @@ function fakeQueue(bodies: string[]): IWorkQueueComponent & { deleted: string[] 
 }
 
 /** The job wired to fakes; Slack stays off unless a fake Slack is given. */
-async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET) {
+async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET, reviewer: Reviewer = fakeReviewer()) {
   const logs = silentLogs();
   const calls: RenderCalls = { started: 0 };
   const queue = fakeQueue(bodies);
   const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, ...(secret ? { BUILDER_CALLBACK_SECRET: secret } : {}), ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "curation-notifications" } : {}) });
   const slack = await createSlackComponent({ config, logs, fetch: slackFetch });
-  const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer(), slack });
+  const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer, slack, sleep: async () => {} });
   return { reviewJob, queue, calls };
 }
 
@@ -148,6 +149,32 @@ describe("the review job", () => {
     assert.deepEqual(body.items.map(({ itemId, contentHash, passed }) => [itemId, contentHash, passed]), [[ITEMS[0], "bafkrei11111111", true], [ITEMS[1], "bafkrei22222222", false]]);
     const triangles = body.items[1].findings.find((finding) => finding.check === "triangle-count")!;
     assert.deepEqual([triangles.rule, triangles.severity, typeof triangles.measured, typeof triangles.limit, typeof triangles.fix], ["M-01", "error", "number", "number", "string"]);
+  });
+
+  it("asks an unanswered model check again on the views it already drew, so the item still gets its verdict", async () => {
+    const builder = fakeBuilder([clean]);
+    const reviewer = flakyReviewer({ "visual-quality": 1 });
+    const { reviewJob, calls } = await job(builder, [], undefined, SECRET, reviewer);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    const once = await job(fakeBuilder([clean]));
+    await once.reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    assert.equal(reviewer.calls["visual-quality"], 2, "asked once more");
+    assert.equal(reviewer.calls["thumbnail-honesty"], 1, "an answered check is not asked again");
+    assert.equal(calls.started, 1, "one render server for the item");
+    assert.equal(calls.frames, once.calls.frames, "no view drawn twice");
+    const body = builder.body();
+    assert.deepEqual([body.items[0].passed, body.verdict], [true, "passed"]);
+  });
+
+  it("stops after two more tries and leaves the item without a verdict, worth sending again", async () => {
+    const builder = fakeBuilder([clean]);
+    const reviewer = flakyReviewer({ "visual-quality": 99 });
+    const { reviewJob } = await job(builder, [], undefined, SECRET, reviewer);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    assert.equal(reviewer.calls["visual-quality"], 3, "the first call and two retries");
+    const body = builder.body();
+    assert.equal(body.items[0].passed, null);
+    assert.deepEqual([body.verdict, body.retryable], ["error", true]);
   });
 
   it("downloads a file both body shapes share once", async () => {

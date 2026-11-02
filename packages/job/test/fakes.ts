@@ -13,6 +13,8 @@ export function silentLogs(): ILoggerComponent {
 export interface RenderCalls {
   /** Render servers started: one per item that reached rendering. */
   started: number;
+  /** Views drawn across every server. */
+  frames?: number;
 }
 
 /** A render server that answers every view with the same frame, at once. */
@@ -26,6 +28,7 @@ export function fakeRenderer(calls: RenderCalls): IRendererComponent {
         buildId: "fake-build",
         capture: async (_input, requests) => {
           const captures: CaptureRecord[] = [];
+          calls.frames = (calls.frames ?? 0) + requests.length;
           for (const request of requests) captures.push({ request, bytes, sha256: await digest(bytes), width: size, height: size });
           return captures;
         },
@@ -48,5 +51,24 @@ export function fakeReviewer(): Reviewer {
       },
       metadata: { provider: "fake", model: "fixture", promptVersion: request.prompt.version, promptDigest: request.promptDigest }
     })
+  };
+}
+
+/**
+ * A model that drops a check's first `failures[check]` calls, as an overloaded or timed-out call comes back, then
+ * answers like fakeReviewer. `calls` counts every request per check.
+ */
+export function flakyReviewer(failures: Record<string, number>): Reviewer & { calls: Record<string, number> } {
+  const agreeing = fakeReviewer();
+  const calls: Record<string, number> = {};
+  return {
+    calls,
+    review: async (request, signal) => {
+      calls[request.check] = (calls[request.check] ?? 0) + 1;
+      if (calls[request.check] <= (failures[request.check] ?? 0)) {
+        return { ok: false, reason: "The review call failed. 529 overloaded_error", metadata: { provider: "fake", model: "fixture", promptVersion: request.prompt.version, promptDigest: request.promptDigest } };
+      }
+      return agreeing.review(request, signal);
+    }
   };
 }

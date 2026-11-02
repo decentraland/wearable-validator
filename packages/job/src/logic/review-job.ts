@@ -18,6 +18,9 @@ const CODE_CHECKS_TIMEOUT_MS = 120_000;
 const MAX_CONSECUTIVE_RECEIVE_FAILURES = 5;
 // the checks that need the renderer or the model: run after the code checks, with both
 const MODEL_CHECKS = registry.filter((check) => check.group === "rendering" || check.group === "code").map((check) => check.name);
+// a model check the model did not answer (network, rate limit, timeout, an unreadable or inconclusive answer) is asked
+// again after each of these waits, on the views already rendered: two more tries, the second after a longer pause
+export const VISUAL_RETRY_DELAYS_MS = [10_000, 30_000];
 // the file an item's finding points at starts with its body shape's folder: `male/shirt.glb` or `"male/shirt.glb" › Albedo`
 const BODY_SHAPE = /^"?(male|female)\//i;
 
@@ -71,6 +74,9 @@ export interface ReviewJobComponents {
   renderer: IRendererComponent;
   reviewer: Reviewer;
   slack: ISlackComponent;
+  /** Waits before asking unanswered model checks again (default VISUAL_RETRY_DELAYS_MS); tests pass zeros. */
+  visualRetryDelaysMs?: number[];
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface DrainOptions {
@@ -130,6 +136,30 @@ export function itemResult(item: ReviewItem, gate: Result, visual: Result): Item
   };
 }
 
+/**
+ * The first visual run with the checks asked again replacing theirs: their rows, their findings, and any views the
+ * second run had to render.
+ */
+export function mergeVisual(first: Result, again: Result): Result {
+  const redone = new Map(again.checks.map((row) => [row.check, row]));
+  const checks = first.checks.map((row) => redone.get(row.check) ?? row);
+  const findings = [...first.findings.filter((finding) => !redone.has(finding.check)), ...again.findings];
+  const known = new Set(first.captures.map((capture) => capture.sha256));
+  const captures = [...first.captures, ...again.captures.filter((capture) => !known.has(capture.sha256))];
+  return {
+    passed: first.passed,
+    checks,
+    findings,
+    captures,
+    summary: {
+      errors: findings.filter((f) => f.severity === "error").length,
+      warnings: findings.filter((f) => f.severity === "warning").length,
+      checked: checks.filter((row) => row.status !== "skipped").length,
+      skipped: checks.filter((row) => row.status === "skipped").length
+    }
+  };
+}
+
 export function collectionResult(request: ValidationRequest, items: ItemResult[]): CollectionResultBody {
   const base = { validationId: request.validationId, collectionId: request.collectionId, rulesVersion: manifest.version, items };
   const undecided = items.filter((item) => item.passed === null);
@@ -139,14 +169,30 @@ export function collectionResult(request: ValidationRequest, items: ItemResult[]
 
 export function createReviewJob(components: ReviewJobComponents) {
   const { logs, queue, builder, renderer, reviewer, slack } = components;
+  const retryDelaysMs = components.visualRetryDelaysMs ?? VISUAL_RETRY_DELAYS_MS;
+  const sleep = components.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const log = logs.getLogger("review-job");
   let stopping = false;
 
-  /** Renders and reviews one item; the render server is started for it and stopped after, whatever happens. */
+  /**
+   * Renders and reviews one item; the render server is started for it and stopped after, whatever happens. A model
+   * check left unanswered is asked again while the server is still up, reusing the views it already drew, so one
+   * failed call does not leave the item without a verdict.
+   */
   async function renderAndReview(item: ReviewItem, input: Input): Promise<Result> {
     const drawer = await renderer.forItem(item.itemId);
     try {
-      return await validate(input, { checks: MODEL_CHECKS, services: { renderer: drawer, reviewer } });
+      let visual = await validate(input, { checks: MODEL_CHECKS, services: { renderer: drawer, reviewer } });
+      for (const delayMs of retryDelaysMs) {
+        const unanswered = visual.checks.filter((row) => row.status === "errored").map((row) => row.check);
+        if (unanswered.length === 0) break;
+        log.info("asking the model again", { item: item.itemId, checks: unanswered.join(","), afterMs: delayMs });
+        await sleep(delayMs);
+        visual = mergeVisual(visual, await validate(input, { checks: unanswered, services: { renderer: drawer, reviewer }, captures: visual.captures }));
+      }
+      const stillUnanswered = visual.checks.filter((row) => row.status === "errored").map((row) => row.check);
+      if (stillUnanswered.length) log.warn("model checks still unanswered", { item: item.itemId, checks: stillUnanswered.join(",") });
+      return visual;
     } finally {
       await drawer.stop().catch(() => {});
     }
