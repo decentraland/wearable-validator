@@ -38,14 +38,14 @@ const ok = (request: ReviewRequest): ReviewResult => ({
 });
 
 describe("visual-quality (V-02 · V-03 · V-04 · V-06)", () => {
-  it("reviews the twelve captures thumbnail-honesty takes plus the eight-frame motion pass, with no thumbnail, and passes on ok", async () => {
+  it("reviews the twelve captures thumbnail-honesty takes plus the sixteen-frame motion pass, with no thumbnail, and passes on ok", async () => {
     const mock = services(ok);
     const result = await validate(await syntheticZip(), { ...CHECK, services: mock });
     assert.equal(result.checks[0].status, "passed");
-    assert.deepEqual(mock.rendered, [20]);
-    assert.equal(mock.reviews[0].images.length, 20);
+    assert.deepEqual(mock.rendered, [28]);
+    assert.equal(mock.reviews[0].images.length, 28);
     const stress = mock.reviews[0].images.filter((image) => image.label.includes("bright green"));
-    assert.equal(stress.length, 8);
+    assert.equal(stress.length, 16);
     // the synthetic item is a hat: the head poses
     const head = manifest.rendering.stress.poses[manifest.rendering.stress.categoryPoses.hat].map((pose) => pose.clip);
     assert.ok(stress.every((image) => head.some((clip) => image.label.includes(`pose ${clip}`))));
@@ -54,14 +54,14 @@ describe("visual-quality (V-02 · V-03 · V-04 · V-06)", () => {
     assert.equal(result.passed, null);
   });
 
-  it("shares captures with render-valid and thumbnail-honesty: one render batch of twenty, two model calls", async () => {
+  it("shares captures with render-valid and thumbnail-honesty: one render batch of twenty-eight, two model calls", async () => {
     const mock = services(ok);
     mock.reviewer.review = async (request) =>
       request.check === "thumbnail-honesty"
         ? { ok: true, answer: { verdict: "matches", summary: "Same.", reviewedCaptureIds: request.images.map((image) => image.id), findings: [] }, metadata: metadata(request) }
         : ok(request);
     const result = await validate(await syntheticZip(), { groups: ["rendering"], services: mock });
-    assert.deepEqual(mock.rendered, [20]);
+    assert.deepEqual(mock.rendered, [28]);
     assert.deepEqual(result.checks.map((row) => `${row.check}:${row.status}`), ["render-valid:passed", "thumbnail-honesty:passed", "visual-quality:passed"]);
   });
 
@@ -94,7 +94,7 @@ describe("visual-quality (V-02 · V-03 · V-04 · V-06)", () => {
     assert.equal(emote.checks.length, 0);
     const noReviewer = await validate(await syntheticZip(), { ...CHECK, services: { renderer: mock.renderer } });
     assert.equal(noReviewer.checks[0].status, "skipped");
-    assert.equal(noReviewer.captures.length, 20);
+    assert.equal(noReviewer.captures.length, 28);
   });
 
   it("rejects answers it cannot trust", () => {

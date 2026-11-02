@@ -1,5 +1,5 @@
 {
-  "version": "0.7.0",
+  "version": "0.7.1",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -153,7 +153,7 @@
   },
   "rendering": {
     "imageSizePx": 512,
-    "recipeVersion": 4,
+    "recipeVersion": 5,
     "bodyShapes": [
       "urn:decentraland:off-chain:base-avatars:BaseMale",
       "urn:decentraland:off-chain:base-avatars:BaseFemale"
@@ -185,7 +185,7 @@
       0.75,
       1
     ],
-    "maxCaptures": 20,
+    "maxCaptures": 28,
     "stress": {
       "skin": "00ff00",
       "azimuthDegrees": [
@@ -199,17 +199,33 @@
             "fraction": 0.5
           },
           {
-            "clip": "clap",
+            "clip": "run",
+            "fraction": 0.25
+          },
+          {
+            "clip": "run",
             "fraction": 0.5
+          },
+          {
+            "clip": "run",
+            "fraction": 0.75
           }
         ],
         "legs": [
+          {
+            "clip": "jump",
+            "fraction": 0.75
+          },
           {
             "clip": "run",
             "fraction": 0.25
           },
           {
-            "clip": "jump",
+            "clip": "run",
+            "fraction": 0.5
+          },
+          {
+            "clip": "run",
             "fraction": 0.75
           }
         ],
@@ -219,8 +235,16 @@
             "fraction": 0.25
           },
           {
-            "clip": "dab",
+            "clip": "run",
+            "fraction": 0.25
+          },
+          {
+            "clip": "run",
             "fraction": 0.5
+          },
+          {
+            "clip": "run",
+            "fraction": 0.75
           }
         ],
         "body": [
@@ -231,6 +255,14 @@
           {
             "clip": "run",
             "fraction": 0.25
+          },
+          {
+            "clip": "run",
+            "fraction": 0.5
+          },
+          {
+            "clip": "run",
+            "fraction": 0.75
           }
         ]
       },
@@ -261,7 +293,7 @@
   "ai": {
     "model": "claude-sonnet-5",
     "maxInputTokens": 40000,
-    "maxImages": 21,
+    "maxImages": 29,
     "timeoutMs": 300000,
     "maxRetries": 0,
     "thinkingBudgetTokens": 1024,

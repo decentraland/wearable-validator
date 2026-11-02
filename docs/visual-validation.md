@@ -93,7 +93,7 @@ Twelve files carry the phase (5 with logic, 5 tests, 1 launcher pair, 1 doc). Ev
   "promptVersion": 4, "recipeVersion": 1,
   "views": { "wearable": ["avatar", "wearable"], "emote": ["avatar"] },
   "azimuthDegrees": { "wearable": [0, 90, 180], "emote": [0, 90] },     // 180 added after rear art was mistaken for the front
-  "stress": {                       // V-02's motion pass: worn, front and side, two clip moments per category, skin chroma green
+  "stress": {                       // V-02's motion pass: worn, front and side, running at three moments plus one pose per category, skin chroma green
     "skin": "00ff00", "azimuthDegrees": [0, 90],
     "poses": { "arms": [dab 0.5, clap 0.5], "legs": [run 0.25, jump 0.75], "head": [head-explode 0.25, dab 0.5], "body": [dab 0.5, run 0.25] },
     "categoryPoses": { "upper_body": "arms", "lower_body": "legs", "hat": "head", … }   // unlisted categories use "body"
@@ -148,7 +148,7 @@ The native render server replaced Chromium on 2026-09-26. Same five sample items
 
 ## 6. What is still open
 
-- Of the Rule Book's larger recipe, the animation clips and the chroma-key clipping pass exist as the motion pass (`rendering.stress`: two clip moments per category, worn, front and side, skin chroma green, judged by `visual-quality`); the 8-step turntable, outfit combinations and contact sheets are not built. The renderer already accepts `pose` on a capture request, so animated poses are a recipe change plus a prompt bump when a labeled fixture set shows rest-pose views miss real clipping.
+- Of the Rule Book's larger recipe, the animation clips and the chroma-key clipping pass exist as the motion pass (`rendering.stress`: running at a quarter, half and three quarters of the stride plus one pose per category, worn, front and side, skin chroma green, judged by `visual-quality`); the 8-step turntable, outfit combinations and contact sheets are not built. The renderer already accepts `pose` on a capture request, so animated poses are a recipe change plus a prompt bump when a labeled fixture set shows rest-pose views miss real clipping.
 - Accuracy is measured on two items only. A labeled set of known-good and known-bad items is the next thing to build before any finding can become more than advisory.
 - Aggregation and policy (`Result.identity`, shadow / advisory / review / block profiles) do not exist; `passed` stays null for every visual run.
 - Idempotency: the Builder may send the same `validationId` again; the job has no store to recognise it and validates it again. Also open: a daily spend cap.
