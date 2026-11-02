@@ -79,6 +79,7 @@ export async function validate(input: Input, options: Options = {}): Promise<Res
         measured: execution.measured ?? measured,
         skipReason: execution.reason,
         review: execution.review,
+        ...(execution.status === "errored" && execution.retryable ? { retryable: true } : {}),
         durationMs: Date.now() - started
       });
       if (execution.status === "skipped") skipped++;

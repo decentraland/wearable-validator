@@ -33,6 +33,8 @@ export interface CheckExecution {
   reason?: string;
   measured?: string;
   review?: ReviewMetadata;
+  /** errored only: asking again may answer it — the model call failed or timed out, or its answer could not be read. */
+  retryable?: boolean;
 }
 
 export interface CheckResult {
@@ -47,6 +49,12 @@ export interface CheckResult {
   coverage: "complete" | "missing";
   /** Model/prompt/usage provenance for AI-backed checks. */
   review?: ReviewMetadata;
+  /**
+   * errored only: running the check again may answer it — its model call failed in transit, timed out or was rate
+   * limited, or the answer could not be read. Unset when the same question would end the same way: an inconclusive
+   * verdict, no reviewer or credentials, a request over budget, an unavailable model, a check that threw.
+   */
+  retryable?: boolean;
 }
 
 export interface Result {
@@ -284,7 +292,13 @@ export interface ReviewMetadata {
 /** Adapters fail soft: ok:false keeps the provenance so an errored row still says which model refused and what it cost. */
 export type ReviewResult =
   | { ok: true; answer: unknown; metadata: ReviewMetadata }
-  | { ok: false; reason: string; metadata: ReviewMetadata };
+  | {
+      ok: false;
+      reason: string;
+      metadata: ReviewMetadata;
+      /** Asking again may get an answer: a dropped or failed call, a rate limit, an overloaded provider, a timeout or an unreadable answer. Leave unset when it would fail the same way. */
+      retryable?: boolean;
+    };
 
 export interface Reviewer {
   review(request: ReviewRequest, signal?: AbortSignal): Promise<ReviewResult>;

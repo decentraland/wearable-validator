@@ -3,7 +3,7 @@
  * the loop or rest ending, and whether the avatar moves at all. One prompt, one model call.
  */
 import { captureLabel, recipeRequests, rendererBuild, resolveCaptures } from "../../../logic/captures.js";
-import { askReviewer, boundedText, coversEveryImage, errored, isExecution, knownIds, object, skipped } from "../../../logic/review.js";
+import { askReviewer, boundedText, coversEveryImage, errored, isExecution, knownIds, object, skipped, unreadable } from "../../../logic/review.js";
 import { manifest } from "../../../manifest/index.js";
 import { finding, type CheckDefinition, type CheckMeta, type Prompt, type ReviewImage } from "../../../types.js";
 import { EMOTES } from "../../docs.js";
@@ -114,7 +114,8 @@ export const emoteQuality: CheckDefinition = {
     const outcome = await askReviewer(ctx, meta.name, emoteQualityPrompt, images);
     if (isExecution(outcome)) return outcome;
     const answer = parseEmoteQualityAnswer(outcome.answer, images.map((image) => image.id), { maxFindings: ctx.manifest.emoteQuality.maxFindings, maxTextLength: ctx.manifest.ai.maxTextLength });
-    if (typeof answer === "string") return errored(answer, outcome.metadata);
+    if (typeof answer === "string") return unreadable(answer, outcome.metadata);
+    // inconclusive is the model's answer, not a failed call: never retryable, or asking again would shop for a verdict
     if (answer.verdict === "inconclusive") return errored(answer.summary, outcome.metadata);
     const measured = `Reviewed ${captures.length} frames. ${answer.summary}`;
     if (answer.verdict === "ok") return { status: "passed", coverage: "complete", findings: [], measured, review: outcome.metadata };

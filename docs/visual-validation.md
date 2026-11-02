@@ -14,7 +14,7 @@ that ask the model are not answered. The library's own tests drive both adapters
 
 Ground rules (CLAUDE.md, restated for this phase):
 
-- Adapters fail soft. `Renderer.capture` throws only on renderer crashes (→ `errored`); `Reviewer.review` rejects only on abort and otherwise resolves a `ReviewResult` union (`ok: false` keeps model/usage/raw text); helpers return `T | string` where the string is the creator-facing skip reason — the `appliesTo` `true | "reason"` idiom. No error classes.
+- Adapters fail soft. `Renderer.capture` throws only on renderer crashes (→ `errored`); `Reviewer.review` rejects only on abort and otherwise resolves a `ReviewResult` union (`ok: false` keeps model/usage/raw text, and `retryable: true` when asking again may answer: a failed, timed-out or rate-limited call, or unreadable JSON); helpers return `T | string` where the string is the creator-facing skip reason — the `appliesTo` `true | "reason"` idiom. No error classes.
 - Every number lives once in `manifest.json` (`rendering`, `ai`, `thumbnailHonesty`); code holds structural constants only (job fields, PNG magic) with a one-line why.
 - The prompt is registry metadata: `CheckDefinition.prompt`. A digest pin in the test forces a `promptVersion` bump when the text changes.
 - Node-only code lives only in `/native`, `/ai`, `packages/job` and `tools/`; the job imports the library by package name only. Root entry stays isomorphic (`captures.ts` and the check use `crypto.subtle`, `fast-png`, `image-size`, `jpeg-js`).
@@ -35,7 +35,7 @@ The code in the order a review runs. Files in reading order inside `packages/wea
 | 4 | `captures/BaseMale-avatar-000.png` … | `src/adapters/native.ts` · `createNativeRenderer().capture()` → `groupRequests()` → `jobFor()` | Writes the item's files to the work folder, sends one job per body shape, view, pose and skin to the render server, reads back one PNG per requested view |
 | 5 | `thumbnail-honesty/1-prompt.md` | `src/checks/rendering/thumbnail-honesty/index.ts` · `run()` → `imageLabel()` | `ReviewRequest = { check, prompt: thumbnailPrompt, promptDigest, images: [12 labeled captures, thumbnail last] }` |
 | 6 | `thumbnail-honesty/2-context.json`, `3-answer.json` | `src/adapters/ai.ts` · `createPiReviewer().review()` → `reviewMessages()`, `configurePayload()`, `parseResponse()` | One `complete()` call over OAuth with `output_config` json_schema, thinking 1024, no tools, no retries → `{ ok, answer | reason, metadata }` |
-| 7 | `thumbnail-honesty/4-finding.json` | `src/checks/rendering/thumbnail-honesty/index.ts` · `parseThumbnailAnswer()` → `thumbnailFinding()` | `matches` → passed; `mismatch` → warning findings (`where: thumbnail.png`, `evidence: [{ captureId }]`); `inconclusive`, `ok: false` or malformed → errored with `review` metadata |
+| 7 | `thumbnail-honesty/4-finding.json` | `src/checks/rendering/thumbnail-honesty/index.ts` · `parseThumbnailAnswer()` → `thumbnailFinding()` | `matches` → passed; `mismatch` → warning findings (`where: thumbnail.png`, `evidence: [{ captureId }]`); `inconclusive`, `ok: false` or malformed → errored with `review` metadata (malformed, or a retryable `ok: false`, also `retryable`; inconclusive never) |
 | 8 | `Result` | `src/validate.ts` · `normalizeExecution()`, `computePassed()`; `packages/job/src/logic/review-job.ts` · `itemResult()` | Cross-checks status vs findings, `passed: null` (subset), `Result.captures` and `checks[0].review` populated; the job maps it to the Builder's result |
 
 ---

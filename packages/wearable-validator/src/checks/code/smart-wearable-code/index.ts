@@ -2,7 +2,7 @@
  * S-12 Smart wearable code — the bundle runs on every wearer's client, so a model reads it (as text, never run) and
  * says what it does; code that is malicious or spams players fails the item.
  */
-import { askReviewer, boundedText, errored, isExecution, object, skipped } from "../../../logic/review.js";
+import { askReviewer, boundedText, errored, isExecution, object, skipped, unreadable } from "../../../logic/review.js";
 import { isSmartWearable, readScene, resolveMain, sceneFiles } from "../../../logic/smart-wearable.js";
 import { manifest } from "../../../manifest/index.js";
 import { finding, type CheckContext, type CheckDefinition, type CheckMeta, type Prompt, type ReviewText } from "../../../types.js";
@@ -134,7 +134,8 @@ export const smartWearableCode: CheckDefinition = {
     const outcome = await askReviewer(ctx, meta.name, smartWearableCodePrompt, [], { texts, maxInputTokens });
     if (isExecution(outcome)) return outcome;
     const answer = parseSmartWearableCodeAnswer(outcome.answer, texts.map((text) => text.id), { maxFindings, maxTextLength: ctx.manifest.ai.maxTextLength });
-    if (typeof answer === "string") return errored(answer, outcome.metadata);
+    if (typeof answer === "string") return unreadable(answer, outcome.metadata);
+    // code too obscure to review goes to a curator: never retryable, so a later lucky "ok" cannot pass it
     if (answer.verdict === "inconclusive") return errored(answer.summary, outcome.metadata);
     const measured = answer.summary;
     if (answer.verdict === "ok") return { status: "passed", coverage: "complete", findings: [], measured, review: outcome.metadata };
