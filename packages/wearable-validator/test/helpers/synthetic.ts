@@ -75,6 +75,10 @@ export interface SyntheticOptions {
    * matrices, so the cube's positions are its rest-pose world positions (representation tests).
    */
   standing?: boolean;
+  /** Bone translations that move named bones away from their bind position: a file saved in another pose (with `standing`). */
+  pose?: Record<string, [number, number, number]>;
+  /** Store POSITION as normalized int16 (KHR_mesh_quantization); every coordinate must lie within ±1 m. */
+  quantizedPositions?: boolean;
   /** Name of the primary material (default "Wearable_MAT"). */
   materialName?: string;
   /** Name of the cube mesh (default "cube"). */
@@ -119,7 +123,9 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
   const scale = options.scale ?? 1;
   const positions = cubePositions(scale, options.triangles ?? 12);
   if (options.offset) for (let i = 0; i < positions.length; i++) positions[i] += options.offset[i % 3];
-  const position = doc.createAccessor("POSITION").setType("VEC3").setArray(positions).setBuffer(buffer);
+  const position = doc.createAccessor("POSITION").setType("VEC3").setBuffer(buffer);
+  if (options.quantizedPositions) position.setArray(Int16Array.from(positions, (value) => Math.round(value * 32767))).setNormalized(true);
+  else position.setArray(positions);
 
   const material = doc.createMaterial(options.materialName ?? "Wearable_MAT");
   if (options.texture) {
@@ -203,6 +209,10 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
         inverseBind.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -t[0], -t[1], -t[2], 1], i * 16);
       });
       skin.setInverseBindMatrices(doc.createAccessor("inverse_bind").setType("MAT4").setArray(inverseBind).setBuffer(buffer));
+    }
+    for (const bone of boneNodes) {
+      const moved = options.pose?.[bone.getName()];
+      if (moved) bone.setTranslation(moved);
     }
     const vertexCount = positions.length / 3;
     const sd = options.skinData;
