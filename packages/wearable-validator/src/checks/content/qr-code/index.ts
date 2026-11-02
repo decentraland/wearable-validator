@@ -1,5 +1,5 @@
 /** F-04 QR codes — a scannable code's target can change after review, so any readable one is rejected. */
-import jsQR from "jsqr";
+import jsQR, { type Options as DecodeOptions } from "jsqr";
 import { decode as decodeJpeg } from "jpeg-js";
 import { decodePngSafe, imageDimensions, isJpegBytes, isPngBytes, pngToRgba } from "../../../logic/images.js";
 import { textureLabel } from "../../../logic/materials.js";
@@ -35,7 +35,9 @@ function toRgba(bytes: Uint8Array, maxPixels: number): RgbaImage | undefined {
 }
 
 interface Scan {
+  /** The code's text. Empty when its content is bytes that aren't text (not valid UTF-8): `bytes` then counts them. */
   decoded?: string;
+  bytes?: number;
   /**
    * A code-shaped detection whose content jsQR could not read: jsQR skips modes it doesn't implement (Structured
    * Append, FNC1), so one symbol of a multi-part code decodes as empty — while phone scanners still open it.
@@ -60,14 +62,27 @@ interface QrLocation {
   topLeftCorner: Point; topRightCorner: Point; bottomRightCorner: Point; bottomLeftCorner: Point;
   topLeftFinderPattern: Point; topRightFinderPattern: Point; bottomLeftFinderPattern: Point;
 }
+interface Detection {
+  data: string;
+  binaryData: ArrayLike<number>;
+  location: QrLocation;
+}
+/** jsQR's signature: tests pass a stand-in to reproduce detections that are hard to draw. */
+export type QrDecoder = (data: Uint8ClampedArray, width: number, height: number, options?: DecodeOptions) => Detection | null;
+interface ShapeRules {
+  qrMaxSideRatio: number;
+  qrEdgeMarginRatio: number;
+}
 
 /**
- * Whether a detection has the shape of a real code: a convex outline inside the image, and finder patterns at a
- * roughly square corner (top-left → top-right and top-left → bottom-left are the code's two sides). On patterned art
- * (stitches, 2D-view atlases) jsQR can "find" a version-1 code with no content whose finder patterns sit a few pixels
- * apart and whose outline folds over itself or leaves the image; such a detection is not a code.
+ * Whether a detection has the shape of a real code: a convex outline inside the image, and finder patterns that span
+ * two sides of similar length (top-left → top-right and top-left → bottom-left, within images.qrMaxSideRatio of each
+ * other; the angle between them is not measured). On patterned art (stitches, 2D-view atlases) jsQR can "find" a
+ * version-1 code with no content whose finder patterns sit a few pixels apart and whose outline folds over itself or
+ * leaves the image; such a detection is not a code. A zero side makes the ratio Infinity (NaN when both are zero),
+ * and neither passes the comparison.
  */
-export function plausibleLocation(loc: QrLocation, width: number, height: number, rules: { qrMaxSideRatio: number; qrEdgeMarginRatio: number }): boolean {
+export function plausibleLocation(loc: QrLocation, width: number, height: number, rules: ShapeRules): boolean {
   const quad = [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner];
   const turns = quad.map((p, i) => {
     const a = quad[(i + 1) % 4];
@@ -80,12 +95,30 @@ export function plausibleLocation(loc: QrLocation, width: number, height: number
   const side = (a: Point, b: Point): number => Math.hypot(b.x - a.x, b.y - a.y);
   const across = side(loc.topLeftFinderPattern, loc.topRightFinderPattern);
   const down = side(loc.topLeftFinderPattern, loc.bottomLeftFinderPattern);
-  if (Math.min(across, down) < 1) return false;
   return Math.max(across, down) / Math.min(across, down) <= rules.qrMaxSideRatio;
 }
 
+/**
+ * Look for a code in one image's pixels. jsQR scans the inverted image (light-on-dark codes) only when the normal pass
+ * finds nothing, and an empty detection counts as something: so when the first detection is a pattern that is not
+ * code-shaped, the image is scanned again inverted, or a real light-on-dark code elsewhere in it would never be read.
+ */
+export function detectCode(image: RgbaImage, rules: ShapeRules, decode: QrDecoder = jsQR): Scan {
+  // undefined: a pattern in the art, not a code, so keep looking
+  const judge = (qr: Detection | null): Scan | undefined => {
+    if (!qr) return {};
+    if (hasPayload(qr)) return qr.data.length > 0 ? { decoded: qr.data } : { decoded: "", bytes: qr.binaryData.length };
+    return plausibleLocation(qr.location, image.width, image.height, rules) ? { unreadableCode: true } : undefined;
+  };
+  // "invertFirst", not "onlyInvert": jsqr 1.4.0 never builds the inverted image for "onlyInvert" and throws. When the
+  // inverted image holds nothing, it falls back to the normal one and returns the same pattern, judged the same way.
+  return judge(decode(image.data, image.width, image.height))
+    ?? judge(decode(image.data, image.width, image.height, { inversionAttempts: "invertFirst" }))
+    ?? {};
+}
+
 /** `budget` is what is left of the item's scan pixels: an image past it is left out, never decoded. */
-function scan(bytes: Uint8Array, maxPixels: number, rules: { qrMaxSideRatio: number; qrEdgeMarginRatio: number }, budget = { left: Infinity, skipped: 0 }): Scan {
+function scan(bytes: Uint8Array, maxPixels: number, rules: ShapeRules, budget = { left: Infinity, skipped: 0 }): Scan {
   if (!isPngBytes(bytes) && !isJpegBytes(bytes)) return {};
   const header = imageDimensions(bytes);
   if (!header) return { unreadable: true };
@@ -97,10 +130,7 @@ function scan(bytes: Uint8Array, maxPixels: number, rules: { qrMaxSideRatio: num
   budget.left -= header.width * header.height;
   const rgba = toRgba(bytes, maxPixels);
   if (!rgba) return { unreadable: true };
-  const qr = jsQR(rgba.data, rgba.width, rgba.height);
-  if (!qr) return {};
-  if (hasPayload(qr)) return { decoded: qr.data };
-  return plausibleLocation(qr.location, rgba.width, rgba.height, rules) ? { unreadableCode: true } : {};
+  return detectCode(rgba, rules);
 }
 
 const truncate = (text: string): string => (text.length > 64 ? `${text.slice(0, 64)}…` : text);
@@ -111,7 +141,7 @@ export const qrCode: CheckDefinition = {
   describe: "no decodable QR codes in textures or the thumbnail",
   explanation: "Scannable QR codes are rejected — their target can change after review.",
   fix: "Remove the QR code from the texture or thumbnail — QR targets can change after review, so they're rejected outright.",
-  details: "Decodes every texture and the thumbnail to pixels and runs a QR detector over them — any readable code fails, and so does a code-shaped detection whose content the detector can't read (one symbol of a multi-part code). A detection without content whose outline is not code-shaped (images.qrMaxSideRatio, images.qrEdgeMarginRatio) is a pattern in the art and is ignored. Images above the decode budget (images.maxDecodePixels) are reported as unscanned instead of decoded, and so are textures past the item's total (images.maxScanPixels).",
+  details: "Decodes every texture and the thumbnail to pixels and runs a QR detector over them — any readable code fails (text or bytes), and so does a code-shaped detection whose content the detector can't read (one symbol of a multi-part code). A detection without content whose outline is not code-shaped (images.qrMaxSideRatio, images.qrEdgeMarginRatio) is a pattern in the art and is ignored; the image is then scanned again inverted, so a light-on-dark code elsewhere in it is still found. Images above the decode budget (images.maxDecodePixels) are reported as unscanned instead of decoded, and so are textures past the item's total (images.maxScanPixels).",
   measure: (ctx) => {
     let images = 0;
     for (const model of ctx.models) images += model.doc.getRoot().listTextures().length;
@@ -122,8 +152,13 @@ export const qrCode: CheckDefinition = {
     const findings: Finding[] = [];
     const maxPixels = ctx.manifest.images.maxDecodePixels;
     const megapixels = Math.round(maxPixels / 100000) / 10;
-    const report = (message: string, where: string, decoded: string): void => {
-      findings.push(finding(meta, "error", message, { where, data: { decoded: truncate(decoded) } }));
+    // content that isn't text has nothing to quote: say how many bytes the code holds instead
+    const contents = (result: Scan): string => (result.bytes === undefined
+      ? `it decodes to "${truncate(result.decoded ?? "")}"`
+      : `it holds ${result.bytes} byte${result.bytes === 1 ? "" : "s"} that aren't text`);
+    const report = (message: string, where: string, result: Scan): void => {
+      const data: Finding["data"] = result.bytes === undefined ? { decoded: truncate(result.decoded ?? "") } : { decoded: "", bytes: result.bytes };
+      findings.push(finding(meta, "error", message, { where, data }));
     };
     const unscanned = (label: string, where: string, size: { width: number; height: number }): void => {
       findings.push(finding(meta, "warning", `${label} is ${size.width}×${size.height} — too large to scan for QR codes (the scanner reads images up to ${megapixels} megapixels). Shrink it to the texture and thumbnail size limits so it can be checked.`, {
@@ -151,9 +186,9 @@ export const qrCode: CheckDefinition = {
         if (result.unreadableCode) return unreadableCode(`Texture "${name}" in "${model.mainFile}"`, where);
         if (result.decoded === undefined) return;
         report(
-          `Texture "${name}" in "${model.mainFile}" contains a scannable QR code (it decodes to "${truncate(result.decoded)}") — QR codes aren't allowed in published content. Remove it from the texture.`,
+          `Texture "${name}" in "${model.mainFile}" contains a scannable QR code (${contents(result)}) — QR codes aren't allowed in published content. Remove it from the texture.`,
           where,
-          result.decoded
+          result
         );
       });
     }
@@ -174,9 +209,9 @@ export const qrCode: CheckDefinition = {
       else if (result.unreadableCode) unreadableCode(`The thumbnail "${thumbnailPath}"`, thumbnailPath);
       else if (result.decoded !== undefined) {
         report(
-          `The thumbnail "${thumbnailPath}" contains a scannable QR code (it decodes to "${truncate(result.decoded)}") — QR codes aren't allowed in published content. Remove it from the image.`,
+          `The thumbnail "${thumbnailPath}" contains a scannable QR code (${contents(result)}) — QR codes aren't allowed in published content. Remove it from the image.`,
           thumbnailPath,
-          result.decoded
+          result
         );
       }
     }
