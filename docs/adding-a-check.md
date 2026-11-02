@@ -21,6 +21,8 @@ The name is the API: readable kebab-case that says what is checked (`triangle-co
 
 Every limit, threshold, tolerance or list the check compares against goes in `src/manifest/manifest.json`, under a block named after the topic, and is declared in the `Manifest` interface in `src/manifest/index.ts`. Code keeps only structural constants (magic bytes, file-name conventions) with a one-line why-comment. Changing a number is a governance act: bump `version` in the manifest.
 
+The manifest has a consumer outside this repo: [`dcl-blender-toolkit`](https://github.com/decentraland/dcl-blender-toolkit) vendors the published copy (`src/rules/manifest.json`, `make sync-rules`) so Blender shows creators the same limits the Builder enforces. A new number reaches Blender only after this package is released and the toolkit syncs, so say in the PR description that a toolkit sync follows. `version`, `triangles`, `textures`, `materials`, `emote`, `fileSize` and every key nested under them must not be renamed or moved: the toolkit reads them by name, and a renamed key is a runtime error there after its next sync. Add keys freely.
+
 ## 3. Write `index.ts`
 
 ```ts
