@@ -75,6 +75,18 @@ export interface Manifest {
     thinkingBudgetTokens: number; imagePixelsPerToken: number; textCharactersPerToken: number; maxTextLength: number;
   };
   /** V-01: how much of a capture must be something drawn. */
+  /**
+   * M-15: the male and female versions of a body garment, each measured against its own skeleton (feet 0, head 1).
+   * Approved items with separate versions differ by at most 0.1 at their top or bottom edge (p99 of 378 sampled).
+   */
+  representations: {
+    /** A larger gap at the top or bottom edge means one version is at the wrong scale or position. */
+    maxEdgeGap: number;
+    /** A garment whose bottom edge sits below this height reaches past the hips: one model for both bodies rarely fits. */
+    hipLine: number;
+    /** Categories whose fit differs between the bodies (feet, hands and skins are shared by design). */
+    fittedCategories: string[];
+  };
   renderValid: { minSubjectRatio: number; backgroundTolerance: number };
   /** V-05. */
   thumbnailHonesty: { promptVersion: number; maxFindings: number };

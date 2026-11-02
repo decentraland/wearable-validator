@@ -68,6 +68,13 @@ export interface SyntheticOptions {
   texture?: { size: number; nonSquare?: boolean; bytes?: Uint8Array };
   /** Scale applied to the cube (bounding-box tests). */
   scale?: number;
+  /** Moves the cube by this much, in rest-pose world space (metres). */
+  offset?: [number, number, number];
+  /**
+   * Stand the canonical bones at avatar heights (feet 0.08 m, hips 0.95 m, head 1.6 m) with matching inverse bind
+   * matrices, so the cube's positions are its rest-pose world positions (representation tests).
+   */
+  standing?: boolean;
   /** Name of the primary material (default "Wearable_MAT"). */
   materialName?: string;
   /** Name of the cube mesh (default "cube"). */
@@ -111,6 +118,7 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
 
   const scale = options.scale ?? 1;
   const positions = cubePositions(scale, options.triangles ?? 12);
+  if (options.offset) for (let i = 0; i < positions.length; i++) positions[i] += options.offset[i % 3];
   const position = doc.createAccessor("POSITION").setType("VEC3").setArray(positions).setBuffer(buffer);
 
   const material = doc.createMaterial(options.materialName ?? "Wearable_MAT");
@@ -182,6 +190,20 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
     const skin = doc.createSkin("skin");
     for (const b of boneNodes) skin.addJoint(b);
     meshNode.setSkin(skin);
+    if (options.standing) {
+      // flat under Armature, so each bone's world position is its translation; bind = that position, inverted
+      const heights: Record<string, [number, number, number]> = {
+        Avatar_Hips: [0, 0.95, 0], Avatar_Head: [0, 1.6, 0], Avatar_Neck: [0, 1.5, 0],
+        Avatar_LeftFoot: [0.1, 0.08, 0], Avatar_RightFoot: [-0.1, 0.08, 0]
+      };
+      const inverseBind = new Float32Array(boneNodes.length * 16);
+      boneNodes.forEach((bone, i) => {
+        const t = heights[bone.getName()] ?? [0, 1, 0];
+        bone.setTranslation(t);
+        inverseBind.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -t[0], -t[1], -t[2], 1], i * 16);
+      });
+      skin.setInverseBindMatrices(doc.createAccessor("inverse_bind").setType("MAT4").setArray(inverseBind).setBuffer(buffer));
+    }
     const vertexCount = positions.length / 3;
     const sd = options.skinData;
     const jointVals = sd?.joints ?? [0, 0, 0, 0];
