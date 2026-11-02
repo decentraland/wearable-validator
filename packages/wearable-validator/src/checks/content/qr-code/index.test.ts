@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { encode as encodePng } from "fast-png";
 import { encode as encodeJpeg } from "jpeg-js";
 import { validate } from "../../../index.js";
+import { hasPayload } from "./index.js";
 import { jpegWithFillBytes, pngHeaderBytes, pngWithLeadingChunk, syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
 
 // Version-2 QR module matrix for "https://example.com/qr" (generated once with the `qrcode`
@@ -59,6 +60,17 @@ describe("qr-code (F-04)", () => {
     const findings = result.findings.filter((f) => f.check === "qr-code");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "error");
+  });
+
+  it("ignores a detection with no payload, as jsQR reports on patterned art", () => {
+    // The shape jsQR returned for a published nail-art thumbnail (Stitch Up Tips): version 1, no data segments.
+    assert.equal(hasPayload({ data: "", binaryData: [] }), false);
+    assert.equal(hasPayload(null), false);
+  });
+
+  it("still counts a code whose payload is only bytes", () => {
+    assert.equal(hasPayload({ data: "", binaryData: [0xde, 0xad] }), true);
+    assert.equal(hasPayload({ data: "https://example.com/qr", binaryData: [0x68] }), true);
   });
 
   it("errors when the thumbnail contains a QR code", async () => {

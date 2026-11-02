@@ -42,6 +42,15 @@ interface Scan {
   unreadable?: boolean;
 }
 
+/**
+ * A detection only counts as a QR code when it carries a payload. On patterned art (stitches, grids, 2D-view atlases)
+ * jsQR can report a version-1 code with no data segments, an empty string and empty bytes; a code with nothing in it
+ * points nowhere, so it can't change target after review — which is what the rule guards against.
+ */
+export function hasPayload(qr: { data: string; binaryData: ArrayLike<number> } | null): boolean {
+  return qr !== null && (qr.data.length > 0 || qr.binaryData.length > 0);
+}
+
 /** `budget` is what is left of the item's scan pixels: an image past it is left out, never decoded. */
 function scan(bytes: Uint8Array, maxPixels: number, budget = { left: Infinity, skipped: 0 }): Scan {
   if (!isPngBytes(bytes) && !isJpegBytes(bytes)) return {};
@@ -56,7 +65,7 @@ function scan(bytes: Uint8Array, maxPixels: number, budget = { left: Infinity, s
   const rgba = toRgba(bytes, maxPixels);
   if (!rgba) return { unreadable: true };
   const qr = jsQR(rgba.data, rgba.width, rgba.height);
-  return { decoded: qr?.data ?? undefined };
+  return { decoded: qr && hasPayload(qr) ? qr.data : undefined };
 }
 
 const truncate = (text: string): string => (text.length > 64 ? `${text.slice(0, 64)}…` : text);
