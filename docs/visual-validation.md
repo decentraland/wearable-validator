@@ -86,7 +86,7 @@ Twelve files carry the phase (5 with logic, 5 tests, 1 launcher pair, 1 doc). Ev
 },
 "ai": {                             // the one call, shared by every AI-backed rule — read only by ai.ts (+ maxTextLength by parsers)
   "model": "claude-sonnet-5",
-  "maxInputTokens": 40000, "maxImages": 21, "timeoutMs": 300000, "maxRetries": 0,
+  "maxInputTokens": 40000, "maxImages": 29, "timeoutMs": 300000, "maxRetries": 0,
   "thinkingBudgetTokens": 1024, "imagePixelsPerToken": 750, "textCharactersPerToken": 3, "maxTextLength": 1200
 },
 "thumbnailHonesty": {               // V-05 only — a flat per-topic block beside thumbnail / hands / emote, HEAD style
@@ -95,11 +95,11 @@ Twelve files carry the phase (5 with logic, 5 tests, 1 launcher pair, 1 doc). Ev
   "azimuthDegrees": { "wearable": [0, 90, 180], "emote": [0, 90] },     // 180 added after rear art was mistaken for the front
   "stress": {                       // V-02's motion pass: worn, front and side, running at three moments plus one pose per category, skin chroma green
     "skin": "00ff00", "azimuthDegrees": [0, 90],
-    "poses": { "arms": [dab 0.5, clap 0.5], "legs": [run 0.25, jump 0.75], "head": [head-explode 0.25, dab 0.5], "body": [dab 0.5, run 0.25] },
-    "categoryPoses": { "upper_body": "arms", "lower_body": "legs", "hat": "head", … }   // unlisted categories use "body"
+    "poses": { "arms": [dab 0.5, run 0.25, run 0.5, run 0.75], "hands": [clap 0.5, run 0.25, run 0.5, run 0.75], "legs": [jump 0.75, run 0.25, run 0.5, run 0.75], "head": [head-explode 0.25, dab 0.5, run 0.25, run 0.75], "body": [dab 0.5, run 0.25, run 0.5, run 0.75] },
+    "categoryPoses": { "upper_body": "arms", "hands_wear": "hands", "lower_body": "legs", "hat": "head", … }   // unlisted categories use "body"
   },
   "emoteFractions": [0, 0.25, 0.5, 0.75, 1],           // five moments: the quarter frames are where mid-motion clipping and sliding show
-  "maxCaptures": 20, "maxFindings": 8
+  "maxCaptures": 28, "maxFindings": 8   // 12 rest-pose views + 16 motion frames on two bodies: full, so a new pose needs a bigger budget
 }
 ```
 

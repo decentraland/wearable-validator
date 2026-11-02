@@ -1,5 +1,5 @@
 {
-  "version": "0.7.1",
+  "version": "0.7.3",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -235,6 +235,24 @@
             "fraction": 0.25
           },
           {
+            "clip": "dab",
+            "fraction": 0.5
+          },
+          {
+            "clip": "run",
+            "fraction": 0.25
+          },
+          {
+            "clip": "run",
+            "fraction": 0.75
+          }
+        ],
+        "hands": [
+          {
+            "clip": "clap",
+            "fraction": 0.5
+          },
+          {
             "clip": "run",
             "fraction": 0.25
           },
@@ -268,7 +286,7 @@
       },
       "categoryPoses": {
         "upper_body": "arms",
-        "hands_wear": "arms",
+        "hands_wear": "hands",
         "lower_body": "legs",
         "feet": "legs",
         "skin": "body",

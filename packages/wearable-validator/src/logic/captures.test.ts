@@ -200,7 +200,11 @@ describe("stress poses", () => {
     assert.ok(Array.isArray(legs));
     assert.deepEqual([...new Set(legs.map((r) => r.pose))], [...new Set(stress.poses.legs.map((pose) => pose.clip))]);
     // every body group is seen running, at more than one moment of the stride
-    for (const group of Object.values(stress.poses)) assert.ok(group.filter((pose) => pose.clip === "run").length >= 3);
+    for (const group of Object.values(stress.poses)) assert.ok(group.filter((pose) => pose.clip === "run").length >= 2);
+    // hands keep the pose where palms and fingers meet; head items keep the arm crossing the face
+    assert.equal(stress.categoryPoses.hands_wear, "hands");
+    assert.ok(stress.poses.hands.some((pose) => pose.clip === "clap"));
+    assert.ok(stress.poses.head.some((pose) => pose.clip === "dab"));
     const unknown = await stressRequests(context({ category: "something_new", item: { category: "something_new", representations: [{ bodyShapes: [MALE], mainFile: "model.glb", contents: ["model.glb"] }] } }), "build-a");
     assert.ok(Array.isArray(unknown));
     assert.deepEqual([...new Set(unknown.map((r) => r.pose))], [...new Set(stress.poses.body.map((pose) => pose.clip))]);
