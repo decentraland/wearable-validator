@@ -1,5 +1,5 @@
 {
-  "version": "0.7.3",
+  "version": "0.7.1",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -60,7 +60,9 @@
   "images": {
     "maxDecodePixels": 16777216,
     "inflateChunkBytes": 16384,
-    "maxScanPixels": 67108864
+    "maxScanPixels": 67108864,
+    "qrMaxSideRatio": 2,
+    "qrEdgeMarginRatio": 0.05
   },
   "boundingBox": {
     "width": 2.42,

@@ -18,6 +18,10 @@ export interface Manifest {
     maxDecodePixels: number; inflateChunkBytes: number;
     /** Pixels the QR scan decodes across all of an item's textures: many texture entries can point at the same bytes. */
     maxScanPixels: number;
+    /** A QR detection without content counts as a code only when its finder patterns' two sides differ by at most this ratio… */
+    qrMaxSideRatio: number;
+    /** …and its outline stays within this share of the image's longer side beyond the image's edges. */
+    qrEdgeMarginRatio: number;
   };
   boundingBox: { width: number; height: number; depth: number };
   text: { nameMax: number; descriptionMax: number; forbiddenChars: string[]; tagsMax: number };
