@@ -272,7 +272,8 @@
     "maxTextLength": 1200
   },
   "renderValid": {
-    "minSubjectRatio": 0.02,
+    "minSubjectRatio": 0.0005,
+    "warnSubjectRatio": 0.02,
     "backgroundTolerance": 24
   },
   "thumbnailHonesty": {
