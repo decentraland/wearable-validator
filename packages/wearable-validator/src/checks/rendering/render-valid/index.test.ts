@@ -65,21 +65,14 @@ describe("render-valid (V-01)", () => {
     assert.equal(subjectRatio(frame(false), manifest.renderValid.backgroundTolerance), 0);
   });
 
-  it("counts a dark red item that is as bright as the grey backdrop", () => {
+  it("counts a dark red item that is as bright as the grey backdrop, however wide it is", () => {
     // the Santa's Slay Gloves case: (86, 12, 16) sums to 114, the backdrop (50, 50, 50) to 150 — a brightness-only
-    // test within 3 × 24 of the row read the gloves as backdrop. The block is 40 % of the width: under half of every row
-    const side = Math.round(0.4 * SIZE);
-    const ratio = subjectRatio(blockFrame([50, 50, 50], [86, 12, 16], 0.16), manifest.renderValid.backgroundTolerance);
-    assert.equal(ratio, (side * side) / (SIZE * SIZE));
-  });
-
-  it("takes a whole pixel as each row's backdrop, so an item covering half a row or more is never counted twice", () => {
+    // test within 3 × 24 of the row read the gloves as backdrop
     const tolerance = manifest.renderValid.backgroundTolerance;
-    // half the width: medians taken per channel mixed (86, 50, 50), a color in no pixel, and counted the backdrop too (0.5)
-    assert.equal(subjectRatio(blockFrame([50, 50, 50], [86, 12, 16], 0.25), tolerance), 0.25);
-    // wider than half: the row's backdrop pixel is now an item pixel, so the row counts its backdrop instead — never both
-    const wide = subjectRatio(blockFrame([50, 50, 50], [86, 12, 16], 0.49), tolerance)!;
-    assert.ok(wide > 0 && wide < 0.49, `measured ${wide}`);
+    for (const share of [0.16, 0.25, 0.49]) {
+      const side = Math.round(Math.sqrt(share) * SIZE);
+      assert.equal(subjectRatio(blockFrame([50, 50, 50], [86, 12, 16], share), tolerance), (side * side) / (SIZE * SIZE), `block covering ${share}`);
+    }
   });
 
   it("warns, without failing, on an item that draws only a little of its frame", async () => {
