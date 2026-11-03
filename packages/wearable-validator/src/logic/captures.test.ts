@@ -182,7 +182,7 @@ describe("captures", () => {
 });
 
 describe("stress poses", () => {
-  it("adds worn front and side views at the category's two clip moments with green skin, and nothing for emotes", async () => {
+  it("adds worn front and side views at the category's clip moments, running included, with green skin, and nothing for emotes", async () => {
     const ctx = context({ category: "upper_body", item: { category: "upper_body", representations: [{ bodyShapes: [MALE, FEMALE], mainFile: "model.glb", contents: ["model.glb"] }] } });
     const requests = await stressRequests(ctx, "build-a");
     assert.ok(Array.isArray(requests));
@@ -198,10 +198,16 @@ describe("stress poses", () => {
 
     const legs = await stressRequests(context({ category: "lower_body", item: { category: "lower_body", representations: [{ bodyShapes: [MALE], mainFile: "model.glb", contents: ["model.glb"] }] } }), "build-a");
     assert.ok(Array.isArray(legs));
-    assert.deepEqual([...new Set(legs.map((r) => r.pose))], stress.poses.legs.map((pose) => pose.clip));
+    assert.deepEqual([...new Set(legs.map((r) => r.pose))], [...new Set(stress.poses.legs.map((pose) => pose.clip))]);
+    // every body group is seen running, at more than one moment of the stride
+    for (const group of Object.values(stress.poses)) assert.ok(group.filter((pose) => pose.clip === "run").length >= 2);
+    // hands keep the pose where palms and fingers meet; head items keep the arm crossing the face
+    assert.equal(stress.categoryPoses.hands_wear, "hands");
+    assert.ok(stress.poses.hands.some((pose) => pose.clip === "clap"));
+    assert.ok(stress.poses.head.some((pose) => pose.clip === "dab"));
     const unknown = await stressRequests(context({ category: "something_new", item: { category: "something_new", representations: [{ bodyShapes: [MALE], mainFile: "model.glb", contents: ["model.glb"] }] } }), "build-a");
     assert.ok(Array.isArray(unknown));
-    assert.deepEqual([...new Set(unknown.map((r) => r.pose))], stress.poses.body.map((pose) => pose.clip));
+    assert.deepEqual([...new Set(unknown.map((r) => r.pose))], [...new Set(stress.poses.body.map((pose) => pose.clip))]);
     assert.deepEqual(await stressRequests(context({ itemType: "emote" }), "build-a"), []);
   });
 });
@@ -222,13 +228,13 @@ describe("plannedCaptures", () => {
 
   it("counts the recipe plus the category's motion pass for a wearable on both shapes", async () => {
     await agrees(context(item("upper_body", [MALE, FEMALE])), recipeOf("wearable", 2) + stressOf("arms", 2));
-    assert.equal(await plannedCaptures(context(item("upper_body", [MALE, FEMALE]))), 20);
+    assert.equal(await plannedCaptures(context(item("upper_body", [MALE, FEMALE]))), 28);
   });
 
   it("uses the head poses for a hat and halves everything for a one-shape wearable", async () => {
     await agrees(context(item("hat", [MALE, FEMALE])), recipeOf("wearable", 2) + stressOf("head", 2));
     await agrees(context(item("hat", [MALE])), recipeOf("wearable", 1) + stressOf("head", 1));
-    assert.equal(await plannedCaptures(context(item("hat", [MALE]))), 10);
+    assert.equal(await plannedCaptures(context(item("hat", [MALE]))), 14);
   });
 
   it("counts every clip fraction and no motion pass for an emote", async () => {

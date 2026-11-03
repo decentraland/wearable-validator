@@ -184,9 +184,9 @@ describe("render-valid (V-01)", () => {
   it("asks for its two front views but the run renders the whole recipe once, up front", async () => {
     const mock = renderer(() => frame(true));
     const result = await validate(await syntheticZip(), { groups: ["rendering"], services: { renderer: mock.service } });
-    // one batch: the two front views first, then the ten rest-pose views and the eight-frame motion pass the rules after it will need
-    assert.deepEqual(mock.rendered.map((batch) => batch.length), [20]);
-    assert.equal(result.captures.length, 20);
+    // one batch: the two front views first, then the ten rest-pose views and the sixteen-frame motion pass the rules after it will need
+    assert.deepEqual(mock.rendered.map((batch) => batch.length), [28]);
+    assert.equal(result.captures.length, 28);
     assert.deepEqual(result.checks.map((row) => `${row.check}:${row.status}`), ["render-valid:passed", "thumbnail-honesty:skipped", "visual-quality:skipped"]);
   });
 });
