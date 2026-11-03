@@ -3,6 +3,8 @@
  * Previous hop: checks/<rule>.ts builds a ReviewRequest (prompt + labeled images).
  * Next hop: the check maps the ReviewResult to a row.
  * Reads top to bottom in call order: gate → budget → build → send → parse → fail soft.
+ * A failure is `retryable` when asking again may get an answer (a dropped or failing call, a rate limit, a timeout, an
+ * unreadable answer); one that would fail the same way (credentials, budget, model, refusal, truncation) is not.
  */
 import { createModels, hasApi, type AssistantMessage, type Context, type Credential, type CredentialStore, type ImageContent, type TextContent } from "@earendil-works/pi-ai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
@@ -76,7 +78,7 @@ export function createPiReviewer(options: PiReviewerOptions): Reviewer {
       images: await Promise.all(request.images.map(async (image) => ({ id: image.id, sha256: await digest(image.bytes) }))),
       ...(request.texts?.length ? { texts: await Promise.all(request.texts.map(async (text) => ({ id: text.id, sha256: await digest(new TextEncoder().encode(text.text)) }))) } : {})
     };
-    const failure = (reason: string): ReviewResult => ({ ok: false, reason, metadata });
+    const failure = (reason: string, retryable = false): ReviewResult => ({ ok: false, reason, metadata, ...(retryable ? { retryable } : {}) });
 
     const gate = await requireOAuth(options.credentials, signal);
     if (gate !== true) return failure(gate);
@@ -108,13 +110,13 @@ export function createPiReviewer(options: PiReviewerOptions): Reviewer {
       });
     } catch (error) {
       signal?.throwIfAborted();
-      return failure(`The review call failed. ${redact(error instanceof Error ? error.message : String(error))}`);
+      return failure(`The review call failed. ${redact(error instanceof Error ? error.message : String(error))}`, true);
     } finally {
       clearTimeout(timeout);
       signal?.removeEventListener("abort", abort);
     }
     signal?.throwIfAborted();
-    if (response.stopReason === "aborted") return failure(`The model did not answer within ${ai.timeoutMs} ms. Run the review again.`);
+    if (response.stopReason === "aborted") return failure(`The model did not answer within ${ai.timeoutMs} ms. Run the review again.`, true);
     return parseResponse(response, metadata, budget);
   }
   return { review };
@@ -202,9 +204,10 @@ function parseResponse(response: AssistantMessage, base: ReviewMetadata, maxInpu
     usage: { input, output, cacheRead, cacheWrite, cost: cost.total },
     answer: text
   };
-  const failure = (reason: string): ReviewResult => ({ ok: false, reason, metadata });
+  const failure = (reason: string, retryable = false): ReviewResult => ({ ok: false, reason, metadata, ...(retryable ? { retryable } : {}) });
   if (response.stopReason !== "stop" || response.rawStopReason === "refusal" || response.content.some((block) => block.type === "toolCall")) {
-    return failure(failureText(response));
+    const { reason, retryable } = unfinished(response);
+    return failure(reason, retryable);
   }
   if (input + cacheRead + cacheWrite > maxInputTokens) {
     return failure(`The review used ${input + cacheRead + cacheWrite} input tokens; the budget is ${maxInputTokens}. Reduce the evidence size before retrying.`);
@@ -212,20 +215,22 @@ function parseResponse(response: AssistantMessage, base: ReviewMetadata, maxInpu
   try {
     return { ok: true, answer: JSON.parse(text), metadata };
   } catch {
-    return failure("The reviewer did not return valid JSON. Run the review again.");
+    return failure("The reviewer did not return valid JSON. Run the review again.", true);
   }
 }
 
-function failureText(response: AssistantMessage): string {
+/** Why the call did not finish, and whether asking again with the same request may get an answer. */
+function unfinished(response: AssistantMessage): { reason: string; retryable: boolean } {
   const message = response.errorMessage ?? "";
-  if (/401|authentication_error|invalid.*token/i.test(message)) return "The OAuth session was rejected. Sign in again before retrying the review.";
-  if (/429|rate_limit/i.test(message)) return "The OAuth account is rate limited. Wait before retrying the review.";
-  if (/404|not_found|model.*not.*available/i.test(message)) return "The selected model is unavailable to this OAuth account. Configure an available image model.";
+  if (/401|authentication_error|invalid.*token/i.test(message)) return { reason: "The OAuth session was rejected. Sign in again before retrying the review.", retryable: false };
+  if (/429|rate_limit/i.test(message)) return { reason: "The OAuth account is rate limited. Wait before retrying the review.", retryable: true };
+  if (/404|not_found|model.*not.*available/i.test(message)) return { reason: "The selected model is unavailable to this OAuth account. Configure an available image model.", retryable: false };
   const stop = response.rawStopReason ?? response.stopReason;
   // thinking counts against the same budget as the answer: twenty frames of findings need room for both
-  if (stop === "max_tokens") return "The model's answer was longer than the model itself can produce. Retry the review with fewer frames.";
+  if (stop === "max_tokens") return { reason: "The model's answer was longer than the model itself can produce. Retry the review with fewer frames.", retryable: false };
   const detail = redact(message);
-  return `The review did not finish (${stop}). ${detail || "Retry the review with complete evidence."}`;
+  // a provider error (5xx, overloaded, a dropped stream) is worth asking again; a refusal or a tool call is the model's own answer
+  return { reason: `The review did not finish (${stop}). ${detail || "Retry the review with complete evidence."}`, retryable: response.stopReason === "error" && response.rawStopReason !== "refusal" };
 }
 
 function redact(message: string): string {

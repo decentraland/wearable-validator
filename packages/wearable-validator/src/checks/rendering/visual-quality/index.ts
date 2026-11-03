@@ -3,7 +3,7 @@
  * twelve captures thumbnail-honesty uses plus the motion pass (stress poses, green skin). One prompt, one model call, findings tagged with the rule they map to.
  */
 import { captureLabel, recipeRequests, rendererBuild, resolveCaptures, stressRequests } from "../../../logic/captures.js";
-import { askReviewer, boundedText, coversEveryImage, errored, isExecution, knownIds, object, skipped } from "../../../logic/review.js";
+import { askReviewer, boundedText, coversEveryImage, errored, isExecution, knownIds, object, skipped, unreadable } from "../../../logic/review.js";
 import { manifest } from "../../../manifest/index.js";
 import { finding, type CheckDefinition, type CheckMeta, type Prompt, type ReviewImage } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -117,7 +117,8 @@ export const visualQuality: CheckDefinition = {
     const outcome = await askReviewer(ctx, meta.name, visualQualityPrompt, images);
     if (isExecution(outcome)) return outcome;
     const answer = parseVisualQualityAnswer(outcome.answer, images.map((image) => image.id), { maxFindings: ctx.manifest.visualQuality.maxFindings, maxTextLength: ctx.manifest.ai.maxTextLength });
-    if (typeof answer === "string") return errored(answer, outcome.metadata);
+    if (typeof answer === "string") return unreadable(answer, outcome.metadata);
+    // inconclusive is the model's answer, not a failed call: never retryable, or asking again would shop for a verdict
     if (answer.verdict === "inconclusive") return errored(answer.summary, outcome.metadata);
     const measured = `Reviewed ${captures.length} rendered views. ${answer.summary}`;
     if (answer.verdict === "ok") return { status: "passed", coverage: "complete", findings: [], measured, review: outcome.metadata };

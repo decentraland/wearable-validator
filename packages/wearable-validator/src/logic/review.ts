@@ -7,7 +7,10 @@ import { digestJson } from "./captures.js";
 import type { CheckContext, CheckExecution, Prompt, ReviewImage, ReviewMetadata, ReviewText } from "../types.js";
 
 export const skipped = (reason: string): CheckExecution => ({ status: "skipped", coverage: "missing", findings: [], reason });
-export const errored = (reason: string, review?: ReviewMetadata): CheckExecution => ({ status: "errored", coverage: "missing", findings: [], reason, review });
+/** No verdict. `retryable` says asking again may answer it (a failed call, an unreadable answer); unset, it would end the same way. */
+export const errored = (reason: string, review?: ReviewMetadata, retryable = false): CheckExecution => ({ status: "errored", coverage: "missing", findings: [], reason, review, ...(retryable ? { retryable } : {}) });
+/** An answer the rule cannot read (malformed, uncovered images, contradictory): no verdict was given, so asking again may get one. An inconclusive verdict is an answer, and goes to errored. */
+export const unreadable = (reason: string, review?: ReviewMetadata): CheckExecution => errored(reason, review, true);
 
 export type ReviewOutcome = { answer: unknown; metadata: ReviewMetadata } | CheckExecution;
 
@@ -15,14 +18,14 @@ export function isExecution(value: ReviewOutcome): value is CheckExecution {
   return "status" in value;
 }
 
-/** One call; a missing reviewer is skipped, a refusal or a mismatched prompt is errored — never a pass. */
+/** One call; a missing reviewer is skipped, a refusal or a mismatched prompt is errored — never a pass. The reviewer says whether its failure is worth asking again. */
 export async function askReviewer(ctx: CheckContext, check: string, prompt: Prompt, images: ReviewImage[], text?: { texts: ReviewText[]; maxInputTokens: number }): Promise<ReviewOutcome> {
   const reviewer = ctx.services?.reviewer;
   if (!reviewer) return skipped("Configure services.reviewer to run this review. Use the optional /ai adapter for Pi with OAuth.");
   const request = { check, prompt, promptDigest: await digestJson(prompt), images, ...text };
   const result = await reviewer.review(request, ctx.signal);
   ctx.signal?.throwIfAborted();
-  if (!result.ok) return errored(result.reason || "The reviewer did not answer.", result.metadata);
+  if (!result.ok) return errored(result.reason || "The reviewer did not answer.", result.metadata, result.retryable === true);
   const { metadata } = result;
   if (metadata.promptDigest !== request.promptDigest || metadata.promptVersion !== prompt.version || !metadata.model || !metadata.provider) {
     return errored("The reviewer answered for a different prompt or omitted its model identity. Run the review again.", metadata);

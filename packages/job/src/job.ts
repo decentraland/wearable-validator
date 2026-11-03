@@ -10,7 +10,7 @@ import { createRendererComponent } from "./adapters/renderer.js";
 import { createReviewer } from "./adapters/reviewer.js";
 import { createSlackComponent } from "./adapters/slack.js";
 import { createWorkQueueComponent } from "./adapters/work-queue.js";
-import { createReviewJob } from "./logic/review-job.js";
+import { createReviewJob, visualRetryDelays } from "./logic/review-job.js";
 
 const config = composeConfigProviders(createConfigComponent(process.env), await createDotEnvConfigComponent({ path: [resolve(import.meta.dirname, "../.env.default")] }));
 // LOG_FORMAT=json: one JSON line per event, so the host's collector ships them unchanged
@@ -21,9 +21,11 @@ const job = createReviewJob({
   builder: await createBuilderComponent({ config, logs }),
   renderer: await createRendererComponent({ config, logs }),
   reviewer: await createReviewer({ config, logs }),
-  slack: await createSlackComponent({ config, logs })
+  slack: await createSlackComponent({ config, logs }),
+  visualRetryDelaysMs: visualRetryDelays(await config.getString("VISUAL_RETRY_DELAYS_MS"))
 });
-// ECS stops a task with SIGTERM: the collection in hand finishes, then the task exits and the rest wait for the next one
+// ECS stops a task with SIGTERM: the collection in hand finishes with no more retries, then the task exits and the rest
+// wait for the next one
 process.once("SIGTERM", () => job.stop());
 await job.drain({
   maxRuntimeMs: ((await config.getNumber("MAX_RUNTIME_MINUTES")) ?? 55) * 60_000,

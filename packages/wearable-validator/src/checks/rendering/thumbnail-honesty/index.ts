@@ -6,7 +6,7 @@
 import { imageSize } from "image-size";
 import { decode as decodeJpeg } from "jpeg-js";
 import { captureLabel, recipeRequests, rendererBuild, resolveCaptures } from "../../../logic/captures.js";
-import { askReviewer, errored, isExecution, skipped } from "../../../logic/review.js";
+import { askReviewer, errored, isExecution, skipped, unreadable } from "../../../logic/review.js";
 import { emptyCaptures } from "../render-valid/index.js";
 import { decodePngSafe, isJpegBytes, isPngBytes } from "../../../logic/images.js";
 import { manifest } from "../../../manifest/index.js";
@@ -190,8 +190,8 @@ export const thumbnailHonesty: CheckDefinition = {
       maxFindings: ctx.manifest.thumbnailHonesty.maxFindings,
       maxTextLength: ctx.manifest.ai.maxTextLength
     });
-    if (typeof answer === "string") return errored(answer, metadata);
-    // inconclusive is missing evidence, never a verdict
+    if (typeof answer === "string") return unreadable(answer, metadata);
+    // inconclusive is missing evidence, never a verdict — and the model's answer, so never retryable
     if (answer.verdict === "inconclusive") return errored(answer.summary, metadata);
     const measured = `Compared the thumbnail with ${captures.length} rendered views. ${answer.summary}`;
     if (answer.verdict === "matches") return { status: "passed", coverage: "complete", findings: [], measured, review: metadata };

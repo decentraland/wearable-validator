@@ -112,6 +112,7 @@ describe("ai", () => {
     assert.equal(missing.ok, false);
     if (missing.ok) return;
     assert.match(missing.reason, /OAuth session/);
+    assert.equal(missing.retryable, undefined, "asking again without credentials fails the same way");
     assert.equal(missing.metadata.model, manifest.ai.model);
     assert.equal(missing.metadata.usage, undefined);
     await credentials.modify("anthropic", async () => ({ type: "api_key", key: "dummy-never-use" }));
@@ -134,6 +135,7 @@ describe("ai", () => {
     assert.equal(result.ok, false);
     if (result.ok) return;
     assert.match(result.reason, /budget/);
+    assert.equal(result.retryable, undefined, "the same evidence is over the same budget");
   });
 
   it("sends code as text with no images under the rule's own budget, which a code request over the shared budget needs", async () => {
@@ -174,6 +176,31 @@ describe("ai", () => {
       assert.equal(result.metadata.stopReason, stop);
       assert.equal(result.metadata.usage?.input, 100);
       assert.equal(result.metadata.answer, text);
+    }
+  });
+
+  it("marks a failure retryable only when asking again may answer it: a failed, overloaded or rate-limited call, an unreadable answer", async () => {
+    const credentials = await oauthCredentials();
+    const apiError = (status: number, type: string, message: string) => () => Response.json({ type: "error", error: { type, message } }, { status });
+    const cases: [string, () => Response, boolean][] = [
+      ["overloaded", apiError(529, "overloaded_error", "Overloaded"), true],
+      ["server error", apiError(500, "api_error", "Internal server error"), true],
+      ["rate limited", apiError(429, "rate_limit_error", "Number of requests has exceeded your rate limit"), true],
+      ["dropped connection", () => { throw new TypeError("fetch failed"); }, true],
+      ["not JSON", () => streamResponse("I cannot review this."), true],
+      ["session rejected", apiError(401, "authentication_error", "invalid x-api-key"), false],
+      ["model unavailable", apiError(404, "not_found_error", "model: claude-x"), false],
+      ["truncated", () => streamResponse("{}", "max_tokens"), false],
+      ["refused", () => streamResponse("{}", "refusal"), false]
+    ];
+    for (const [name, answer, retryable] of cases) {
+      let calls = 0;
+      const reviewer = createPiReviewer({ credentials, fetch: async () => (calls++, answer()) });
+      const result = await reviewer.review(request);
+      assert.equal(calls, 1, `${name}: one call, the caller decides on asking again`);
+      assert.equal(result.ok, false, name);
+      if (result.ok) return;
+      assert.equal(result.retryable === true, retryable, `${name}: ${result.reason}`);
     }
   });
 

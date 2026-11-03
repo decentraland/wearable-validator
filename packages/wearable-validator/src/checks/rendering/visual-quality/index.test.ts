@@ -88,6 +88,19 @@ describe("visual-quality (V-02 · V-03 · V-04 · V-06)", () => {
     assert.equal(result.findings[0].where, "model.glb");
   });
 
+  it("marks an unanswered row retryable, never an inconclusive answer or a failure that would repeat", async () => {
+    const row = async (answer: (request: ReviewRequest) => ReviewResult) => (await validate(await syntheticZip(), { ...CHECK, services: services(answer) })).checks[0];
+    const dropped = await row((request) => ({ ok: false, reason: "The review did not finish (error). 529 overloaded_error", metadata: metadata(request), retryable: true }));
+    assert.deepEqual([dropped.status, dropped.retryable], ["errored", true], "a failed call");
+    const unreadable = await row((request) => ({ ok: true, answer: { verdict: "ok", summary: "Fine.", reviewedCaptureIds: [], findings: [] }, metadata: metadata(request) }));
+    assert.deepEqual([unreadable.status, unreadable.retryable], ["errored", true], "an answer that does not cover the views");
+    const inconclusive = await row((request) => ({ ok: true, answer: { verdict: "inconclusive", summary: "The item is too small to judge.", reviewedCaptureIds: request.images.map((image) => image.id), findings: [] }, metadata: metadata(request) }));
+    assert.deepEqual([inconclusive.status, inconclusive.retryable], ["errored", undefined], "the model declined to judge: its answer, not a failure");
+    const overBudget = await row((request) => ({ ok: false, reason: "The review needs about 900000 input tokens; the budget is 100000. Reduce the evidence size.", metadata: metadata(request) }));
+    assert.deepEqual([overBudget.status, overBudget.retryable], ["errored", undefined], "the reviewer did not call it retryable");
+    assert.equal("retryable" in (await row(ok)), false, "only errored rows carry it");
+  });
+
   it("is not applicable to emotes and skips without a reviewer", async () => {
     const mock = services(ok);
     const emote = await validate(await syntheticZip({ kind: "emote" }), { ...CHECK, services: mock });
