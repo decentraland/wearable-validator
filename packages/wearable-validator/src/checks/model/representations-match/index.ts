@@ -3,16 +3,14 @@
  * way, and one model rarely fits both bodies past the hips. Curators send back female-only fit problems (waist height,
  * hip seam, see-through) that the male version doesn't show.
  */
-import type { Document, Skin } from "@gltf-transform/core";
-import { colliderNodes, worldMatrices } from "../../../logic/gltf.js";
+import { BodyShape } from "@dcl/schemas";
+import type { Accessor, Document, Skin } from "@gltf-transform/core";
+import { colliderNodes, invert, worldMatrices } from "../../../logic/gltf.js";
 import { wearableGeometryOnly } from "../../../logic/wearable-only.js";
 import { finding, type CheckContext, type CheckDefinition, type CheckMeta, type Finding, type ParsedModel } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
 
 const meta: CheckMeta = { name: "representations-match", group: "model", rule: "M-15", docs: `${WEARABLES}#building-3d-models-for-wearables` };
-
-const MALE = "urn:decentraland:off-chain:base-avatars:BaseMale";
-const FEMALE = "urn:decentraland:off-chain:base-avatars:BaseFemale";
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -35,30 +33,10 @@ function frameOf(head: number | undefined, left: number | undefined, right: numb
   return body > 0 ? { feet, body } : null;
 }
 
-/** Column-major 4×4 inverse by Gauss–Jordan elimination with partial pivoting, or null when the matrix is singular. */
-export function invert(m: number[]): number[] | null {
-  // rows of [M | I]; column-major storage, so M[row][col] = m[col * 4 + row]
-  const rows = [0, 1, 2, 3].map((r) => [0, 1, 2, 3].map((c) => m[c * 4 + r]).concat([0, 1, 2, 3].map((c) => (c === r ? 1 : 0))));
-  for (let col = 0; col < 4; col++) {
-    let pivot = col;
-    for (let r = col + 1; r < 4; r++) if (Math.abs(rows[r][col]) > Math.abs(rows[pivot][col])) pivot = r;
-    if (!(Math.abs(rows[pivot][col]) > 1e-12)) return null;
-    [rows[col], rows[pivot]] = [rows[pivot], rows[col]];
-    const scale = rows[col][col];
-    for (let c = 0; c < 8; c++) rows[col][c] /= scale;
-    for (let r = 0; r < 4; r++) {
-      const factor = rows[r][col];
-      if (r !== col && factor !== 0) for (let c = 0; c < 8; c++) rows[r][c] -= factor * rows[col][c];
-    }
-  }
-  const out = new Array<number>(16);
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) out[c * 4 + r] = rows[r][4 + c];
-  return out;
-}
-
 /**
  * The skin's feet and head heights at bind time: each joint sits at the inverse of its inverse bind matrix, in the
- * space the skinned mesh's positions are stored in — whatever pose the file was saved in.
+ * space the skinned mesh's positions are stored in — whatever pose the file was saved in. Null when the skin leaves
+ * the head or a foot out of its joints: their node pose would only be right if the file were saved in bind pose.
  */
 function bindFrame(skin: Skin): Frame | null {
   const joints = skin.listJoints();
@@ -76,9 +54,11 @@ function bindFrame(skin: Skin): Frame | null {
 const heightOf = (m: number[], p: [number, number, number]): number => m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
 
 /**
- * The garment's extent against the model's own skeleton, or null without feet and head bones. A skinned mesh ignores
- * its node: at bind time its vertices are their stored positions, measured against the bones its inverse bind
- * matrices place. A mesh without a skin is measured where its node puts it, against the bones' node pose.
+ * The garment's extent against the model's own skeleton. A skinned mesh ignores its node: at bind time its vertices
+ * are their stored positions, measured against the bones its inverse bind matrices place. A mesh without a skin is
+ * measured where its node puts it, against the bones' node pose; its bounding box turns with a rotated node, so it can
+ * measure taller than it is. Null when a drawn mesh has no feet and head bones to measure against (its skin leaves
+ * them out of its joints, or the file has none): the rest alone could warn on a version that is fine.
  */
 export function extentOf(doc: Document): Extent | null {
   const worlds = worldMatrices(doc);
@@ -98,11 +78,11 @@ export function extentOf(doc: Document): Extent | null {
     const skin = node.getSkin();
     if (skin && !binds.has(skin)) binds.set(skin, bindFrame(skin));
     const frame = skin ? binds.get(skin)! : pose;
-    if (!frame) continue;
     const matrix = skin ? IDENTITY : worlds.get(node)!;
     for (const prim of mesh.listPrimitives()) {
       const position = prim.getAttribute("POSITION");
       if (!position || position.getCount() === 0) continue;
+      if (!frame) return null;
       // KHR_mesh_quantization stores normalized integers: decode them to the values the vertices stand for
       const min = position.getMinNormalized([0, 0, 0]);
       const max = position.getMaxNormalized([0, 0, 0]);
@@ -118,41 +98,69 @@ export function extentOf(doc: Document): Extent | null {
 
 /** The model each body shape wears, when the item declares both. */
 function versions(ctx: CheckContext): { male: ParsedModel; female: ParsedModel } | null {
-  const male = ctx.models.find((model) => model.bodyShapes.includes(MALE));
-  const female = ctx.models.find((model) => model.bodyShapes.includes(FEMALE));
+  const male = ctx.models.find((model) => model.bodyShapes.includes(BodyShape.MALE));
+  const female = ctx.models.find((model) => model.bodyShapes.includes(BodyShape.FEMALE));
   return male && female ? { male, female } : null;
 }
 
-const geometries = new WeakMap<Document, Float32Array[]>();
+/** Which comparisons the item's category takes part in: separate versions that must line up, one model that must not pass the hips. */
+function scopeOf(ctx: CheckContext): { compared: boolean; fitted: boolean } {
+  const { comparedCategories, fittedCategories } = ctx.manifest.representations;
+  const category = ctx.category;
+  return {
+    compared: category !== undefined && comparedCategories.includes(category),
+    fitted: category !== undefined && fittedCategories.includes(category)
+  };
+}
 
-/** Every drawn primitive's vertex positions, decoded, in file order (colliders excluded). */
-function geometryOf(doc: Document): Float32Array[] {
-  const cached = geometries.get(doc);
-  if (cached) return cached;
+/** Every drawn primitive's POSITION accessor, in file order (colliders excluded). */
+function positionsOf(doc: Document): Accessor[] {
   const colliders = colliderNodes(doc);
-  const primitives: Float32Array[] = [];
+  const positions: Accessor[] = [];
   for (const node of doc.getRoot().listNodes()) {
     const mesh = node.getMesh();
     if (!mesh || colliders.has(node)) continue;
     for (const prim of mesh.listPrimitives()) {
       const position = prim.getAttribute("POSITION");
-      if (!position) continue;
-      const values = new Float32Array(position.getCount() * 3);
-      const element = [0, 0, 0];
-      for (let i = 0; i < position.getCount(); i++) values.set(position.getElement(i, element), i * 3);
-      primitives.push(values);
+      if (position) positions.push(position);
     }
   }
-  geometries.set(doc, primitives);
-  return primitives;
+  return positions;
 }
 
-/** One model for both bodies: the same file, or the same vertices exported again (another material name, another file name). */
-function sameModel(a: ParsedModel, b: ParsedModel): boolean {
-  if (a === b || a.mainFile === b.mainFile) return true;
-  const left = geometryOf(a.doc);
-  const right = geometryOf(b.doc);
-  return left.length === right.length && left.every((values, i) => values.length === right[i].length && values.every((value, j) => value === right[i][j]));
+/** The same vertex positions (decoded, if quantized) in every primitive. Counts go first, so most separate versions exit before a vertex is decoded. */
+function sameVertices(a: Document, b: Document): boolean {
+  const left = positionsOf(a);
+  const right = positionsOf(b);
+  if (left.length !== right.length || left.some((position, i) => position.getCount() !== right[i].getCount())) return false;
+  const x = [0, 0, 0];
+  const y = [0, 0, 0];
+  return left.every((position, i) => {
+    for (let v = 0; v < position.getCount(); v++) {
+      position.getElement(v, x);
+      right[i].getElement(v, y);
+      if (x[0] !== y[0] || x[1] !== y[1] || x[2] !== y[2]) return false;
+    }
+    return true;
+  });
+}
+
+/** One model for both bodies, or two versions, with where each sits on its body. */
+type Reading = { shared: true; extent: Extent | null } | { shared: false; male: Extent | null; female: Extent | null };
+
+/**
+ * One model is the same file, or the same vertices uploaded again under another file or material name that also sit
+ * at the same place on their bodies. Identical vertices that a node or the inverse bind matrices place differently
+ * (a copy exported at the wrong scale) are two versions, and are compared.
+ */
+function read({ male, female }: { male: ParsedModel; female: ParsedModel }): Reading {
+  if (male.mainFile === female.mainFile) return { shared: true, extent: extentOf(male.doc) };
+  const maleExtent = extentOf(male.doc);
+  const femaleExtent = extentOf(female.doc);
+  const sameExtent = maleExtent?.bottom === femaleExtent?.bottom && maleExtent?.top === femaleExtent?.top;
+  return sameExtent && sameVertices(male.doc, female.doc)
+    ? { shared: true, extent: maleExtent }
+    : { shared: false, male: maleExtent, female: femaleExtent };
 }
 
 const share = (n: number): string => `${Math.round(n * 100)}%`;
@@ -160,37 +168,45 @@ const share = (n: number): string => `${Math.round(n * 100)}%`;
 export const representationsMatch: CheckDefinition = {
   ...meta,
   title: "Male and female versions",
-  describe: "a body garment's male and female versions sit alike on their bodies",
-  explanation: "The male and female avatars differ at the chest, waist and hips. A garment's two versions should sit on their bodies the same way: a version far higher, lower or bigger than the other is usually a broken export, and curators send back waistbands at the wrong height and broken hip seams.",
+  describe: "an upper- or lower-body garment's male and female versions sit alike on their bodies",
+  explanation: "The male and female avatars differ at the chest, waist and hips. The two versions of an upper- or lower-body garment should sit on their bodies the same way: one far higher, lower or bigger than the other is usually a broken export, and curators send back waistbands at the wrong height and broken hip seams. Hair, hats and other items can differ by body on purpose and are not compared.",
   fix: "Wear the item on both base bodies in the Builder preview. If one version is far higher, lower or bigger than the other, fix its scale or position in your 3D tool and upload it again.",
-  details: "Measures each version's lowest and highest point against its own skeleton, from the feet (0) to the head bone (1). A skinned mesh is measured in bind pose: its stored (decoded, if quantized) positions against the head and feet bones its inverse bind matrices place, so the pose the file was saved in does not matter; a mesh without a skin is measured where its node puts it. With separate versions, a gap at either edge above representations.maxEdgeGap warns. With one model for both bodies (the same file, or the same vertex positions uploaded twice), an item in representations.fittedCategories whose bottom edge reaches below representations.hipLine warns; that list is empty today, so one model shared by both bodies is not flagged. Feet, hands and skins share a model by design and are not compared.",
+  details: "Only categories in representations.comparedCategories (upper and lower body today) are compared. Measures each version's lowest and highest point against its own skeleton, from the feet (0) to the head bone (1). A skinned mesh is measured in bind pose: its stored (decoded, if quantized) positions against the head and feet bones its inverse bind matrices place, so the pose the file was saved in does not matter. A mesh without a skin is measured by its bounding box where its node puts it; on a rotated node the box turns with it, so it may measure taller than it is. A version with a mesh whose skin leaves the head or feet bones out of its joints is not measured, and nothing is compared. Separate versions whose top or bottom edge differ by more than representations.maxEdgeGap warn. The same file, or the same vertex positions that also sit at the same place on their bodies, count as one model; a copy that a node or bind transform places differently is compared as a separate version. One model for both bodies warns only in representations.fittedCategories, when its bottom edge reaches below representations.hipLine; that list is empty today, so a shared model is not flagged.",
   categoryDependent: true,
   appliesTo: wearableGeometryOnly,
   measure: (ctx) => {
     const pair = versions(ctx);
     if (!pair) return "one body shape declared";
-    if (sameModel(pair.male, pair.female)) return "one model for both bodies";
-    const male = extentOf(pair.male.doc);
-    const female = extentOf(pair.female.doc);
-    return male && female ? `male ${share(male.bottom)}–${share(male.top)} · female ${share(female.bottom)}–${share(female.top)} of body height` : "no skeleton to measure against";
+    const { compared, fitted } = scopeOf(ctx);
+    const skipped = ctx.category ? `${ctx.category} is not compared` : "category unknown";
+    if (!compared && !fitted) return skipped;
+    const reading = read(pair);
+    if (reading.shared) return "one model for both bodies";
+    if (!compared) return skipped;
+    const { male, female } = reading;
+    return male && female ? `male ${share(male.bottom)}–${share(male.top)} · female ${share(female.bottom)}–${share(female.top)} of body height` : "no head and feet bones to measure against";
   },
   run: (ctx) => {
     const findings: Finding[] = [];
     const pair = versions(ctx);
-    if (!pair || !ctx.category) return findings;
-    const { maxEdgeGap, hipLine, fittedCategories } = ctx.manifest.representations;
-    if (sameModel(pair.male, pair.female)) {
-      if (!fittedCategories.includes(ctx.category)) return findings;
-      const extent = extentOf(pair.male.doc);
-      if (extent && extent.bottom < hipLine) {
-        findings.push(finding(meta, "warning",
-          `"${pair.male.mainFile}" is worn by both body shapes and reaches past the hips (down to ${share(extent.bottom)} of body height). The female body differs at the waist and hips; check the fit on BaseFemale, or upload a fitted female version.`,
-          { where: pair.male.mainFile, measured: share(extent.bottom), limit: `separate versions below ${share(hipLine)}` }));
-      }
+    const { compared, fitted } = scopeOf(ctx);
+    if (!pair || !ctx.category || (!compared && !fitted)) return findings;
+    const { maxEdgeGap, hipLine } = ctx.manifest.representations;
+    const reading = read(pair);
+    if (reading.shared) {
+      const { extent } = reading;
+      if (!fitted || !extent || extent.bottom >= hipLine) return findings;
+      const { male, female } = pair;
+      const worn = male.mainFile === female.mainFile
+        ? `"${male.mainFile}" is worn by both body shapes and reaches`
+        : `"${male.mainFile}" and "${female.mainFile}" are the same model, so both body shapes wear it, and it reaches`;
+      findings.push(finding(meta, "warning",
+        `${worn} past the hips (down to ${share(extent.bottom)} of body height). The female body differs at the waist and hips; check the fit on BaseFemale, or upload a fitted female version.`,
+        { where: female.mainFile, measured: share(extent.bottom), limit: `separate versions below ${share(hipLine)}` }));
       return findings;
     }
-    const male = extentOf(pair.male.doc);
-    const female = extentOf(pair.female.doc);
+    if (!compared) return findings;
+    const { male, female } = reading;
     if (!male || !female) return findings;
     const gap = Math.max(Math.abs(male.top - female.top), Math.abs(male.bottom - female.bottom));
     if (gap > maxEdgeGap) {

@@ -113,7 +113,7 @@
   },
   "representations-match": {
     "file": "src/checks/model/representations-match/index.ts",
-    "line": 12
+    "line": 13
   },
   "skeleton": {
     "file": "src/checks/model/skeleton/index.ts",

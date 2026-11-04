@@ -323,6 +323,7 @@
   },
   "representations": {
     "maxEdgeGap": 0.2,
+    "comparedCategories": ["upper_body", "lower_body"],
     "hipLine": 0.45,
     "fittedCategories": []
   },

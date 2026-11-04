@@ -72,9 +72,14 @@ export interface SyntheticOptions {
   offset?: [number, number, number];
   /**
    * Stand the canonical bones at avatar heights (feet 0.08 m, hips 0.95 m, head 1.6 m) with matching inverse bind
-   * matrices, so the cube's positions are its rest-pose world positions (representation tests).
+   * matrices, so the cube's positions are its rest-pose world positions (representation tests). With
+   * `skinned: false` the bones still stand, and the unskinned cube is drawn where its node puts it.
    */
   standing?: boolean;
+  /** Bones created as nodes but left out of the skin's joints (an exporter that drops bones the mesh doesn't use). */
+  unskinnedBones?: string[];
+  /** Uniform scale on the cube's node: where an unskinned cube is drawn (a skinned mesh ignores its node). */
+  nodeScale?: number;
   /** Bone translations that move named bones away from their bind position: a file saved in another pose (with `standing`). */
   pose?: Record<string, [number, number, number]>;
   /** Store POSITION as normalized int16 (KHR_mesh_quantization); every coordinate must lie within ±1 m. */
@@ -109,6 +114,12 @@ export interface SyntheticOptions {
   /** Quaternion [x, y, z, w] applied to the mesh's root node (Z-up-export heuristic tests). */
   rootRotation?: [number, number, number, number];
 }
+
+/** Bone heights on the standing test skeleton (`standing`); any other bone stands at 1 m. */
+const STANDING: Record<string, [number, number, number]> = {
+  Avatar_Hips: [0, 0.95, 0], Avatar_Head: [0, 1.6, 0], Avatar_Neck: [0, 1.5, 0],
+  Avatar_LeftFoot: [0.1, 0.08, 0], Avatar_RightFoot: [-0.1, 0.08, 0]
+};
 
 /**
  * Builds a minimal valid wearable/emote GLB in memory: a cube skinned to the
@@ -154,6 +165,7 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
   const mesh = doc.createMesh(options.meshName ?? "cube").addPrimitive(prim);
   const meshNode = doc.createNode("cube_node").setMesh(mesh);
   if (options.rootRotation) meshNode.setRotation(options.rootRotation);
+  if (options.nodeScale) meshNode.setScale([options.nodeScale, options.nodeScale, options.nodeScale]);
   scene.addChild(meshNode);
 
   for (let i = 0; i < (options.extraMaterials ?? 0); i++) {
@@ -187,32 +199,34 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
 
   const boneNames = options.bones ?? AVATAR_BONE_NAMES;
   let boneNodes: Node[] = [];
-  if (options.skinned !== false) {
+  // flat under Armature, so each bone's world position is its translation
+  const standingAt = (bone: Node): [number, number, number] => STANDING[bone.getName()] ?? [0, 1, 0];
+  if (options.skinned !== false || options.standing) {
     const armature = doc.createNode("Armature");
     scene.addChild(armature);
     boneNodes = boneNames.map((name) => doc.createNode(name));
     // flat hierarchy under Armature — enough for joint-name checks
     for (const b of boneNodes) armature.addChild(b);
-    const skin = doc.createSkin("skin");
-    for (const b of boneNodes) skin.addJoint(b);
-    meshNode.setSkin(skin);
-    if (options.standing) {
-      // flat under Armature, so each bone's world position is its translation; bind = that position, inverted
-      const heights: Record<string, [number, number, number]> = {
-        Avatar_Hips: [0, 0.95, 0], Avatar_Head: [0, 1.6, 0], Avatar_Neck: [0, 1.5, 0],
-        Avatar_LeftFoot: [0.1, 0.08, 0], Avatar_RightFoot: [-0.1, 0.08, 0]
-      };
-      const inverseBind = new Float32Array(boneNodes.length * 16);
-      boneNodes.forEach((bone, i) => {
-        const t = heights[bone.getName()] ?? [0, 1, 0];
-        bone.setTranslation(t);
-        inverseBind.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -t[0], -t[1], -t[2], 1], i * 16);
-      });
-      skin.setInverseBindMatrices(doc.createAccessor("inverse_bind").setType("MAT4").setArray(inverseBind).setBuffer(buffer));
-    }
+    if (options.standing) for (const bone of boneNodes) bone.setTranslation(standingAt(bone));
     for (const bone of boneNodes) {
       const moved = options.pose?.[bone.getName()];
       if (moved) bone.setTranslation(moved);
+    }
+  }
+  if (options.skinned !== false) {
+    const leftOut = new Set(options.unskinnedBones ?? []);
+    const jointNodes = boneNodes.filter((bone) => !leftOut.has(bone.getName()));
+    const skin = doc.createSkin("skin");
+    for (const b of jointNodes) skin.addJoint(b);
+    meshNode.setSkin(skin);
+    if (options.standing) {
+      // bind = each joint's standing position, inverted
+      const inverseBind = new Float32Array(jointNodes.length * 16);
+      jointNodes.forEach((bone, i) => {
+        const t = standingAt(bone);
+        inverseBind.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -t[0], -t[1], -t[2], 1], i * 16);
+      });
+      skin.setInverseBindMatrices(doc.createAccessor("inverse_bind").setType("MAT4").setArray(inverseBind).setBuffer(buffer));
     }
     const vertexCount = positions.length / 3;
     const sd = options.skinData;

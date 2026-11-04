@@ -85,6 +85,12 @@ export interface Manifest {
   representations: {
     /** A larger gap at the top or bottom edge means one version is at the wrong scale or position. */
     maxEdgeGap: number;
+    /**
+     * Categories whose separate versions are compared against maxEdgeGap. Only upper_body and lower_body were
+     * calibrated (none of 300 approved items warned). Other categories legitimately differ by body: short male hair
+     * with shoulder-length female hair is a 0.26 gap at the bottom edge, and hats, masks and helmets can differ too.
+     */
+    comparedCategories: string[];
     /** A garment whose bottom edge sits below this height reaches past the hips: one model for both bodies rarely fits. */
     hipLine: number;
     /**
