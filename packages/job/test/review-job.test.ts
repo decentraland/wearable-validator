@@ -214,6 +214,17 @@ describe("the review job", () => {
     assert.deepEqual([triangles.rule, triangles.severity, typeof triangles.measured, typeof triangles.limit, typeof triangles.fix], ["M-01", "error", "number", "number", "string"]);
   });
 
+  it("passes a hat up to 10% over its triangle budget, with the overage as a warning the Builder can show", async () => {
+    const nearLimit = await syntheticEntity(await syntheticZip({ glb: await syntheticGlb({ triangles: 1600 }) }), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:3`);
+    const builder = fakeBuilder([nearLimit]);
+    const { reviewJob } = await job(builder);
+    assert.equal(await reviewJob.process(message(envelope(request([item(nearLimit, ITEMS[0])])))), "delete");
+    const body = builder.body();
+    assert.deepEqual([body.verdict, body.items[0].passed], ["passed", true], "the curators' margin: a warning, not a rejection");
+    const triangles = body.items[0].findings.find((finding) => finding.check === "triangle-count")!;
+    assert.deepEqual([triangles.severity, triangles.measured, triangles.limit], ["warning", 1600, 1500]);
+  });
+
   it("asks an unanswered model check again on the views it already drew, so the item still gets its verdict", async () => {
     const builder = fakeBuilder([clean]);
     const reviewer = flakyReviewer({ "visual-quality": 1 });

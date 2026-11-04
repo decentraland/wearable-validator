@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validate } from "../../../index.js";
+import { manifest, validate } from "../../../index.js";
+import { marginText, triangleCount } from "./index.js";
 import { found, status } from "#test/helpers/findings.js";
 import { syntheticGlb } from "#test/helpers/synthetic.js";
 import { wearableZip } from "#test/helpers/wearable-zip.js";
@@ -33,6 +34,19 @@ describe("triangle-count (M-01)", () => {
     const [past] = found(await validate(await wearableZip({ triangles: 1651 }), { checks: ["triangle-count"] }), "triangle-count");
     assert.equal(past.severity, "error");
     assert.match(past.message, /11% over/, "never reads as 10% over while failing");
+  });
+
+  it("words the margin at its own precision, so a failing count never reads as the tolerated share", () => {
+    assert.deepEqual(marginText(0.1, 1650, 1500), { tolerated: "10", over: "10" });
+    assert.deepEqual(marginText(0.1, 1651, 1500), { tolerated: "10", over: "11" });
+    // a margin of 12.5%: 1,125 of 1,000 is within, 1,126 is not and reads 12.6
+    assert.deepEqual(marginText(0.125, 1125, 1000), { tolerated: "12.5", over: "12.5" });
+    assert.deepEqual(marginText(0.125, 1126, 1000), { tolerated: "12.5", over: "12.6" });
+    assert.deepEqual(marginText(0.125, 1124, 1000), { tolerated: "12.5", over: "12.4" });
+  });
+
+  it("states the margin from the rules in its explanation", () => {
+    assert.match(triangleCount.explanation, new RegExp(`Up to ${manifest.triangles.warningMarginRatio * 100}% over the budget is a warning`));
   });
 
   it("applies the margin to the pooled budget, not the category's base", async () => {
