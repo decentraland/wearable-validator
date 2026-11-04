@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createConfigComponent } from "@well-known-components/env-config-provider";
 import { manifest } from "@dcl-regenesislabs/wearable-validator";
 import { createBuilderComponent, SIGNATURE_HEADER, signature, TIMESTAMP_HEADER } from "../src/adapters/builder.js";
-import { asComment, createSlackComponent, itemMessage } from "../src/adapters/slack.js";
+import { asComment, createSlackComponent, itemMessage, sizeText } from "../src/adapters/slack.js";
 import type { IWorkQueueComponent, QueueMessage } from "../src/adapters/work-queue.js";
 import { noModelReviewer } from "../src/adapters/reviewer.js";
 import { collectionResult, createReviewJob, mergeVisual, sizeOf, visualRetryDelays, type CollectionResultBody, type ItemResult } from "../src/logic/review-job.js";
@@ -419,6 +419,19 @@ describe("Slack", () => {
     assert.equal(builder.posts.length, 1, "and the Builder still gets its result");
   });
 
+  it("shows no size for an item whose files could not be downloaded, and the size for the one that could", async () => {
+    const slack = fakeSlack();
+    const builder = fakeBuilder([clean]);
+    const { reviewJob } = await job(builder, [], slack.fetch);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0], { contents: { "model.glb": "bafkreinothere" } }), item(clean, ITEMS[1])]))));
+    const replies = slack.calls.filter((call) => (call.method === "chat.postMessage" && call.body.thread_ts) || call.method === "files.completeUploadExternal");
+    assert.equal(replies.length, 2, "one reply per item");
+    const text = (call: SlackCall): string => (call.method === "chat.postMessage" ? blocksText(call.body) : String(call.body.initial_comment));
+    assert.match(text(replies[0]), /Could not be validated/);
+    assert.doesNotMatch(text(replies[0]), /📦/, "no size without the files");
+    assert.match(text(replies[1]), /📦 \d+\.\d\d \/ 3\.00 MB/);
+  });
+
   it("tells the channel when a request cannot be validated, with the collection and why, and drops nothing unseen", async () => {
     const slack = fakeSlack();
     const builder = fakeBuilder([clean]);
@@ -489,9 +502,11 @@ describe("Slack", () => {
     assert.equal(sizeOf({ ...tropicalMask, itemType: "emote", metadata: { emoteDataADR74: { category: "dance" } } }, files).limit, manifest.fileSize.emoteBytes);
   });
 
-  it("leaves the size out when the files could not be read", () => {
-    const text = asComment(itemMessage(tropicalMask, { itemId: ITEMS[0], contentHash: "bafkreiabc", passed: null, findings: [], error: "download failed" }));
-    assert.doesNotMatch(text, /\ud83d\udce6/);
+  it("reads a few bytes over the ceiling as 3.01, never 3.00 next to a failure", () => {
+    const limit = manifest.fileSize.wearableBytes;
+    assert.equal(sizeText({ bytes: limit + 300, limit }), "3.01 / 3.00 MB");
+    assert.equal(sizeText({ bytes: limit, limit }), "3.00 / 3.00 MB");
+    assert.equal(sizeText({ bytes: limit - 5_000, limit }), "3.00 / 3.00 MB", "under the ceiling it rounds as usual");
   });
 
   it("lists each check once, its male/female copies as one line, the hashed model file as \"the model\" and the shared fix once", () => {

@@ -49,8 +49,15 @@ export interface ItemNotice {
   size?: ItemSize;
 }
 
-/** "2.95 / 3.00 MB": the same total the size check measures, shown on every item so curators and creators read one number. */
-export const sizeText = (size: ItemSize): string => `${(size.bytes / 1048576).toFixed(2)} / ${(size.limit / 1048576).toFixed(2)} MB`;
+/**
+ * "2.95 / 3.00 MB": the same total the size check measures, shown on every item so curators and creators read one
+ * number. Over the ceiling it rounds up, so a few bytes over reads 3.01, never 3.00 next to a failure.
+ */
+export function sizeText(size: ItemSize): string {
+  const mib = size.bytes / 1048576;
+  const shown = size.bytes > size.limit ? Math.ceil(mib * 100) / 100 : Math.round(mib * 100) / 100;
+  return `${shown.toFixed(2)} / ${(size.limit / 1048576).toFixed(2)} MB`;
+}
 
 export interface ISlackComponent {
   readonly enabled: boolean;

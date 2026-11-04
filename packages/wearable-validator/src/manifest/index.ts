@@ -127,11 +127,6 @@ export const AVATAR_CORE_BONE_NAMES: string[] = [
 ];
 
 /**
- * effectiveLimit = base + Σ unique hides' budgets. Hiding the base hands adds their 500 (the docs' hands_wear
- * 1,000 → 1,500); hiding the head counts as hiding every head slot. A helmet, or anything hiding the head, tops out at
- * 4,000 (the docs' helmet rule).
- */
-/**
  * The size ceiling an item is held to (ADR-246): every file counts, thumbnail and rarity image included. Emotes and
  * wearables share one ceiling; skins have their own.
  */
@@ -140,6 +135,11 @@ export function fileSizeLimit(itemType: "wearable" | "emote", category?: string)
   return itemType === "emote" ? sizes.emoteBytes : category === "skin" ? sizes.skinBytes : sizes.wearableBytes;
 }
 
+/**
+ * effectiveLimit = base + Σ unique hides' budgets. Hiding the base hands adds their 500 (the docs' hands_wear
+ * 1,000 → 1,500); hiding the head counts as hiding every head slot. A helmet, or anything hiding the head, tops out at
+ * 4,000 (the docs' helmet rule).
+ */
 export function effectiveTriangleLimit(category: string, hides: string[] = []): number {
   const { perCategory, hiddenHandsBudget, headSlots, hiddenHeadLimit } = manifest.triangles;
   const hidesHead = hides.includes("head");

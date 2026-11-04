@@ -127,7 +127,6 @@ function visualVerdict(visual: Result): boolean | null {
   return visual.checks.some((row) => row.status === "failed") ? false : null;
 }
 
-/** The item's thumbnail, as its metadata names it. */
 /**
  * The item's size as the catalyst counts it — every file once, thumbnail and rarity image included — against its
  * ceiling, so Slack shows the same total the size check measures even when nothing fails. Not part of the Builder's
@@ -139,6 +138,7 @@ export function sizeOf(item: ReviewItem, files: Map<string, Uint8Array>): ItemSi
   return { bytes: uniqueBytesTotal(files.values()), limit: fileSizeLimit(item.itemType, category) };
 }
 
+/** The item's thumbnail, as its metadata names it. */
 function thumbnailOf(item: ReviewItem, files: Map<string, Uint8Array>): Uint8Array | undefined {
   const path = typeof item.metadata.thumbnail === "string" ? item.metadata.thumbnail : "thumbnail.png";
   return files.get(path);
