@@ -78,6 +78,28 @@ export interface Manifest {
     model: string; maxInputTokens: number; maxImages: number; timeoutMs: number; maxRetries: number;
     thinkingBudgetTokens: number; imagePixelsPerToken: number; textCharactersPerToken: number; maxTextLength: number;
   };
+  /**
+   * M-15: the male and female versions of a body garment, each measured against its own skeleton (feet 0, head 1).
+   * Approved items with separate versions differ by at most 0.1 at their top or bottom edge (p99 of 378 sampled).
+   */
+  representations: {
+    /** A larger gap at the top or bottom edge means one version is at the wrong scale or position. */
+    maxEdgeGap: number;
+    /**
+     * Categories whose separate versions are compared against maxEdgeGap. Only upper_body and lower_body were
+     * calibrated (none of 300 approved items warned). Other categories legitimately differ by body: short male hair
+     * with shoulder-length female hair is a 0.26 gap at the bottom edge, and hats, masks and helmets can differ too.
+     */
+    comparedCategories: string[];
+    /** A garment whose bottom edge sits below this height reaches past the hips: one model for both bodies rarely fits. */
+    hipLine: number;
+    /**
+     * Categories where one model worn by both bodies past the hips warns (feet, hands and skins are shared by design).
+     * Empty for now: with upper_body and lower_body it warned on 37 of 300 approved items (12%), mostly long dresses,
+     * coats and costumes curators accepted. Listing categories here turns it on; nothing else changes.
+     */
+    fittedCategories: string[];
+  };
   /** V-01: how much of a capture must be something drawn. */
   renderValid: {
     /** Below this share of the frame a view counts as empty: the item draws nothing (an error, and the model checks skip it). */

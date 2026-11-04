@@ -2,7 +2,7 @@
 
 Decentraland's wearable and emote rule book as code. Hand it a Builder zip, a `.glb` or a published item and it returns every problem at once: what is wrong, where, the measured value against the limit, and how to fix it.
 
-- **35 code checks** (files, model, emote, content) run anywhere: browser or Node.
+- **36 code checks** (files, model, emote, content) run anywhere: browser or Node.
 - **4 visual checks** render the item and ask Claude to judge it. They run on a Node server only (a native Unity render server).
 - **1 code review** (`smart-wearable-code`, group `code`) has Claude read a smart wearable's scene and bundle as text, never running it: it says what the code does, and malicious or spam code fails the item. It needs only the `/ai` reviewer.
 
