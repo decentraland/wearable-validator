@@ -46,7 +46,7 @@ export interface ItemFinding {
 export interface ItemResult {
   itemId: string;
   contentHash: string;
-  /** null: no verdict — the item could not be validated, or a visual check was not answered. */
+  /** null: no verdict, with nothing failed — the item could not be validated, a visual check was not answered, or some checks cannot measure this kind of item. */
   passed: boolean | null;
   findings: ItemFinding[];
   /** What the model saw, one line per visual check it answered. */
@@ -134,7 +134,8 @@ function thumbnailOf(item: ReviewItem, files: Map<string, Uint8Array>): Uint8Arr
 }
 
 export function itemResult(item: ReviewItem, gate: Result, visual: Result): ItemResult {
-  // no verdict from the code checks (a facial feature is PNGs: no model check can measure it) is no verdict for the item
+  // no verdict from the code checks is no verdict for the item: a facial feature without errors (it is PNGs, no model
+  // check can measure it) stays undecided; with an error the code checks already said false
   const passed = gate.passed === false ? false : gate.passed === null ? null : visualVerdict(visual);
   const rows = [...gate.checks, ...visual.checks];
   // undecided only because some checks cannot measure this kind of item, with nothing failed or unanswered: a person
