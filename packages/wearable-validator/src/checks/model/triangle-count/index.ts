@@ -23,9 +23,9 @@ export const triangleCount: CheckDefinition = {
   ...meta,
   title: "Triangle count",
   describe: "Triangle count stays within the per-category budget, including hidden-slot pooling.",
-  explanation: "Each category has a triangle budget (for example 1,500 for upper body, 500 for eyewear). Hiding other categories adds their budget to yours: hiding the base hands adds 500, and an item that hides the whole head may reach 4,000.",
+  explanation: "Each category has a triangle budget (for example 1,500 for upper body, 500 for eyewear). Hiding other categories adds their budget to yours: hiding the base hands adds 500, and an item that hides the whole head may reach 4,000. Up to 10% over the budget is a warning; more than that is rejected.",
   fix: "Reduce geometry in Blender: add a Decimate modifier, delete faces that are never visible (inside the body), and merge tiny details into textures. Hiding other slots adds their budget to yours.",
-  details: "Counts triangles per representation from the mesh data (indices ÷ 3; collider nodes excluded) and compares against the effective budget: the category's base plus every hidden slot's budget, the hidden slots being the representation's overrideHides when it sets them, else the item's hides. Hiding the base hands adds 500; hiding the head counts as hiding every head slot; a helmet, or anything hiding the head, tops out at 4,000.",
+  details: "Counts triangles per representation from the mesh data (indices ÷ 3; collider nodes excluded) and compares against the effective budget: the category's base plus every hidden slot's budget, the hidden slots being the representation's overrideHides when it sets them, else the item's hides. Hiding the base hands adds 500; hiding the head counts as hiding every head slot; a helmet, or anything hiding the head, tops out at 4,000. A count over the budget by at most triangles.warningMarginRatio of it (rounded down) warns; above that it fails.",
   categoryDependent: true,
   appliesTo: wearableGeometryOnly,
   measure: (ctx) => {
@@ -44,10 +44,17 @@ export const triangleCount: CheckDefinition = {
         .reduce((strictest, next) => (next[1] < strictest[1] ? next : strictest));
       if (total > limit) {
         const pooled = hides.length > 0 ? ` (base budget for ${category} plus the hidden slots: ${hides.join(", ")})` : ` for ${category}`;
+        const ratio = ctx.manifest.triangles.warningMarginRatio;
+        const margin = Math.floor(limit * ratio);
+        // rounded up, so a count past the margin never reads as "10% over" next to "up to 10% is accepted"
+        const over = `${Math.ceil(((total - limit) * 100) / limit)}% over`;
+        const within = total <= limit + margin;
         findings.push(
-          finding(meta, "error",
-            `"${model.mainFile}" has ${total} triangles — the limit is ${limit}${pooled}. Remove geometry, or hide more slots to pool their budgets.`,
-            { where: model.mainFile, measured: total, limit, data: { category, hides: [...hides] } })
+          finding(meta, within ? "warning" : "error",
+            within
+              ? `"${model.mainFile}" has ${total} triangles, ${over} the limit of ${limit}${pooled}. Up to ${Math.round(ratio * 100)}% over (${limit + margin}) is accepted with a warning; trim geometry to stay within the budget.`
+              : `"${model.mainFile}" has ${total} triangles, ${over} the limit of ${limit}${pooled}; up to ${Math.round(ratio * 100)}% over (${limit + margin}) is accepted. Remove geometry, or hide more slots to pool their budgets.`,
+            { where: model.mainFile, measured: total, limit, data: { category, hides: [...hides], tolerated: limit + margin } })
         );
       }
       if (hasStripOrFan) {
