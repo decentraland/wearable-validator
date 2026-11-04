@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validate } from "../src/index.js";
+import { checks, validate } from "../src/index.js";
 import { pngBytes, syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
 
 describe("plumbing smoke", () => {
@@ -41,6 +41,33 @@ describe("plumbing smoke", () => {
     const result = await validate(await facial(600), { checks: ["file-format"] });
     assert.ok(result.findings.some((finding) => finding.severity === "error"));
     assert.equal(result.passed, null);
+  });
+
+  it("still never mints a verdict for a subset of groups, errors or not", async () => {
+    const result = await validate(await facial(600), { groups: ["files"] });
+    assert.ok(result.findings.some((finding) => finding.severity === "error"));
+    assert.equal(result.passed, null);
+  });
+
+  it("fails a full run on a broken model: the model checks skip it, file-format errors", async () => {
+    const result = await validate(await syntheticZip({ glb: new TextEncoder().encode("not a real model at all, sorry!!") }));
+    assert.ok(result.checks.some((row) => row.status === "skipped"));
+    assert.ok(result.findings.some((finding) => finding.check === "file-format" && finding.severity === "error"));
+    assert.equal(result.passed, false);
+  });
+
+  it("fails a full run on an error even when another check throws", async () => {
+    const texture = checks["texture-size"];
+    const run = texture.run;
+    texture.run = () => { throw new Error("boom"); };
+    try {
+      const result = await validate(await syntheticZip({ glb: await syntheticGlb({ triangles: 5000 }) }));
+      assert.equal(result.checks.find((row) => row.check === "texture-size")?.status, "errored");
+      assert.ok(result.findings.some((finding) => finding.check === "triangle-count" && finding.severity === "error"));
+      assert.equal(result.passed, false);
+    } finally {
+      texture.run = run;
+    }
   });
 
   it("bad bytes yield a file-format finding, never a throw", async () => {
