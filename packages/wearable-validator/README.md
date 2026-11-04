@@ -20,7 +20,7 @@ import { validate, fixes } from "@dcl-regenesislabs/wearable-validator";
 const bytes = new Uint8Array(await file.arrayBuffer()); // a Builder .zip or a bare .glb
 const result = await validate(bytes);
 
-result.passed; // false on any error; true when everything was checked and passed; null otherwise (a bare .glb, a subset, a skipped check)
+result.passed; // a full run: false on any error, true when everything was checked and passed, null when a check was skipped; a bare .glb or a subset: always null
 for (const finding of result.findings) {
   console.log(finding.severity, finding.message, finding.where, finding.measured, finding.limit);
   console.log("How to fix:", fixes[finding.check], finding.docs);
