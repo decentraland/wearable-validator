@@ -87,7 +87,7 @@ await renderer.stop(); // on shutdown
 
 - `passed`: `true` or `false`; `null` when not everything was checked (a bare `.glb`, a subset of checks, or a row that was `skipped` or `errored`: its `skipReason` says why).
 - `summary`: `{ errors, warnings, checked, skipped }`.
-- `checks[]`: one row per check, with `status` (`passed`, `failed`, `warning`, `skipped` or `errored`), `measured` and `skipReason`.
+- `checks[]`: one row per check, with `status` (`passed`, `failed`, `warning`, `skipped` or `errored`), `measured` and `skipReason`. An `errored` row with `retryable: true` may be answered by running that check again (its model call failed or timed out, or the answer could not be read); without it, running again would end the same way (an inconclusive answer, no model, a request over budget).
 - `findings[]`: `check`, `severity`, `message` (written for creators), `where`, `measured`, `limit`, `rule`, `docs`.
 
 Lookups:

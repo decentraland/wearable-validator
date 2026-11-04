@@ -52,7 +52,12 @@ result.findings;  // every problem at once: message, where, measured vs limit, f
 
 When a creator publishes a collection, the Builder publishes a validation request with every item inline. The queue
 wakes the job; for each item it downloads the files by hash from Builder storage, runs the code checks, renders on the
-native render server (the Unity avatar scene drawn on the CPU, no browser, no GPU) and runs the visual checks. One
+native render server (the Unity avatar scene drawn on the CPU, no browser, no GPU) and runs the visual checks. A visual
+check the model leaves unanswered (a failed, timed-out or rate-limited call, or an answer it cannot read) is asked again
+twice, after 10 s and 30 s, on the views already rendered (`VISUAL_RETRY_DELAYS_MS`; the library adapter's
+`ai.maxRetries`, 0, is the SDK's own retry inside one call and stays off); an inconclusive answer, no model or a
+request over budget is never asked again, and no retry starts once the job is stopping or would outlast its runtime
+budget. One
 result for the collection goes to the Builder's callback, signed (only when `BUILDER_CALLBACK_SECRET` is set), and the job exits once the queue is empty, so it
 costs nothing between collections. With `SLACK_BOT_TOKEN` and `SLACK_CHANNEL` (a channel name) set, each collection is posted to a channel
 with one thread reply per item (every finding, the model's summary, the pictures): the only record the job leaves. The contract: [docs/builder-integration.md](docs/builder-integration.md). What it

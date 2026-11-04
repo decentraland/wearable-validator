@@ -2,23 +2,24 @@
 import { decodePngSafe } from "./images.js";
 
 /**
- * Share of pixels that are not backdrop. The previewer's backdrop is a smooth vertical gradient, so every
- * row is near one color; a pixel farther than `tolerance` (per channel sum / 3) from its row's median is
- * something drawn. Measured on real captures: an item alone reads 12–23 %, a worn avatar 8–13 %.
+ * Share of pixels that are not backdrop. The render server frames the item in the middle of a smooth vertical
+ * gradient, so each row's first pixel is that row's backdrop; a pixel whose red, green or blue sits farther than
+ * `tolerance` from it is something drawn. Channels are compared one by one: a dark red glove (86, 12, 16) is about as
+ * bright as the grey backdrop (50, 50, 50), so a brightness-only test read it as backdrop.
+ * Measured on the job's real captures: an item alone reads 10–38 %, the worn avatar's front view 9–13 %.
  */
 export function subjectRatio(bytes: Uint8Array, tolerance: number): number | undefined {
   const png = decodePngSafe(bytes);
   if (!png || png.depth !== 8 || png.channels < 3) return undefined;
   const { width, height, channels, data } = png;
-  const row = new Int32Array(width);
   let subject = 0;
   for (let y = 0; y < height; y++) {
+    const row = y * width * channels;
+    const [r, g, b] = [data[row], data[row + 1], data[row + 2]];
     for (let x = 0; x < width; x++) {
-      const o = (y * width + x) * channels;
-      row[x] = data[o] + data[o + 1] + data[o + 2];
+      const o = row + x * channels;
+      if (Math.abs(data[o] - r) > tolerance || Math.abs(data[o + 1] - g) > tolerance || Math.abs(data[o + 2] - b) > tolerance) subject++;
     }
-    const median = row.slice().sort()[width >> 1];
-    for (let x = 0; x < width; x++) if (Math.abs(row[x] - median) > tolerance * 3) subject++;
   }
   return subject / (width * height);
 }

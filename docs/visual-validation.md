@@ -14,7 +14,7 @@ that ask the model are not answered. The library's own tests drive both adapters
 
 Ground rules (CLAUDE.md, restated for this phase):
 
-- Adapters fail soft. `Renderer.capture` throws only on renderer crashes (→ `errored`); `Reviewer.review` rejects only on abort and otherwise resolves a `ReviewResult` union (`ok: false` keeps model/usage/raw text); helpers return `T | string` where the string is the creator-facing skip reason — the `appliesTo` `true | "reason"` idiom. No error classes.
+- Adapters fail soft. `Renderer.capture` throws only on renderer crashes (→ `errored`); `Reviewer.review` rejects only on abort and otherwise resolves a `ReviewResult` union (`ok: false` keeps model/usage/raw text, and `retryable: true` when asking again may answer: a failed, timed-out or rate-limited call, or unreadable JSON); helpers return `T | string` where the string is the creator-facing skip reason — the `appliesTo` `true | "reason"` idiom. No error classes.
 - Every number lives once in `manifest.json` (`rendering`, `ai`, `thumbnailHonesty`); code holds structural constants only (job fields, PNG magic) with a one-line why.
 - The prompt is registry metadata: `CheckDefinition.prompt`. A digest pin in the test forces a `promptVersion` bump when the text changes.
 - Node-only code lives only in `/native`, `/ai`, `packages/job` and `tools/`; the job imports the library by package name only. Root entry stays isomorphic (`captures.ts` and the check use `crypto.subtle`, `fast-png`, `image-size`, `jpeg-js`).
@@ -35,7 +35,7 @@ The code in the order a review runs. Files in reading order inside `packages/wea
 | 4 | `captures/BaseMale-avatar-000.png` … | `src/adapters/native.ts` · `createNativeRenderer().capture()` → `groupRequests()` → `jobFor()` | Writes the item's files to the work folder, sends one job per body shape, view, pose and skin to the render server, reads back one PNG per requested view |
 | 5 | `thumbnail-honesty/1-prompt.md` | `src/checks/rendering/thumbnail-honesty/index.ts` · `run()` → `imageLabel()` | `ReviewRequest = { check, prompt: thumbnailPrompt, promptDigest, images: [12 labeled captures, thumbnail last] }` |
 | 6 | `thumbnail-honesty/2-context.json`, `3-answer.json` | `src/adapters/ai.ts` · `createPiReviewer().review()` → `reviewMessages()`, `configurePayload()`, `parseResponse()` | One `complete()` call over OAuth with `output_config` json_schema, thinking 1024, no tools, no retries → `{ ok, answer | reason, metadata }` |
-| 7 | `thumbnail-honesty/4-finding.json` | `src/checks/rendering/thumbnail-honesty/index.ts` · `parseThumbnailAnswer()` → `thumbnailFinding()` | `matches` → passed; `mismatch` → warning findings (`where: thumbnail.png`, `evidence: [{ captureId }]`); `inconclusive`, `ok: false` or malformed → errored with `review` metadata |
+| 7 | `thumbnail-honesty/4-finding.json` | `src/checks/rendering/thumbnail-honesty/index.ts` · `parseThumbnailAnswer()` → `thumbnailFinding()` | `matches` → passed; `mismatch` → warning findings (`where: thumbnail.png`, `evidence: [{ captureId }]`); `inconclusive`, `ok: false` or malformed → errored with `review` metadata (malformed, or a retryable `ok: false`, also `retryable`; inconclusive never) |
 | 8 | `Result` | `src/validate.ts` · `normalizeExecution()`, `computePassed()`; `packages/job/src/logic/review-job.ts` · `itemResult()` | Cross-checks status vs findings, `passed: null` (subset), `Result.captures` and `checks[0].review` populated; the job maps it to the Builder's result |
 
 ---
@@ -86,20 +86,20 @@ Twelve files carry the phase (5 with logic, 5 tests, 1 launcher pair, 1 doc). Ev
 },
 "ai": {                             // the one call, shared by every AI-backed rule — read only by ai.ts (+ maxTextLength by parsers)
   "model": "claude-sonnet-5",
-  "maxInputTokens": 40000, "maxImages": 21, "timeoutMs": 300000, "maxRetries": 0,
+  "maxInputTokens": 40000, "maxImages": 29, "timeoutMs": 300000, "maxRetries": 0,
   "thinkingBudgetTokens": 1024, "imagePixelsPerToken": 750, "textCharactersPerToken": 3, "maxTextLength": 1200
 },
 "thumbnailHonesty": {               // V-05 only — a flat per-topic block beside thumbnail / hands / emote, HEAD style
   "promptVersion": 4, "recipeVersion": 1,
   "views": { "wearable": ["avatar", "wearable"], "emote": ["avatar"] },
   "azimuthDegrees": { "wearable": [0, 90, 180], "emote": [0, 90] },     // 180 added after rear art was mistaken for the front
-  "stress": {                       // V-02's motion pass: worn, front and side, two clip moments per category, skin chroma green
+  "stress": {                       // V-02's motion pass: worn, front and side, running at three moments plus one pose per category, skin chroma green
     "skin": "00ff00", "azimuthDegrees": [0, 90],
-    "poses": { "arms": [dab 0.5, clap 0.5], "legs": [run 0.25, jump 0.75], "head": [head-explode 0.25, dab 0.5], "body": [dab 0.5, run 0.25] },
-    "categoryPoses": { "upper_body": "arms", "lower_body": "legs", "hat": "head", … }   // unlisted categories use "body"
+    "poses": { "arms": [dab 0.5, run 0.25, run 0.5, run 0.75], "hands": [clap 0.5, run 0.25, run 0.5, run 0.75], "legs": [jump 0.75, run 0.25, run 0.5, run 0.75], "head": [head-explode 0.25, dab 0.5, run 0.25, run 0.75], "body": [dab 0.5, run 0.25, run 0.5, run 0.75] },
+    "categoryPoses": { "upper_body": "arms", "hands_wear": "hands", "lower_body": "legs", "hat": "head", … }   // unlisted categories use "body"
   },
   "emoteFractions": [0, 0.25, 0.5, 0.75, 1],           // five moments: the quarter frames are where mid-motion clipping and sliding show
-  "maxCaptures": 20, "maxFindings": 8
+  "maxCaptures": 28, "maxFindings": 8   // 12 rest-pose views + 16 motion frames on two bodies: full, so a new pose needs a bigger budget
 }
 ```
 
@@ -148,7 +148,7 @@ The native render server replaced Chromium on 2026-09-26. Same five sample items
 
 ## 6. What is still open
 
-- Of the Rule Book's larger recipe, the animation clips and the chroma-key clipping pass exist as the motion pass (`rendering.stress`: two clip moments per category, worn, front and side, skin chroma green, judged by `visual-quality`); the 8-step turntable, outfit combinations and contact sheets are not built. The renderer already accepts `pose` on a capture request, so animated poses are a recipe change plus a prompt bump when a labeled fixture set shows rest-pose views miss real clipping.
+- Of the Rule Book's larger recipe, the animation clips and the chroma-key clipping pass exist as the motion pass (`rendering.stress`: running at a quarter, half and three quarters of the stride plus one pose per category, worn, front and side, skin chroma green, judged by `visual-quality`); the 8-step turntable, outfit combinations and contact sheets are not built. The renderer already accepts `pose` on a capture request, so animated poses are a recipe change plus a prompt bump when a labeled fixture set shows rest-pose views miss real clipping.
 - Accuracy is measured on two items only. A labeled set of known-good and known-bad items is the next thing to build before any finding can become more than advisory.
 - Aggregation and policy (`Result.identity`, shadow / advisory / review / block profiles) do not exist; `passed` stays null for every visual run.
 - Idempotency: the Builder may send the same `validationId` again; the job has no store to recognise it and validates it again. Also open: a daily spend cap.

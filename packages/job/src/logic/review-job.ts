@@ -4,6 +4,7 @@
  * queue is empty and exits, so it scales to zero between collections; a message is deleted only once the Builder has
  * the result, so a failure to reach the callback is retried by SQS.
  */
+import { setTimeout as delay } from "node:timers/promises";
 import type { ILoggerComponent } from "@well-known-components/interfaces";
 import { fixes, manifest, registry, validate, type CaptureRecord, type Finding, type Input, type Result, type Reviewer } from "@dcl-regenesislabs/wearable-validator";
 import type { IBuilderComponent } from "../adapters/builder.js";
@@ -18,6 +19,12 @@ const CODE_CHECKS_TIMEOUT_MS = 120_000;
 const MAX_CONSECUTIVE_RECEIVE_FAILURES = 5;
 // the checks that need the renderer or the model: run after the code checks, with both
 const MODEL_CHECKS = registry.filter((check) => check.group === "rendering" || check.group === "code").map((check) => check.name);
+// a model check the model did not answer — its row is errored and `retryable`: the call failed, timed out or was rate
+// limited, or the answer could not be read — is asked again after each of these waits, on the views already rendered.
+// An inconclusive answer, no model, a request over budget or an unavailable model is never asked again: the same
+// question would end the same way. Configurable as VISUAL_RETRY_DELAYS_MS; the library adapter's ai.maxRetries (0) is
+// the SDK's own retry inside one call and stays off, so this is the only retry policy.
+export const VISUAL_RETRY_DELAYS_MS = [10_000, 30_000];
 // the file an item's finding points at starts with its body shape's folder: `male/shirt.glb` or `"male/shirt.glb" › Albedo`
 const BODY_SHAPE = /^"?(male|female)\//i;
 
@@ -71,6 +78,10 @@ export interface ReviewJobComponents {
   renderer: IRendererComponent;
   reviewer: Reviewer;
   slack: ISlackComponent;
+  /** Waits before asking unanswered model checks again, one retry each (default VISUAL_RETRY_DELAYS_MS); [] turns retries off. */
+  visualRetryDelaysMs?: number[];
+  /** Waits `ms`, or less once `signal` aborts (stop() was called). Tests pass one that returns at once. */
+  sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
 }
 
 export interface DrainOptions {
@@ -80,6 +91,18 @@ export interface DrainOptions {
 }
 
 const numeric = (value: number | string | undefined): number | undefined => (typeof value === "number" ? value : undefined);
+
+/** VISUAL_RETRY_DELAYS_MS as the job reads it: comma-separated whole milliseconds; empty turns retries off; unset is the default. */
+export function visualRetryDelays(value: string | undefined): number[] {
+  if (value === undefined) return VISUAL_RETRY_DELAYS_MS;
+  if (value.trim() === "") return [];
+  const delays = value.split(",").map((part) => (/^\s*\d+\s*$/.test(part) ? Number(part) : NaN));
+  if (delays.some((ms) => !Number.isSafeInteger(ms))) throw new Error(`VISUAL_RETRY_DELAYS_MS must be comma-separated whole milliseconds, such as 10000,30000, or empty for no retries; got "${value}".`);
+  return delays;
+}
+
+/** The checks worth asking the model again: unanswered, and the library says another try may answer them. */
+const unanswered = (visual: Result): string[] => visual.checks.filter((row) => row.status === "errored" && row.retryable).map((row) => row.check);
 
 function itemFinding(finding: Finding): ItemFinding {
   const shape = BODY_SHAPE.exec(finding.where ?? "")?.[1]?.toLowerCase() as ItemFinding["bodyShape"];
@@ -130,6 +153,32 @@ export function itemResult(item: ReviewItem, gate: Result, visual: Result): Item
   };
 }
 
+/**
+ * The first visual run with the checks asked again replacing theirs: their rows and their findings. A view is the
+ * capture it was requested as (its request key): the retry is handed the first run's views and returns them, so only a
+ * view the first run never drew is added, and none is listed twice. `passed` is null, as for any subset of the checks:
+ * the item's verdict comes from the merged rows (visualVerdict).
+ */
+export function mergeVisual(first: Result, again: Result): Result {
+  const redone = new Map(again.checks.map((row) => [row.check, row]));
+  const checks = first.checks.map((row) => redone.get(row.check) ?? row);
+  const findings = [...first.findings.filter((finding) => !redone.has(finding.check)), ...again.findings];
+  const drawn = new Set(first.captures.map((capture) => capture.request.key));
+  const captures = [...first.captures, ...again.captures.filter((capture) => !drawn.has(capture.request.key))];
+  return {
+    passed: null,
+    checks,
+    findings,
+    captures,
+    summary: {
+      errors: findings.filter((f) => f.severity === "error").length,
+      warnings: findings.filter((f) => f.severity === "warning").length,
+      checked: checks.filter((row) => row.status !== "skipped").length,
+      skipped: checks.filter((row) => row.status === "skipped").length
+    }
+  };
+}
+
 export function collectionResult(request: ValidationRequest, items: ItemResult[]): CollectionResultBody {
   const base = { validationId: request.validationId, collectionId: request.collectionId, rulesVersion: manifest.version, items };
   const undecided = items.filter((item) => item.passed === null);
@@ -139,14 +188,49 @@ export function collectionResult(request: ValidationRequest, items: ItemResult[]
 
 export function createReviewJob(components: ReviewJobComponents) {
   const { logs, queue, builder, renderer, reviewer, slack } = components;
+  const retryDelaysMs = components.visualRetryDelaysMs ?? VISUAL_RETRY_DELAYS_MS;
+  const sleep = components.sleep ?? ((ms: number, signal: AbortSignal) => delay(ms, undefined, { signal }).catch(() => {}));
   const log = logs.getLogger("review-job");
   let stopping = false;
+  // stop() aborts it: a wait before a retry ends at once
+  const stopped = new AbortController();
+  // drain() sets it: a retry is started only if it fits in what is left of the runtime budget
+  let deadline = Infinity;
 
-  /** Renders and reviews one item; the render server is started for it and stopped after, whatever happens. */
+  /** Why the checks are not asked again now, or undefined when they are. */
+  function noRetry(checks: string[], delayMs: number): string | undefined {
+    if (stopping) return "the job is stopping";
+    // the checks run in series, and in a provider slowdown each call lasts the adapter's whole timeout: a retry is
+    // started only if its wait plus that worst case ends before the runtime budget does
+    if (Date.now() + delayMs + checks.length * manifest.ai.timeoutMs > deadline) return "the runtime budget left is too short";
+    return undefined;
+  }
+
+  /**
+   * Renders and reviews one item; the render server is started for it and stopped after, whatever happens. A model
+   * check left unanswered is asked again while the server is still up, reusing the views it already drew, so one
+   * failed call does not leave the item without a verdict.
+   */
   async function renderAndReview(item: ReviewItem, input: Input): Promise<Result> {
     const drawer = await renderer.forItem(item.itemId);
     try {
-      return await validate(input, { checks: MODEL_CHECKS, services: { renderer: drawer, reviewer } });
+      let visual = await validate(input, { checks: MODEL_CHECKS, services: { renderer: drawer, reviewer } });
+      for (const delayMs of retryDelaysMs) {
+        const checks = unanswered(visual);
+        if (checks.length === 0) break;
+        const skip = noRetry(checks, delayMs);
+        if (skip) {
+          log.warn("not asking the model again", { item: item.itemId, checks: checks.join(","), reason: skip });
+          break;
+        }
+        log.info("asking the model again", { item: item.itemId, checks: checks.join(","), afterMs: delayMs });
+        await sleep(delayMs, stopped.signal);
+        if (stopping) break;
+        visual = mergeVisual(visual, await validate(input, { checks, services: { renderer: drawer, reviewer }, captures: visual.captures }));
+      }
+      const stillUnanswered = visual.checks.filter((row) => row.status === "errored").map((row) => `${row.check}${row.retryable ? "" : " (not retryable)"}`);
+      if (stillUnanswered.length) log.warn("model checks still unanswered", { item: item.itemId, checks: stillUnanswered.join(",") });
+      return visual;
     } finally {
       await drawer.stop().catch(() => {});
     }
@@ -215,12 +299,14 @@ export function createReviewJob(components: ReviewJobComponents) {
 
   return {
     process,
+    /** The collection in hand finishes, with no more waits or retries; then the drain ends. */
     stop(): void {
       stopping = true;
+      stopped.abort();
     },
     /** Works through the queue until it is empty, the runtime budget is spent or stop() is called. */
     async drain(options: DrainOptions): Promise<number> {
-      const deadline = Date.now() + options.maxRuntimeMs;
+      deadline = Date.now() + options.maxRuntimeMs;
       let processed = 0;
       let empty = 0;
       let failures = 0;

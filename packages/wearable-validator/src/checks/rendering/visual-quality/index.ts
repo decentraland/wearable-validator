@@ -3,7 +3,7 @@
  * twelve captures thumbnail-honesty uses plus the motion pass (stress poses, green skin). One prompt, one model call, findings tagged with the rule they map to.
  */
 import { captureLabel, recipeRequests, rendererBuild, resolveCaptures, stressRequests } from "../../../logic/captures.js";
-import { askReviewer, boundedText, coversEveryImage, errored, isExecution, knownIds, object, skipped } from "../../../logic/review.js";
+import { askReviewer, boundedText, coversEveryImage, errored, isExecution, knownIds, object, skipped, unreadable } from "../../../logic/review.js";
 import { manifest } from "../../../manifest/index.js";
 import { finding, type CheckDefinition, type CheckMeta, type Prompt, type ReviewImage } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -94,7 +94,7 @@ export const visualQuality: CheckDefinition = {
   describe: "no clipping, broken skinning, texture defects or wrong scale in the rendered views",
   explanation: "What players see on the avatar has to look right: no skin poking through the garment, no stretched or floating parts, no missing textures or inside-out faces, and a size that fits the body. These are the defects curators most often send back.",
   fix: "Check the item on both body shapes in the Builder preview: fix clipping by adjusting the mesh or hiding the affected body part, re-weight stretched vertices to the right bones, embed and assign every texture, flip inverted normals, and export at avatar scale (about 2 m tall).",
-  details: "Sends the twelve captures thumbnail-honesty already took (worn and alone, front, side and back, both body shapes) plus the motion pass (worn, front and side, at two clip moments chosen for the category, skin in chroma green so skin through cloth shows) to one pinned vision model with a versioned prompt. Each reported defect names its aspect and cites the captures that show it; the aspect decides which rule-book ID the finding carries (clipping V-02, skinning V-03, texture V-04, scale V-06). Advisory: findings are warnings for a human to weigh.",
+  details: "Sends the twelve captures thumbnail-honesty already took (worn and alone, front, side and back, both body shapes) plus the motion pass (worn, front and side, running at a quarter, half and three quarters of the stride plus one pose chosen for the category, skin in chroma green so skin through cloth shows) to one pinned vision model with a versioned prompt. Each reported defect names its aspect and cites the captures that show it; the aspect decides which rule-book ID the finding carries (clipping V-02, skinning V-03, texture V-04, scale V-06). Advisory: findings are warnings for a human to weigh.",
   prompt: visualQualityPrompt,
   appliesTo: (ctx) =>
     ctx.itemType !== "wearable" ? "emotes are reviewed by emote-quality"
@@ -117,7 +117,8 @@ export const visualQuality: CheckDefinition = {
     const outcome = await askReviewer(ctx, meta.name, visualQualityPrompt, images);
     if (isExecution(outcome)) return outcome;
     const answer = parseVisualQualityAnswer(outcome.answer, images.map((image) => image.id), { maxFindings: ctx.manifest.visualQuality.maxFindings, maxTextLength: ctx.manifest.ai.maxTextLength });
-    if (typeof answer === "string") return errored(answer, outcome.metadata);
+    if (typeof answer === "string") return unreadable(answer, outcome.metadata);
+    // inconclusive is the model's answer, not a failed call: never retryable, or asking again would shop for a verdict
     if (answer.verdict === "inconclusive") return errored(answer.summary, outcome.metadata);
     const measured = `Reviewed ${captures.length} rendered views. ${answer.summary}`;
     if (answer.verdict === "ok") return { status: "passed", coverage: "complete", findings: [], measured, review: outcome.metadata };

@@ -38,14 +38,14 @@ const ok = (request: ReviewRequest): ReviewResult => ({
 });
 
 describe("visual-quality (V-02 · V-03 · V-04 · V-06)", () => {
-  it("reviews the twelve captures thumbnail-honesty takes plus the eight-frame motion pass, with no thumbnail, and passes on ok", async () => {
+  it("reviews the twelve captures thumbnail-honesty takes plus the sixteen-frame motion pass, with no thumbnail, and passes on ok", async () => {
     const mock = services(ok);
     const result = await validate(await syntheticZip(), { ...CHECK, services: mock });
     assert.equal(result.checks[0].status, "passed");
-    assert.deepEqual(mock.rendered, [20]);
-    assert.equal(mock.reviews[0].images.length, 20);
+    assert.deepEqual(mock.rendered, [28]);
+    assert.equal(mock.reviews[0].images.length, 28);
     const stress = mock.reviews[0].images.filter((image) => image.label.includes("bright green"));
-    assert.equal(stress.length, 8);
+    assert.equal(stress.length, 16);
     // the synthetic item is a hat: the head poses
     const head = manifest.rendering.stress.poses[manifest.rendering.stress.categoryPoses.hat].map((pose) => pose.clip);
     assert.ok(stress.every((image) => head.some((clip) => image.label.includes(`pose ${clip}`))));
@@ -54,14 +54,14 @@ describe("visual-quality (V-02 · V-03 · V-04 · V-06)", () => {
     assert.equal(result.passed, null);
   });
 
-  it("shares captures with render-valid and thumbnail-honesty: one render batch of twenty, two model calls", async () => {
+  it("shares captures with render-valid and thumbnail-honesty: one render batch of twenty-eight, two model calls", async () => {
     const mock = services(ok);
     mock.reviewer.review = async (request) =>
       request.check === "thumbnail-honesty"
         ? { ok: true, answer: { verdict: "matches", summary: "Same.", reviewedCaptureIds: request.images.map((image) => image.id), findings: [] }, metadata: metadata(request) }
         : ok(request);
     const result = await validate(await syntheticZip(), { groups: ["rendering"], services: mock });
-    assert.deepEqual(mock.rendered, [20]);
+    assert.deepEqual(mock.rendered, [28]);
     assert.deepEqual(result.checks.map((row) => `${row.check}:${row.status}`), ["render-valid:passed", "thumbnail-honesty:passed", "visual-quality:passed"]);
   });
 
@@ -88,13 +88,26 @@ describe("visual-quality (V-02 · V-03 · V-04 · V-06)", () => {
     assert.equal(result.findings[0].where, "model.glb");
   });
 
+  it("marks an unanswered row retryable, never an inconclusive answer or a failure that would repeat", async () => {
+    const row = async (answer: (request: ReviewRequest) => ReviewResult) => (await validate(await syntheticZip(), { ...CHECK, services: services(answer) })).checks[0];
+    const dropped = await row((request) => ({ ok: false, reason: "The review did not finish (error). 529 overloaded_error", metadata: metadata(request), retryable: true }));
+    assert.deepEqual([dropped.status, dropped.retryable], ["errored", true], "a failed call");
+    const unreadable = await row((request) => ({ ok: true, answer: { verdict: "ok", summary: "Fine.", reviewedCaptureIds: [], findings: [] }, metadata: metadata(request) }));
+    assert.deepEqual([unreadable.status, unreadable.retryable], ["errored", true], "an answer that does not cover the views");
+    const inconclusive = await row((request) => ({ ok: true, answer: { verdict: "inconclusive", summary: "The item is too small to judge.", reviewedCaptureIds: request.images.map((image) => image.id), findings: [] }, metadata: metadata(request) }));
+    assert.deepEqual([inconclusive.status, inconclusive.retryable], ["errored", undefined], "the model declined to judge: its answer, not a failure");
+    const overBudget = await row((request) => ({ ok: false, reason: "The review needs about 900000 input tokens; the budget is 100000. Reduce the evidence size.", metadata: metadata(request) }));
+    assert.deepEqual([overBudget.status, overBudget.retryable], ["errored", undefined], "the reviewer did not call it retryable");
+    assert.equal("retryable" in (await row(ok)), false, "only errored rows carry it");
+  });
+
   it("is not applicable to emotes and skips without a reviewer", async () => {
     const mock = services(ok);
     const emote = await validate(await syntheticZip({ kind: "emote" }), { ...CHECK, services: mock });
     assert.equal(emote.checks.length, 0);
     const noReviewer = await validate(await syntheticZip(), { ...CHECK, services: { renderer: mock.renderer } });
     assert.equal(noReviewer.checks[0].status, "skipped");
-    assert.equal(noReviewer.captures.length, 20);
+    assert.equal(noReviewer.captures.length, 28);
   });
 
   it("rejects answers it cannot trust", () => {

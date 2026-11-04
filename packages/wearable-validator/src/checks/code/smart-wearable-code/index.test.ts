@@ -47,13 +47,21 @@ describe("smart-wearable-code (S-12)", () => {
   });
 
   it("gives no verdict when it cannot tell, when the model cites a file it was not given, or when the code is too large to send", async () => {
-    const inconclusive = reviewer(() => ({ verdict: "inconclusive", summary: "The bundle decodes a payload it never shows.", findings: [] }));
-    assert.equal((await validate(await smart(), { ...CHECK, services: inconclusive.services })).checks[0].status, "errored");
-    const invented = reviewer(() => ({ verdict: "spam", summary: "Ads.", findings: [{ kind: "spam", message: "Shows ads.", fileId: "other.js", excerpt: "ad()" }] }));
-    assert.equal((await validate(await smart(), { ...CHECK, services: invented.services })).checks[0].status, "errored");
+    const row = async (mock: ReturnType<typeof reviewer>, bundle?: Uint8Array) => (await validate(await smart(bundle), { ...CHECK, services: mock.services })).checks[0];
+    // too obscure to review goes to a curator: asking again must not let a later "ok" pass it
+    const inconclusive = await row(reviewer(() => ({ verdict: "inconclusive", summary: "The bundle decodes a payload it never shows.", findings: [] })));
+    assert.deepEqual([inconclusive.status, inconclusive.retryable], ["errored", undefined]);
+    // the model flagged the code but cited a file it was not given: a curator decides, since a second answer could say "ok"
+    const invented = await row(reviewer(() => ({ verdict: "spam", summary: "Ads.", findings: [{ kind: "spam", message: "Shows ads.", fileId: "other.js", excerpt: "ad()" }] })));
+    assert.deepEqual([invented.status, invented.retryable], ["errored", undefined]);
+    const unsupported = await row(reviewer(() => ({ verdict: "malicious", summary: "Steals the wallet.", findings: [] })));
+    assert.deepEqual([unsupported.status, unsupported.retryable], ["errored", undefined], "malicious without findings is still the model flagging the code");
+    // an "ok" the rule cannot read is no answer: asking again may get one
+    const garbled = await row(reviewer(() => ({ verdict: "ok", summary: "Fine.", findings: [{ kind: "spam", message: "x", fileId: "other.js", excerpt: "x" }] })));
+    assert.deepEqual([garbled.status, garbled.retryable], ["errored", true]);
     const huge = reviewer(() => ({ verdict: "ok", summary: "-", findings: [] }));
-    const result = await validate(await smart(new Uint8Array(manifest.smartWearableCode.maxCodeBytes + 1).fill(32)), { ...CHECK, services: huge.services });
-    assert.equal(result.checks[0].status, "errored");
+    const tooLarge = await row(huge, new Uint8Array(manifest.smartWearableCode.maxCodeBytes + 1).fill(32));
+    assert.deepEqual([tooLarge.status, tooLarge.retryable], ["errored", undefined], "the same bundle is over the same cap");
     assert.equal(huge.reviews.length, 0, "a bundle over the cap is never sent");
   });
 
