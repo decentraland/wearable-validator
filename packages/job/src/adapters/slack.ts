@@ -35,11 +35,28 @@ export interface SlackMessage {
   blocks: Block[];
 }
 
+/** The item's size as the catalyst counts it (every file once, thumbnail and rarity image included) and its ceiling. */
+export interface ItemSize {
+  bytes: number;
+  limit: number;
+}
+
 export interface ItemNotice {
   item: ReviewItem;
   result: ItemResult;
   thumbnail?: Uint8Array;
   captures: CaptureRecord[];
+  size?: ItemSize;
+}
+
+/**
+ * "2.95 / 3.00 MB": the same total the size check measures, shown on every item so curators and creators read one
+ * number. Over the ceiling it rounds up, so a few bytes over reads 3.01, never 3.00 next to a failure.
+ */
+export function sizeText(size: ItemSize): string {
+  const mib = size.bytes / 1048576;
+  const shown = size.bytes > size.limit ? Math.ceil(mib * 100) / 100 : Math.round(mib * 100) / 100;
+  return `${shown.toFixed(2)} / ${(size.limit / 1048576).toFixed(2)} MB`;
 }
 
 export interface ISlackComponent {
@@ -177,11 +194,12 @@ function checkLines(entry: ReportCheck): string {
 }
 
 /** One item's reply: its verdict, what to fix, what to look at, then the model's review in one line. */
-export function itemMessage(item: ReviewItem, result: ItemResult): SlackMessage {
+export function itemMessage(item: ReviewItem, result: ItemResult, size?: ItemSize): SlackMessage {
   const name = itemName(item);
   const report = itemReport(item, result);
   const blocks: Block[] = [{ type: "header", text: { type: "plain_text", text: cut(name, HEADER_MAX) } }];
-  blocks.push(section(`*${itemVerdict(result)}* · ${counts(item, result)}${result.error ? `\n${inertMrkdwn(result.error)}` : ""}`));
+  const weight = size ? ` · 📦 ${sizeText(size)}` : "";
+  blocks.push(section(`*${itemVerdict(result)}* · ${counts(item, result)}${weight}${result.error ? `\n${inertMrkdwn(result.error)}` : ""}`));
   for (const [title, severity] of [["To fix", "error"], ["Worth a look", "warning"]] as const) {
     const entries = report.checks.filter((entry) => entry.severity === severity);
     if (entries.length === 0) continue;
@@ -198,7 +216,7 @@ export function itemMessage(item: ReviewItem, result: ItemResult): SlackMessage 
     blocks.push(section(`*Model review* ${report.modelReview.map((review) => `${MARK[review.outcome]} ${escapeMrkdwn(review.title)}`).join(" · ")}`));
   }
   blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: cut(`item ${item.itemId} · content ${item.contentHash}`, SECTION_MAX) }] });
-  return { text: `${name} — ${itemVerdict(result)} · ${counts(item, result)}`, blocks };
+  return { text: `${name} — ${itemVerdict(result)} · ${counts(item, result)}${size ? ` · ${sizeText(size)}` : ""}`, blocks };
 }
 
 /** A message's blocks as one mrkdwn comment, so an upload carries the text above its pictures in a single message. */
@@ -353,7 +371,7 @@ export async function createSlackComponent(components: SlackComponents): Promise
       }
     },
     async itemValidated(ts, notice) {
-      const message = itemMessage(notice.item, notice.result);
+      const message = itemMessage(notice.item, notice.result, notice.size);
       try {
         // the findings are the record: pictures that cannot be uploaded leave a text-only reply, never none
         const files = await uploadImages(notice).catch((error: unknown) => {
