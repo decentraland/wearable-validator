@@ -13,7 +13,7 @@ export const fileSize: CheckDefinition = {
   explanation: "The full item — model, thumbnail and rarity image included — must stay under 3 MB (9 MB for skins) so it loads fast in-world.",
   fix: "Shrink textures first (biggest win): halve them (1024×1024 → 512×512) and re-bake. Then remove unused geometry and merge duplicated meshes. The thumbnail and rarity image count toward the limit too.",
   details:
-    "Sums the actual file bytes — model, thumbnail and rarity image included (ADR-246), each identical file once, as the catalyst counts a deployment by unique content hash — against the per-category ceiling, plus the model-alone headroom rule so nothing passes here and fails at deploy.",
+    "Sums the actual file bytes — model, thumbnail and rarity image included (ADR-246), each identical file once, as the catalyst counts a deployment by unique content hash — against the per-category ceiling. A wearable's model alone must also stay fileSize.modelHeadroomBytes under that ceiling; an emote has no per-model rule (fileSize.emoteModelHeadroomBytes is 0), only its total.",
   measure: (ctx) => `${mb(uniqueBytesTotal(ctx.files.values()))} MB total`,
   categoryDependent: true,
   run: (ctx) => {
@@ -35,7 +35,10 @@ export const fileSize: CheckDefinition = {
       );
     }
 
-    const modelLimit = limit - sizes.modelHeadroomBytes;
+    // emotes have no per-model rule: the total above, thumbnail included, is the whole limit (curators' decision)
+    const headroom = ctx.itemType === "emote" ? sizes.emoteModelHeadroomBytes : sizes.modelHeadroomBytes;
+    if (headroom <= 0) return findings;
+    const modelLimit = limit - headroom;
     for (const path of modelFileCandidates(ctx)) {
       const bytes = ctx.files.get(path);
       if (bytes && bytes.length > modelLimit) {

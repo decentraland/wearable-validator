@@ -3,11 +3,19 @@ import manifestJson from "./manifest.json" with { type: "json" };
 export interface Manifest {
   version: string;
   triangles: { default: number; perCategory: Record<string, number>; hiddenHandsBudget: number; headSlots: string[]; hiddenHeadLimit: number };
-  textures: { default: number; skin: number; maxSize: number; facialMaxSize: number };
+  textures: {
+    default: number; skin: number; maxSize: number;
+    /** Eyes, eyebrows and mouth PNGs: 512×512 since the curators' decision (Nov 2026); it was 256×256. */
+    facialMaxSize: number;
+  };
   materials: { default: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];
   fileSize: {
-    wearableBytes: number; skinBytes: number; emoteBytes: number; modelHeadroomBytes: number;
+    wearableBytes: number; skinBytes: number; emoteBytes: number;
+    /** A wearable's model alone must stay this far under the item ceiling. 0 means no per-model rule: only the total counts. */
+    modelHeadroomBytes: number;
+    /** The same for emotes: 0, so an emote is held only to its item total, thumbnail included (curators' decision, Nov 2026). */
+    emoteModelHeadroomBytes: number;
     thumbnailBytes: number; thumbnailMaxSize: number;
     smartWearableVideoBytes: number; audioBytes: number; maxInputBytes: number;
     /** Zip bounds, checked against the declared sizes before inflating and against the real bytes while inflating. */
