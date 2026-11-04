@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validate } from "../../../index.js";
+import { manifest, validate } from "../../../index.js";
 import { found, status } from "#test/helpers/findings.js";
 import { syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
 import { invert } from "./index.js";
@@ -25,6 +25,17 @@ async function separate(category: string, male: Uint8Array, female: Uint8Array) 
 
 async function shared(category: string, glb: Uint8Array) {
   return syntheticZip({ glb, manifest: wearable(category, [{ bodyShapes: [MALE, FEMALE], mainFile: "model.glb", contents: ["model.glb"] }]) });
+}
+
+/** The shared-model warning ships off (an empty list): these tests list the body garments to exercise it. */
+async function withFittedCategories<T>(run: () => Promise<T>): Promise<T> {
+  const before = manifest.representations.fittedCategories;
+  manifest.representations.fittedCategories = ["upper_body", "lower_body"];
+  try {
+    return await run();
+  } finally {
+    manifest.representations.fittedCategories = before;
+  }
 }
 
 describe("representations-match (M-15)", () => {
@@ -58,8 +69,15 @@ describe("representations-match (M-15)", () => {
     assert.equal(result.checks[0].measured, bind.checks[0].measured);
   });
 
-  it("warns when one model is worn by both bodies and reaches past the hips", async () => {
+  it("does not flag one model worn by both bodies while no category is listed as fitted", async () => {
+    assert.deepEqual(manifest.representations.fittedCategories, [], "the shared-model warning ships off");
     const result = await validate(await shared("lower_body", await pants()), { checks: ["representations-match"] });
+    assert.equal(status(result, "representations-match"), "passed");
+    assert.equal(result.checks[0].measured, "one model for both bodies");
+  });
+
+  it("warns when one model is worn by both bodies and reaches past the hips, once its category is listed", async () => {
+    const result = await withFittedCategories(async () => validate(await shared("lower_body", await pants()), { checks: ["representations-match"] }));
     const [warning] = found(result, "representations-match");
     assert.equal(warning.severity, "warning");
     assert.match(warning.message, /worn by both body shapes and reaches past the hips/);
@@ -67,7 +85,7 @@ describe("representations-match (M-15)", () => {
 
   it("treats the same mesh uploaded twice as one model, even with another material name", async () => {
     const copy = await syntheticGlb({ standing: true, scale: 0.85, offset: [0, 0.07, 0], materialName: "Female_MAT" });
-    const result = await validate(await separate("lower_body", await pants(), copy), { checks: ["representations-match"] });
+    const result = await withFittedCategories(async () => validate(await separate("lower_body", await pants(), copy), { checks: ["representations-match"] }));
     assert.equal(result.checks[0].measured, "one model for both bodies");
     const [warning] = found(result, "representations-match");
     assert.match(warning.message, /worn by both body shapes and reaches past the hips/);
@@ -89,7 +107,7 @@ describe("representations-match (M-15)", () => {
 
   it("leaves a short top that both bodies share alone", async () => {
     const top = await syntheticGlb({ standing: true, scale: 0.5, offset: [0, 0.9, 0] });
-    const result = await validate(await shared("upper_body", top), { checks: ["representations-match"] });
+    const result = await withFittedCategories(async () => validate(await shared("upper_body", top), { checks: ["representations-match"] }));
     assert.equal(status(result, "representations-match"), "passed");
   });
 

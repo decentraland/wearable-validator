@@ -87,7 +87,11 @@ export interface Manifest {
     maxEdgeGap: number;
     /** A garment whose bottom edge sits below this height reaches past the hips: one model for both bodies rarely fits. */
     hipLine: number;
-    /** Categories whose fit differs between the bodies (feet, hands and skins are shared by design). */
+    /**
+     * Categories where one model worn by both bodies past the hips warns (feet, hands and skins are shared by design).
+     * Empty for now: with upper_body and lower_body it warned on 37 of 300 approved items (12%), mostly long dresses,
+     * coats and costumes curators accepted. Listing categories here turns it on; nothing else changes.
+     */
     fittedCategories: string[];
   };
   /** V-01: how much of a capture must be something drawn. */

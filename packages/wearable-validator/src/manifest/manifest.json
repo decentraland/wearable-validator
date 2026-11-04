@@ -324,7 +324,7 @@
   "representations": {
     "maxEdgeGap": 0.2,
     "hipLine": 0.45,
-    "fittedCategories": ["upper_body", "lower_body"]
+    "fittedCategories": []
   },
   "renderValid": {
     "minSubjectRatio": 0.0005,
