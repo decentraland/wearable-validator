@@ -1,5 +1,5 @@
 {
-  "version": "0.7.1",
+  "version": "0.8.1",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -20,7 +20,8 @@
     },
     "hiddenHandsBudget": 500,
     "headSlots": ["mask", "eyewear", "earring", "tiara", "top_head", "facial_hair", "hat", "helmet", "hair"],
-    "hiddenHeadLimit": 4000
+    "hiddenHeadLimit": 4000,
+    "warningMarginRatio": 0.1
   },
   "textures": {
     "default": 2,

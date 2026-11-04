@@ -80,6 +80,9 @@ Published on the events topic, one per collection and attempt:
 - An item that could not be validated carries `error` with why; the others are still reported.
 - Findings carry `bodyShape` (`male` / `female`) when they point at one body shape's file, and `measured` / `limit`
   only when they are numbers.
+- `measured > limit` does not mean the item fails: read `severity`. A `warning` can exceed its `limit`; for example
+  a triangle count up to 10% over its budget (`triangles.warningMarginRatio` in the rules) is a warning and the
+  item passes. Show it as something to look at, not as a violation.
 - Retries: on a network error, a 5xx, a 408 or a 429 the job tries again with backoff; any other answer is final.
   Answer 204, also for a result you already have.
 
