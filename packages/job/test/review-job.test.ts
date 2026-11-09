@@ -338,6 +338,27 @@ describe("the review job", () => {
     assert.deepEqual([body.verdict, body.reason, body.retryable], ["error", "unsupported", false]);
   });
 
+  it("rejects a facial feature with errors instead of calling it undecided, so the Builder doesn't retry it", async () => {
+    const representation = { bodyShapes: ["urn:decentraland:off-chain:base-avatars:BaseMale"], mainFile: "eyebrows.png", contents: ["eyebrows.png", "eyebrows_mask.png"] };
+    const manifest = { name: "Big Brows", description: "synthetic", rarity: "common", data: { category: "eyebrows", tags: [], hides: [], replaces: [], representations: [representation] } };
+    const big = await syntheticEntity(await syntheticZip({ manifest, extraFiles: { "eyebrows.png": pngBytes(600, 600), "eyebrows_mask.png": pngBytes(600, 600) } }), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:4`);
+    big.files.delete("model.glb");
+    big.content = big.content.filter(({ file }) => file !== "model.glb");
+    const slack = fakeSlack();
+    const builder = fakeBuilder([clean, big]);
+    const { reviewJob } = await job(builder, [], slack.fetch);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0]), item(big, ITEMS[1])]))));
+    const body = builder.body();
+    assert.deepEqual(body.items.map(({ passed, unsupported }) => [passed, unsupported]), [[true, undefined], [false, undefined]]);
+    assert.deepEqual([body.verdict, body.retryable], ["rejected", undefined], "a decided rejection, not an error to send again");
+    const replies = slack.calls
+      .filter((call) => (call.method === "chat.postMessage" && call.body.thread_ts) || call.method === "files.completeUploadExternal")
+      .map((call) => (call.method === "chat.postMessage" ? JSON.stringify(call.body.blocks) : String(call.body.initial_comment)));
+    const text = replies.find((reply) => reply.includes("Big Brows"))!;
+    assert.match(text, /❌ Failed/);
+    assert.doesNotMatch(text, /a visual check was not answered/);
+  });
+
   it("retries the callback on 5xx, 408 and 429, stops at a 4xx it meant, and leaves the message for SQS after the last try", async () => {
     const flaky = fakeBuilder([clean], [503, 429, 408]);
     assert.equal(await (await job(flaky)).reviewJob.process(message(envelope(request([item(clean, ITEMS[0])])))), "delete");
