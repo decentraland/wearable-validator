@@ -1,5 +1,6 @@
 /** S-05 File size — every byte is downloaded by every avatar nearby, so the whole item has a per-category ceiling (ADR-246). */
 import { mb, uniqueBytesTotal } from "../../../logic/bytes.js";
+import { fileSizeLimit } from "../../../manifest/index.js";
 import { modelFileCandidates } from "../../../logic/model-files.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -19,7 +20,7 @@ export const fileSize: CheckDefinition = {
   run: (ctx) => {
     const findings: Finding[] = [];
     const { fileSize: sizes } = ctx.manifest;
-    const limit = ctx.itemType === "emote" ? sizes.emoteBytes : ctx.category === "skin" ? sizes.skinBytes : sizes.wearableBytes;
+    const limit = fileSizeLimit(ctx.itemType, ctx.category);
     const label = ctx.itemType === "emote" ? "an emote" : ctx.category === "skin" ? "a skin" : "a wearable";
 
     // the Builder keeps a copy per body shape (male/x.glb, female/x.glb): the catalyst stores and counts one

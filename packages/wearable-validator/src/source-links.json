@@ -57,7 +57,7 @@
   },
   "file-size": {
     "file": "src/checks/files/file-size/index.ts",
-    "line": 7
+    "line": 8
   },
   "gltf-hygiene": {
     "file": "src/checks/files/gltf-hygiene/index.ts",
