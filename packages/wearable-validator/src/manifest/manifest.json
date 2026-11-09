@@ -1,5 +1,5 @@
 {
-  "version": "0.7.1",
+  "version": "0.8.0",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -320,6 +320,12 @@
     "imagePixelsPerToken": 750,
     "textCharactersPerToken": 3,
     "maxTextLength": 1200
+  },
+  "representations": {
+    "maxEdgeGap": 0.2,
+    "comparedCategories": ["upper_body", "lower_body"],
+    "hipLine": 0.45,
+    "fittedCategories": []
   },
   "renderValid": {
     "minSubjectRatio": 0.0005,
