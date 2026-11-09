@@ -2,6 +2,7 @@
 import { isGlb, readSelfContainedGltf } from "../../../logic/gltf.js";
 import { decodePngSafe, imageDimensions, isPngBytes } from "../../../logic/images.js";
 import { isFacial } from "../../../logic/facial.js";
+import { manifest } from "../../../manifest/index.js";
 import { modelFileCandidates } from "../../../logic/model-files.js";
 import { finding, type CheckContext, type CheckDefinition, type CheckMeta, type Finding, type Severity } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -55,7 +56,7 @@ export const fileFormat: CheckDefinition = {
     "Wearables must be exported as a single .glb file (a .gltf works too when everything is embedded in it). Eyebrows, eyes and mouth items are PNG images with a transparent background instead of a 3D model.",
   fix: "In Blender: File → Export → glTF 2.0, format 'glTF Binary (.glb)'. For eyebrows/eyes/mouth, export a square PNG with a transparent background instead.",
   details:
-    "Reads the model files' magic bytes — a real GLB starts with the 'glTF' header; a .gltf must embed every buffer and image (data: URIs), since a file it names elsewhere cannot be loaded from the item. Facial-feature categories route to the PNG path instead (square, ≤256×256, alpha channel) and skip every mesh rule.",
+    `Reads the model files' magic bytes — a real GLB starts with the 'glTF' header; a .gltf must embed every buffer and image (data: URIs), since a file it names elsewhere cannot be loaded from the item. Facial-feature categories route to the PNG path instead (square, ≤${manifest.textures.facialMaxSize}×${manifest.textures.facialMaxSize}, alpha channel) and skip every mesh rule.`,
   measure: (ctx) => {
     const models = [...ctx.files.keys()].filter((p) => p.endsWith(".glb") || p.endsWith(".gltf"));
     return models.length > 0 ? `${models.length} model file${models.length > 1 ? "s" : ""}` : undefined;

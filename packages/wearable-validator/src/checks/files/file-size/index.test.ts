@@ -31,13 +31,27 @@ describe("file-size (S-05)", () => {
     assert.equal(only(result.findings, "file-size").length, 0);
   });
 
-  it("applies the emote budget to emotes", async () => {
+  it("applies the emote budget to emotes, as the item total only", async () => {
     const glb = padBytes(await syntheticGlb({ animation: { name: "Pose_Avatar", seconds: 2 } }), 3_500_000);
     const findings = only((await validate(await syntheticZip({ glb, kind: "emote" }), { checks: ["file-size"] })).findings, "file-size");
-    assert.ok(findings.length >= 1);
+    assert.equal(findings.length, 1, "no separate model-alone error for an emote");
     assert.equal(findings[0].severity, "error");
     assert.equal(findings[0].limit, 3145728);
     assert.match(findings[0].message, /emote/);
+  });
+
+  it("passes an emote whose model is over 2 MB while the item stays under 3 MB (curators' decision)", async () => {
+    // like Master of the Dead (2.12 MB model) and Lolth (2.32 MB), approved and published
+    const glb = padBytes(await syntheticGlb({ animation: { name: "Pose_Avatar", seconds: 2 } }), 2_500_000);
+    const result = await validate(await syntheticZip({ glb, kind: "emote" }), { checks: ["file-size"] });
+    assert.equal(only(result.findings, "file-size").length, 0);
+  });
+
+  it("still holds a wearable's model alone to the ceiling minus the headroom", async () => {
+    const glb = padBytes(await syntheticGlb(), 2_500_000);
+    const [model] = only((await validate(await syntheticZip({ glb }), { checks: ["file-size"] })).findings, "file-size");
+    assert.equal(model.limit, 3145728 - 1048576);
+    assert.equal(model.where, "model.glb");
   });
 
   it("warns once with category-unknown on a bare GLB without a hint", async () => {
