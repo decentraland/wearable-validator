@@ -140,8 +140,10 @@ function computePassed(ctx: CheckContext, options: Options, results: CheckResult
   if (ctx.inputKind === "glb" || ctx.inputKind === "png-set") return null; // bare inputs never mint a verdict
   const requestedSubset = Boolean(options.checks?.length) || Boolean(options.groups && CORE_GROUPS.some((group) => !options.groups!.includes(group)));
   if (requestedSubset) return null; // partial run
+  // an error found decides it: what could not be asserted can only add problems, never clear this one
+  if (errors > 0) return false;
   if (results.some((r) => r.coverage === "missing" || r.status === "skipped" || r.status === "errored")) return null; // couldn't assert everything
-  return errors === 0;
+  return true;
 }
 
 /** Legacy Finding[] becomes a complete execution; explicit executions must agree with their findings. */

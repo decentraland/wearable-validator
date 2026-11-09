@@ -6,10 +6,10 @@
  */
 import { setTimeout as delay } from "node:timers/promises";
 import type { ILoggerComponent } from "@well-known-components/interfaces";
-import { fixes, manifest, registry, validate, type CaptureRecord, type Finding, type Input, type Result, type Reviewer } from "@dcl-regenesislabs/wearable-validator";
+import { fileSizeLimit, fixes, manifest, registry, uniqueBytesTotal, validate, type CaptureRecord, type Finding, type Input, type Result, type Reviewer } from "@dcl-regenesislabs/wearable-validator";
 import type { IBuilderComponent } from "../adapters/builder.js";
 import type { IRendererComponent } from "../adapters/renderer.js";
-import type { ISlackComponent } from "../adapters/slack.js";
+import type { ISlackComponent, ItemSize } from "../adapters/slack.js";
 import type { IWorkQueueComponent, QueueMessage } from "../adapters/work-queue.js";
 import { runCodeChecks } from "./code-checks.js";
 import { InvalidReviewRequest, parseReviewRequest, summarizeRequest, type ReviewItem, type ValidationRequest } from "./review-request.js";
@@ -46,7 +46,7 @@ export interface ItemFinding {
 export interface ItemResult {
   itemId: string;
   contentHash: string;
-  /** null: no verdict — the item could not be validated, or a visual check was not answered. */
+  /** null: no verdict, with nothing failed — the item could not be validated, a visual check was not answered, or some checks cannot measure this kind of item. */
   passed: boolean | null;
   findings: ItemFinding[];
   /** What the model saw, one line per visual check it answered. */
@@ -127,6 +127,17 @@ function visualVerdict(visual: Result): boolean | null {
   return visual.checks.some((row) => row.status === "failed") ? false : null;
 }
 
+/**
+ * The item's size as the catalyst counts it — every file once, thumbnail and rarity image included — against its
+ * ceiling, so Slack shows the same total the size check measures even when nothing fails. Not part of the Builder's
+ * callback: its schema is strict.
+ */
+export function sizeOf(item: ReviewItem, files: Map<string, Uint8Array>): ItemSize {
+  const data = item.metadata.data as { category?: unknown } | undefined;
+  const category = typeof data?.category === "string" ? data.category : undefined;
+  return { bytes: uniqueBytesTotal(files.values()), limit: fileSizeLimit(item.itemType, category) };
+}
+
 /** The item's thumbnail, as its metadata names it. */
 function thumbnailOf(item: ReviewItem, files: Map<string, Uint8Array>): Uint8Array | undefined {
   const path = typeof item.metadata.thumbnail === "string" ? item.metadata.thumbnail : "thumbnail.png";
@@ -134,7 +145,8 @@ function thumbnailOf(item: ReviewItem, files: Map<string, Uint8Array>): Uint8Arr
 }
 
 export function itemResult(item: ReviewItem, gate: Result, visual: Result): ItemResult {
-  // no verdict from the code checks (a facial feature is PNGs: no model check can measure it) is no verdict for the item
+  // no verdict from the code checks is no verdict for the item: a facial feature without errors (it is PNGs, no model
+  // check can measure it) stays undecided; with an error the code checks already said false
   const passed = gate.passed === false ? false : gate.passed === null ? null : visualVerdict(visual);
   const rows = [...gate.checks, ...visual.checks];
   // undecided only because some checks cannot measure this kind of item, with nothing failed or unanswered: a person
@@ -237,11 +249,13 @@ export function createReviewJob(components: ReviewJobComponents) {
   }
 
   /** One item's result, with what Slack shows of it: the thumbnail and the rendered views. */
-  async function validateItem(item: ReviewItem): Promise<{ result: ItemResult; thumbnail?: Uint8Array; captures: CaptureRecord[] }> {
+  async function validateItem(item: ReviewItem): Promise<{ result: ItemResult; thumbnail?: Uint8Array; captures: CaptureRecord[]; size?: ItemSize }> {
     const started = Date.now();
     let files: Map<string, Uint8Array> | undefined;
+    let size: ItemSize | undefined;
     try {
       files = await builder.fetchFiles(item);
+      size = sizeOf(item, files);
       // the entity mode: metadata, the files, and the hash each file was published under, so content integrity is checked too
       const input: Input = { files, metadata: item.metadata, content: Object.entries(item.contents).map(([file, hash]) => ({ file, hash })) };
       const gate = await runCodeChecks(input, { signal: new AbortController().signal, onProgress: () => {}, timeoutMs: CODE_CHECKS_TIMEOUT_MS });
@@ -249,11 +263,11 @@ export function createReviewJob(components: ReviewJobComponents) {
       const visual = await renderAndReview(item, input);
       const result = itemResult(item, gate, visual);
       log.info("item validated", { item: item.itemId, passed: String(result.passed), ms: Date.now() - started });
-      return { result, thumbnail: thumbnailOf(item, files), captures: visual.captures };
+      return { result, thumbnail: thumbnailOf(item, files), captures: visual.captures, size };
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       log.warn("item could not be validated", { item: item.itemId, reason });
-      return { result: { itemId: item.itemId, contentHash: item.contentHash, passed: null, findings: [], error: reason }, thumbnail: files && thumbnailOf(item, files), captures: [] };
+      return { result: { itemId: item.itemId, contentHash: item.contentHash, passed: null, findings: [], error: reason }, thumbnail: files && thumbnailOf(item, files), captures: [], size };
     }
   }
 
@@ -280,9 +294,9 @@ export function createReviewJob(components: ReviewJobComponents) {
       const ts = await slack.collectionStarted(request);
       const items: ItemResult[] = [];
       for (const item of request.items) {
-        const { result, thumbnail, captures } = await validateItem(item);
+        const { result, thumbnail, captures, size } = await validateItem(item);
         items.push(result);
-        if (ts) await slack.itemValidated(ts, { item, result, thumbnail, captures });
+        if (ts) await slack.itemValidated(ts, { item, result, thumbnail, captures, size });
       }
       const body = collectionResult(request, items);
       if (ts) await slack.collectionFinished(ts, request, body, Date.now() - started);

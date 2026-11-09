@@ -2,7 +2,11 @@ import manifestJson from "./manifest.json" with { type: "json" };
 
 export interface Manifest {
   version: string;
-  triangles: { default: number; perCategory: Record<string, number>; hiddenHandsBudget: number; headSlots: string[]; hiddenHeadLimit: number };
+  triangles: {
+    default: number; perCategory: Record<string, number>; hiddenHandsBudget: number; headSlots: string[]; hiddenHeadLimit: number;
+    /** Up to this share over the effective budget is a warning, not a rejection (curators' unanimous decision, Nov 2026). */
+    warningMarginRatio: number;
+  };
   textures: {
     default: number; skin: number; maxSize: number;
     /** Eyes, eyebrows and mouth PNGs: 512×512 since the curators' decision (Nov 2026); it was 256×256. */
@@ -86,6 +90,28 @@ export interface Manifest {
     model: string; maxInputTokens: number; maxImages: number; timeoutMs: number; maxRetries: number;
     thinkingBudgetTokens: number; imagePixelsPerToken: number; textCharactersPerToken: number; maxTextLength: number;
   };
+  /**
+   * M-15: the male and female versions of a body garment, each measured against its own skeleton (feet 0, head 1).
+   * Approved items with separate versions differ by at most 0.1 at their top or bottom edge (p99 of 378 sampled).
+   */
+  representations: {
+    /** A larger gap at the top or bottom edge means one version is at the wrong scale or position. */
+    maxEdgeGap: number;
+    /**
+     * Categories whose separate versions are compared against maxEdgeGap. Only upper_body and lower_body were
+     * calibrated (none of 300 approved items warned). Other categories legitimately differ by body: short male hair
+     * with shoulder-length female hair is a 0.26 gap at the bottom edge, and hats, masks and helmets can differ too.
+     */
+    comparedCategories: string[];
+    /** A garment whose bottom edge sits below this height reaches past the hips: one model for both bodies rarely fits. */
+    hipLine: number;
+    /**
+     * Categories where one model worn by both bodies past the hips warns (feet, hands and skins are shared by design).
+     * Empty for now: with upper_body and lower_body it warned on 37 of 300 approved items (12%), mostly long dresses,
+     * coats and costumes curators accepted. Listing categories here turns it on; nothing else changes.
+     */
+    fittedCategories: string[];
+  };
   /** V-01: how much of a capture must be something drawn. */
   renderValid: {
     /** Below this share of the frame a view counts as empty: the item draws nothing (an error, and the model checks skip it). */
@@ -133,6 +159,15 @@ export const AVATAR_CORE_BONE_NAMES: string[] = [
   "Avatar_LeftUpLeg", "Avatar_LeftLeg", "Avatar_LeftFoot",
   "Avatar_RightUpLeg", "Avatar_RightLeg", "Avatar_RightFoot"
 ];
+
+/**
+ * The size ceiling an item is held to (ADR-246): every file counts, thumbnail and rarity image included. Emotes and
+ * wearables share one ceiling; skins have their own.
+ */
+export function fileSizeLimit(itemType: "wearable" | "emote", category?: string): number {
+  const sizes = manifest.fileSize;
+  return itemType === "emote" ? sizes.emoteBytes : category === "skin" ? sizes.skinBytes : sizes.wearableBytes;
+}
 
 /**
  * effectiveLimit = base + Σ unique hides' budgets. Hiding the base hands adds their 500 (the docs' hands_wear

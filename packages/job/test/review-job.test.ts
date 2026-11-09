@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { createConfigComponent } from "@well-known-components/env-config-provider";
 import { manifest } from "@dcl-regenesislabs/wearable-validator";
 import { createBuilderComponent, SIGNATURE_HEADER, signature, TIMESTAMP_HEADER } from "../src/adapters/builder.js";
-import { asComment, createSlackComponent, itemMessage } from "../src/adapters/slack.js";
+import { asComment, createSlackComponent, itemMessage, sizeText } from "../src/adapters/slack.js";
 import type { IWorkQueueComponent, QueueMessage } from "../src/adapters/work-queue.js";
 import { noModelReviewer } from "../src/adapters/reviewer.js";
-import { collectionResult, createReviewJob, mergeVisual, visualRetryDelays, type CollectionResultBody, type ItemResult } from "../src/logic/review-job.js";
+import { collectionResult, createReviewJob, mergeVisual, sizeOf, visualRetryDelays, type CollectionResultBody, type ItemResult } from "../src/logic/review-job.js";
 import { InvalidReviewRequest, parseReviewRequest, REVIEW_EVENT, type ReviewItem, type ValidationRequest } from "../src/logic/review-request.js";
 import { fakeRenderer, fakeReviewer, flakyReviewer, silentLogs, type RenderCalls } from "./fakes.js";
 import type { CaptureRecord, CaptureRequest, Finding, Result, Reviewer } from "@dcl-regenesislabs/wearable-validator";
@@ -214,6 +214,17 @@ describe("the review job", () => {
     assert.deepEqual([triangles.rule, triangles.severity, typeof triangles.measured, typeof triangles.limit, typeof triangles.fix], ["M-01", "error", "number", "number", "string"]);
   });
 
+  it("passes a hat up to 10% over its triangle budget, with the overage as a warning the Builder can show", async () => {
+    const nearLimit = await syntheticEntity(await syntheticZip({ glb: await syntheticGlb({ triangles: 1600 }) }), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:3`);
+    const builder = fakeBuilder([nearLimit]);
+    const { reviewJob } = await job(builder);
+    assert.equal(await reviewJob.process(message(envelope(request([item(nearLimit, ITEMS[0])])))), "delete");
+    const body = builder.body();
+    assert.deepEqual([body.verdict, body.items[0].passed], ["passed", true], "the curators' margin: a warning, not a rejection");
+    const triangles = body.items[0].findings.find((finding) => finding.check === "triangle-count")!;
+    assert.deepEqual([triangles.severity, triangles.measured, triangles.limit], ["warning", 1600, 1500]);
+  });
+
   it("asks an unanswered model check again on the views it already drew, so the item still gets its verdict", async () => {
     const builder = fakeBuilder([clean]);
     const reviewer = flakyReviewer({ "visual-quality": 1 });
@@ -338,6 +349,27 @@ describe("the review job", () => {
     assert.deepEqual([body.verdict, body.reason, body.retryable], ["error", "unsupported", false]);
   });
 
+  it("rejects a facial feature with errors instead of calling it undecided, so the Builder doesn't retry it", async () => {
+    const representation = { bodyShapes: ["urn:decentraland:off-chain:base-avatars:BaseMale"], mainFile: "eyebrows.png", contents: ["eyebrows.png", "eyebrows_mask.png"] };
+    const manifest = { name: "Big Brows", description: "synthetic", rarity: "common", data: { category: "eyebrows", tags: [], hides: [], replaces: [], representations: [representation] } };
+    const big = await syntheticEntity(await syntheticZip({ manifest, extraFiles: { "eyebrows.png": pngBytes(600, 600), "eyebrows_mask.png": pngBytes(600, 600) } }), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:4`);
+    big.files.delete("model.glb");
+    big.content = big.content.filter(({ file }) => file !== "model.glb");
+    const slack = fakeSlack();
+    const builder = fakeBuilder([clean, big]);
+    const { reviewJob } = await job(builder, [], slack.fetch);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0]), item(big, ITEMS[1])]))));
+    const body = builder.body();
+    assert.deepEqual(body.items.map(({ passed, unsupported }) => [passed, unsupported]), [[true, undefined], [false, undefined]]);
+    assert.deepEqual([body.verdict, body.retryable], ["rejected", undefined], "a decided rejection, not an error to send again");
+    const replies = slack.calls
+      .filter((call) => (call.method === "chat.postMessage" && call.body.thread_ts) || call.method === "files.completeUploadExternal")
+      .map((call) => (call.method === "chat.postMessage" ? JSON.stringify(call.body.blocks) : String(call.body.initial_comment)));
+    const text = replies.find((reply) => reply.includes("Big Brows"))!;
+    assert.match(text, /❌ Failed/);
+    assert.doesNotMatch(text, /a visual check was not answered/);
+  });
+
   it("retries the callback on 5xx, 408 and 429, stops at a 4xx it meant, and leaves the message for SQS after the last try", async () => {
     const flaky = fakeBuilder([clean], [503, 429, 408]);
     assert.equal(await (await job(flaky)).reviewJob.process(message(envelope(request([item(clean, ITEMS[0])])))), "delete");
@@ -411,11 +443,25 @@ describe("Slack", () => {
     for (const share of [firstItem, secondItem]) assert.deepEqual([share.body.channel_id, share.body.thread_ts], ["C123", "1700000000.000001"]);
     assert.ok((firstItem.body.files as unknown[]).length >= 2, "the thumbnail and the worn front view");
     assert.match(String(firstItem.body.initial_comment), /^\*Test Wearable\*\n\*✅ Passed\*/, "the item's text is the upload's comment, above its pictures");
+    assert.match(String(firstItem.body.initial_comment), /📦 \d+\.\d\d \/ 3\.00 MB/, "every item shows its size against its ceiling, even when nothing fails");
     assert.match(String(secondItem.body.initial_comment), /❌ \*Triangle count\* · M-01/);
     const update = chat.at(-1)!;
     assert.deepEqual([update.body.channel, update.body.ts], ["C123", "1700000000.000001"]);
     assert.match(blocksText(update.body), /Rejected/);
     assert.equal(builder.posts.length, 1, "and the Builder still gets its result");
+  });
+
+  it("shows no size for an item whose files could not be downloaded, and the size for the one that could", async () => {
+    const slack = fakeSlack();
+    const builder = fakeBuilder([clean]);
+    const { reviewJob } = await job(builder, [], slack.fetch);
+    await reviewJob.process(message(envelope(request([item(clean, ITEMS[0], { contents: { "model.glb": "bafkreinothere" } }), item(clean, ITEMS[1])]))));
+    const replies = slack.calls.filter((call) => (call.method === "chat.postMessage" && call.body.thread_ts) || call.method === "files.completeUploadExternal");
+    assert.equal(replies.length, 2, "one reply per item");
+    const text = (call: SlackCall): string => (call.method === "chat.postMessage" ? blocksText(call.body) : String(call.body.initial_comment));
+    assert.match(text(replies[0]), /Could not be validated/);
+    assert.doesNotMatch(text(replies[0]), /📦/, "no size without the files");
+    assert.match(text(replies[1]), /📦 \d+\.\d\d \/ 3\.00 MB/);
   });
 
   it("tells the channel when a request cannot be validated, with the collection and why, and drops nothing unseen", async () => {
@@ -472,6 +518,28 @@ describe("Slack", () => {
   const finding = (check: string, rule: string, severity: "error" | "warning", message: string, where?: string) => ({ rule, check, severity, message, ...(where ? { where } : {}), docs: "https://docs.example" });
   const tropicalMask = { itemId: ITEMS[0], contentHash: "bafkreiabc", itemType: "wearable" as const, metadata: { name: "Tropical Mask" }, contents: {} };
   const comment = (item: ReviewItem, result: ItemResult): string => asComment(itemMessage(item, result)).replace(/\u200b/g, "");
+
+  it("measures an item as the catalyst does: every file once, thumbnail and rarity image included", () => {
+    const model = new Uint8Array(1_500_000).fill(1);
+    const files = new Map([["male/hoodie.glb", model], ["female/hoodie.glb", model.slice()], ["thumbnail.png", new Uint8Array(200_000).fill(2)], ["image.png", new Uint8Array(90_000).fill(3)]]);
+    const size = sizeOf({ ...tropicalMask, metadata: { name: "Hoodie", data: { category: "upper_body" } } }, files);
+    assert.deepEqual(size, { bytes: 1_790_000, limit: manifest.fileSize.wearableBytes }, "both body shapes share one model");
+    const text = asComment(itemMessage(tropicalMask, { itemId: ITEMS[0], contentHash: "bafkreiabc", passed: true, findings: [] }, size));
+    assert.match(text, /\*\u2705 Passed\* \u00b7 nothing to fix \u00b7 \ud83d\udce6 1\.71 \/ 3\.00 MB/);
+  });
+
+  it("holds skins to their own ceiling and emotes to the shared one", () => {
+    const files = new Map([["model.glb", new Uint8Array(10)]]);
+    assert.equal(sizeOf({ ...tropicalMask, metadata: { data: { category: "skin" } } }, files).limit, manifest.fileSize.skinBytes);
+    assert.equal(sizeOf({ ...tropicalMask, itemType: "emote", metadata: { emoteDataADR74: { category: "dance" } } }, files).limit, manifest.fileSize.emoteBytes);
+  });
+
+  it("reads a few bytes over the ceiling as 3.01, never 3.00 next to a failure", () => {
+    const limit = manifest.fileSize.wearableBytes;
+    assert.equal(sizeText({ bytes: limit + 300, limit }), "3.01 / 3.00 MB");
+    assert.equal(sizeText({ bytes: limit, limit }), "3.00 / 3.00 MB");
+    assert.equal(sizeText({ bytes: limit - 5_000, limit }), "3.00 / 3.00 MB", "under the ceiling it rounds as usual");
+  });
 
   it("lists each check once, its male/female copies as one line, the hashed model file as \"the model\" and the shared fix once", () => {
     const text = comment(dinoSkin, dinoSkinResult);

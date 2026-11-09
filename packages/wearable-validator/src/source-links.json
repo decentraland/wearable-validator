@@ -57,7 +57,7 @@
   },
   "file-size": {
     "file": "src/checks/files/file-size/index.ts",
-    "line": 7
+    "line": 8
   },
   "gltf-hygiene": {
     "file": "src/checks/files/gltf-hygiene/index.ts",
@@ -111,6 +111,10 @@
     "file": "src/checks/model/material-names/index.ts",
     "line": 9
   },
+  "representations-match": {
+    "file": "src/checks/model/representations-match/index.ts",
+    "line": 13
+  },
   "skeleton": {
     "file": "src/checks/model/skeleton/index.ts",
     "line": 10
@@ -141,7 +145,7 @@
   },
   "triangle-count": {
     "file": "src/checks/model/triangle-count/index.ts",
-    "line": 20
+    "line": 34
   },
   "emote-quality": {
     "file": "src/checks/rendering/emote-quality/index.ts",

@@ -58,7 +58,10 @@ export interface CheckResult {
 }
 
 export interface Result {
-  /** Computed over core groups only. null = partial run or bare GLB — never infer pass from it. */
+  /**
+   * Computed over core groups only. false on any error; true when every check ran and passed; null otherwise (a bare
+   * input, a subset of checks or groups, or a skipped/errored row with no error) — never infer pass from null.
+   */
   passed: boolean | null;
   checks: CheckResult[];
   findings: Finding[];
