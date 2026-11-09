@@ -145,7 +145,7 @@
   },
   "triangle-count": {
     "file": "src/checks/model/triangle-count/index.ts",
-    "line": 20
+    "line": 34
   },
   "emote-quality": {
     "file": "src/checks/rendering/emote-quality/index.ts",

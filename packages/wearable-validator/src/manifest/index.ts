@@ -2,7 +2,11 @@ import manifestJson from "./manifest.json" with { type: "json" };
 
 export interface Manifest {
   version: string;
-  triangles: { default: number; perCategory: Record<string, number>; hiddenHandsBudget: number; headSlots: string[]; hiddenHeadLimit: number };
+  triangles: {
+    default: number; perCategory: Record<string, number>; hiddenHandsBudget: number; headSlots: string[]; hiddenHeadLimit: number;
+    /** Up to this share over the effective budget is a warning, not a rejection (curators' unanimous decision, Nov 2026). */
+    warningMarginRatio: number;
+  };
   textures: { default: number; skin: number; maxSize: number; facialMaxSize: number };
   materials: { default: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];

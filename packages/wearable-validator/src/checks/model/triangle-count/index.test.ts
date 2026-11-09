@@ -1,20 +1,60 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validate } from "../../../index.js";
+import { manifest, validate } from "../../../index.js";
+import { marginText, triangleCount } from "./index.js";
 import { found, status } from "#test/helpers/findings.js";
 import { syntheticGlb } from "#test/helpers/synthetic.js";
 import { wearableZip } from "#test/helpers/wearable-zip.js";
 
 describe("triangle-count (M-01)", () => {
-  it("errors when triangles exceed the category budget", async () => {
-    const zip = await wearableZip({ triangles: 1600 }); // hat budget: 1500
+  it("errors when triangles exceed the category budget by more than 10%", async () => {
+    const zip = await wearableZip({ triangles: 1700 }); // hat budget: 1500, tolerated up to 1650
     const result = await validate(zip, { checks: ["triangle-count"] });
     const findings = found(result, "triangle-count");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "error");
-    assert.equal(findings[0].measured, 1600);
+    assert.equal(findings[0].measured, 1700);
     assert.equal(findings[0].limit, 1500);
+    assert.match(findings[0].message, /1700 triangles, 14% over the limit of 1500 for hat; up to 10% over \(1650\) is accepted/);
     assert.equal(status(result, "triangle-count"), "failed");
+  });
+
+  it("warns, without failing, when triangles are at most 10% over the budget", async () => {
+    const result = await validate(await wearableZip({ triangles: 1600 }), { checks: ["triangle-count"] });
+    const [warning] = found(result, "triangle-count");
+    assert.equal(warning.severity, "warning");
+    assert.deepEqual([warning.measured, warning.limit, warning.data?.tolerated], [1600, 1500, 1650]);
+    assert.match(warning.message, /1600 triangles, 7% over the limit of 1500 for hat\. Up to 10% over \(1650\) is accepted with a warning/);
+    assert.equal(status(result, "triangle-count"), "warning");
+  });
+
+  it("draws the line at exactly 10% over: 1,650 warns for a 1,500 budget, 1,651 fails", async () => {
+    const [edge] = found(await validate(await wearableZip({ triangles: 1650 }), { checks: ["triangle-count"] }), "triangle-count");
+    assert.equal(edge.severity, "warning");
+    const [past] = found(await validate(await wearableZip({ triangles: 1651 }), { checks: ["triangle-count"] }), "triangle-count");
+    assert.equal(past.severity, "error");
+    assert.match(past.message, /11% over/, "never reads as 10% over while failing");
+  });
+
+  it("words the margin at its own precision, so a failing count never reads as the tolerated share", () => {
+    assert.deepEqual(marginText(0.1, 1650, 1500), { tolerated: "10", over: "10" });
+    assert.deepEqual(marginText(0.1, 1651, 1500), { tolerated: "10", over: "11" });
+    // a margin of 12.5%: 1,125 of 1,000 is within, 1,126 is not and reads 12.6
+    assert.deepEqual(marginText(0.125, 1125, 1000), { tolerated: "12.5", over: "12.5" });
+    assert.deepEqual(marginText(0.125, 1126, 1000), { tolerated: "12.5", over: "12.6" });
+    assert.deepEqual(marginText(0.125, 1124, 1000), { tolerated: "12.5", over: "12.4" });
+  });
+
+  it("states the margin from the rules in its explanation", () => {
+    assert.match(triangleCount.explanation, new RegExp(`Up to ${manifest.triangles.warningMarginRatio * 100}% over the budget is a warning`));
+  });
+
+  it("applies the margin to the pooled budget, not the category's base", async () => {
+    // a jacket hiding the hands: 1,500 + 500 = 2,000, tolerated up to 2,200
+    const within = await validate(await wearableZip({ triangles: 2150 }, { category: "upper_body", hides: ["hands"] }), { checks: ["triangle-count"] });
+    assert.equal(status(within, "triangle-count"), "warning");
+    const past = await validate(await wearableZip({ triangles: 2250 }, { category: "upper_body", hides: ["hands"] }), { checks: ["triangle-count"] });
+    assert.equal(status(past, "triangle-count"), "failed");
   });
 
   it("pools hidden-slot budgets into the limit", async () => {
