@@ -111,6 +111,10 @@
     "file": "src/checks/model/material-names/index.ts",
     "line": 9
   },
+  "representations-match": {
+    "file": "src/checks/model/representations-match/index.ts",
+    "line": 13
+  },
   "skeleton": {
     "file": "src/checks/model/skeleton/index.ts",
     "line": 10

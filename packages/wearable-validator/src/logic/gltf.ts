@@ -200,6 +200,27 @@ function multiply(a: number[], b: number[]): number[] {
   return out;
 }
 
+/** Column-major 4×4 inverse by Gauss–Jordan elimination with partial pivoting, or null when the matrix is singular. */
+export function invert(m: number[]): number[] | null {
+  // rows of [M | I]; column-major storage, so M[row][col] = m[col * 4 + row]
+  const rows = [0, 1, 2, 3].map((r) => [0, 1, 2, 3].map((c) => m[c * 4 + r]).concat([0, 1, 2, 3].map((c) => (c === r ? 1 : 0))));
+  for (let col = 0; col < 4; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < 4; r++) if (Math.abs(rows[r][col]) > Math.abs(rows[pivot][col])) pivot = r;
+    if (!(Math.abs(rows[pivot][col]) > 1e-12)) return null;
+    [rows[col], rows[pivot]] = [rows[pivot], rows[col]];
+    const scale = rows[col][col];
+    for (let c = 0; c < 8; c++) rows[col][c] /= scale;
+    for (let r = 0; r < 4; r++) {
+      const factor = rows[r][col];
+      if (r !== col && factor !== 0) for (let c = 0; c < 8; c++) rows[r][c] -= factor * rows[col][c];
+    }
+  }
+  const out = new Array<number>(16);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) out[c * 4 + r] = rows[r][4 + c];
+  return out;
+}
+
 export interface TriangleCount {
   total: number;
   /** true when any STRIP/FAN primitive was counted (warn: non-standard export). */
