@@ -14,6 +14,21 @@ describe("measured values", () => {
     assert.match(byCheck.get("static-mesh")?.measured ?? "", /0 animations/);
   });
 
+  it("the material and texture columns leave out a skin copy, as the checks do", async () => {
+    const glb = await syntheticGlb({
+      texture: { size: 64 },
+      extraMaterialDefs: [
+        { name: "AvatarSkin_MAT.001", textures: [{ size: 32 }] },
+        { name: "Detail_MAT", textures: [{ size: 8 }] }
+      ]
+    });
+    const result = await validate(await syntheticZip({ glb }), { checks: ["material-count", "texture-count", "material-names"] });
+    const byCheck = new Map(result.checks.map((c) => [c.check, c]));
+    assert.equal(byCheck.get("material-count")?.measured, "2 materials");
+    assert.equal(byCheck.get("texture-count")?.measured, "2 textures");
+    assert.equal(byCheck.get("material-names")?.measured, "has AvatarSkin_MAT.001");
+  });
+
   it("emote checks measure duration and clips", async () => {
     const result = await validate(await syntheticZip({ kind: "emote" }));
     const byCheck = new Map(result.checks.map((c) => [c.check, c]));

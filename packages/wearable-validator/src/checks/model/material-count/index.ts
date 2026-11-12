@@ -11,7 +11,7 @@ export const materialCount: CheckDefinition = {
   title: "Material count",
   describe: "materials stay within the per-category limit (2 by default, 5 for skins), excluding the skin material",
   explanation: "Models may use at most 2 materials (5 for skins), not counting the skin material (AvatarSkin_MAT).",
-  fix: "Merge materials: join meshes and assign one shared material with an atlas texture. At most 2 materials (5 for skins), not counting AvatarSkin_MAT.",
+  fix: "Merge materials: join meshes and assign one shared material with an atlas texture. At most 2 materials (5 for skins), not counting the skin material (any material with \"skin\" in its name, such as AvatarSkin_MAT).",
   details: "Counts distinct material objects per representation, excluding colliders and the skin material. Skin is recognised as the engine does: any material whose name contains \"skin\" in any case (materials.skinNameToken), so AvatarSkin_MAT.001, the name Blender gives a copy, is left out too. Repeated names do not merge materials. The displayed count is the largest per-representation count.",
   categoryDependent: true,
   appliesTo: wearableMaterialsOnly,
@@ -27,7 +27,7 @@ export const materialCount: CheckDefinition = {
       if (mats.length > limit) {
         findings.push(
           finding(meta, "error",
-            `"${model.mainFile}" uses ${mats.length} materials; the limit is ${limit}${ctx.category === "skin" ? " for skins" : ""} (${ctx.manifest.materials.avatarSkinMat} excluded). Merge meshes so they share at most ${limit} materials.`,
+            `"${model.mainFile}" uses ${mats.length} materials; the limit is ${limit}${ctx.category === "skin" ? " for skins" : ""} (the skin material excluded: any with "${ctx.manifest.materials.skinNameToken}" in its name, such as ${ctx.manifest.materials.avatarSkinMat}). Merge meshes so they share at most ${limit} materials.`,
             { where: model.mainFile, measured: mats.length, limit, data: { materials: mats.map((m) => m.getName()) } })
         );
       }

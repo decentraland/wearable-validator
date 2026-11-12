@@ -30,11 +30,12 @@ export const materialNames: CheckDefinition = {
   appliesTo: wearableMaterialsOnly,
   measure: (ctx) => {
     for (const model of ctx.models) {
-      for (const material of model.doc.getRoot().listMaterials()) {
+      // the same materials run() looks at: one only a collider uses is not a skin material the engine draws
+      for (const material of countedMaterials(model.doc)) {
         if (isSkinMaterial(material, ctx.manifest.materials.skinNameToken)) return `has ${material.getName()}`;
       }
     }
-    return `no ${ctx.manifest.materials.avatarSkinMat}`;
+    return "no skin material";
   },
   run: (ctx) => {
     const findings: Finding[] = [];

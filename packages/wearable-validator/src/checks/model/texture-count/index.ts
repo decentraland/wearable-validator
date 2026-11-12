@@ -1,5 +1,5 @@
 /** M-02 Texture count — every extra image is another draw call on an avatar that shares the frame with dozens of others. */
-import type { Material, Texture } from "@gltf-transform/core";
+import type { Document, Material, Texture } from "@gltf-transform/core";
 import { countedMaterials, isSkinMaterial, textureName } from "../../../logic/materials.js";
 import { wearableMaterialsOnly } from "../../../logic/wearable-only.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
@@ -15,6 +15,19 @@ const TEXTURE_SLOTS: { slot: string; get: (m: Material) => Texture | null }[] = 
   { slot: "occlusionTexture", get: (m) => m.getOcclusionTexture() }
 ];
 
+/** The images that count toward the limit: every slot of every counted material, the skin material's left out. */
+function countedTextures(doc: Document, skinNameToken: string): Set<Texture> {
+  const textures = new Set<Texture>();
+  for (const mat of countedMaterials(doc)) {
+    if (isSkinMaterial(mat, skinNameToken)) continue;
+    for (const { get } of TEXTURE_SLOTS) {
+      const tex = get(mat);
+      if (tex) textures.add(tex);
+    }
+  }
+  return textures;
+}
+
 export const textureCount: CheckDefinition = {
   ...meta,
   title: "Texture count",
@@ -25,21 +38,14 @@ export const textureCount: CheckDefinition = {
   appliesTo: wearableMaterialsOnly,
   measure: (ctx) => {
     let images = 0;
-    for (const model of ctx.models) images = Math.max(images, model.doc.getRoot().listTextures().length);
+    for (const model of ctx.models) images = Math.max(images, countedTextures(model.doc, ctx.manifest.materials.skinNameToken).size);
     return `${images} texture${images === 1 ? "" : "s"}`;
   },
   run: (ctx) => {
     const findings: Finding[] = [];
     const limit = ctx.category === "skin" ? ctx.manifest.textures.skin : ctx.manifest.textures.default;
     for (const model of ctx.models) {
-      const textures = new Set<Texture>();
-      for (const mat of countedMaterials(model.doc)) {
-        if (isSkinMaterial(mat, ctx.manifest.materials.skinNameToken)) continue;
-        for (const { get } of TEXTURE_SLOTS) {
-          const tex = get(mat);
-          if (tex) textures.add(tex);
-        }
-      }
+      const textures = countedTextures(model.doc, ctx.manifest.materials.skinNameToken);
       if (textures.size > limit) {
         findings.push(
           finding(meta, "error",

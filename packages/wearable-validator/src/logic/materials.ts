@@ -8,7 +8,8 @@ import { colliderNodes } from "./gltf.js";
  * So "AvatarSkin_MAT.001", what Blender names a second copy, is skin as much as "AvatarSkin_MAT" is.
  */
 export function isSkinMaterial(material: Material, token: string): boolean {
-  return material.getName().toLowerCase().includes(token.toLowerCase());
+  // an empty token would match every name and exempt the whole model from the counts
+  return token !== "" && material.getName().toLowerCase().includes(token.toLowerCase());
 }
 
 /** Materials that count toward limits: used by primitives of meshes on non-collider nodes. */
