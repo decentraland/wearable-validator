@@ -2,6 +2,15 @@
 import type { Document, Material, Texture } from "@gltf-transform/core";
 import { colliderNodes } from "./gltf.js";
 
+/**
+ * Whether the engine treats a material as the avatar's skin: its name contains the token ("skin", any case), which is how
+ * the explorer picks the materials it tints with the player's skin colour (unity-explorer DecentralandMaterialGenerator).
+ * So "AvatarSkin_MAT.001", what Blender names a second copy, is skin as much as "AvatarSkin_MAT" is.
+ */
+export function isSkinMaterial(material: Material, token: string): boolean {
+  return material.getName().toLowerCase().includes(token.toLowerCase());
+}
+
 /** Materials that count toward limits: used by primitives of meshes on non-collider nodes. */
 export function countedMaterials(doc: Document): Material[] {
   const set = new Set<Material>();

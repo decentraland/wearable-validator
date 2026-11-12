@@ -13,6 +13,12 @@ describe("material-names (M-07)", () => {
     assert.match(findings[0].message, /AvatarSkin_MAT/);
   });
 
+  it("passes a skin item whose skin material is a copy the engine still tints", async () => {
+    const glb = await syntheticGlb({ extraMaterialDefs: [{ name: "AvatarSkin_MAT.001" }] });
+    const result = await validate(await syntheticZip({ glb, category: "skin" }), { checks: ["material-names"] });
+    assert.equal(found(result, "material-names").length, 0);
+  });
+
   it("passes a skin item that includes AvatarSkin_MAT", async () => {
     const glb = await syntheticGlb({ extraMaterialDefs: [{ name: "AvatarSkin_MAT" }] });
     const result = await validate(await syntheticZip({ glb, category: "skin" }), { checks: ["material-names"] });

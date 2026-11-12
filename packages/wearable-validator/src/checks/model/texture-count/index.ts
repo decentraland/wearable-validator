@@ -1,6 +1,6 @@
 /** M-02 Texture count — every extra image is another draw call on an avatar that shares the frame with dozens of others. */
 import type { Material, Texture } from "@gltf-transform/core";
-import { countedMaterials, textureName } from "../../../logic/materials.js";
+import { countedMaterials, isSkinMaterial, textureName } from "../../../logic/materials.js";
 import { wearableMaterialsOnly } from "../../../logic/wearable-only.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
@@ -21,7 +21,7 @@ export const textureCount: CheckDefinition = {
   describe: "unique texture images stay within the per-category limit (2 by default, 5 for skins)",
   explanation: "Models may use at most 2 textures (5 for skins).",
   fix: "Bake your textures into a single atlas (Blender: UV → Pack Islands, then bake all materials to one image) so the model references at most 2 images.",
-  details: "Counts unique texture images referenced by any material slot, with AvatarSkin_MAT excluded from the count.",
+  details: "Counts unique texture images referenced by any material slot. The skin material is left out: any material whose name contains \"skin\", which is how the engine recognises it (AvatarSkin_MAT, or the AvatarSkin_MAT.001 Blender gives a copy).",
   appliesTo: wearableMaterialsOnly,
   measure: (ctx) => {
     let images = 0;
@@ -34,7 +34,7 @@ export const textureCount: CheckDefinition = {
     for (const model of ctx.models) {
       const textures = new Set<Texture>();
       for (const mat of countedMaterials(model.doc)) {
-        if (mat.getName() === ctx.manifest.materials.avatarSkinMat) continue;
+        if (isSkinMaterial(mat, ctx.manifest.materials.skinNameToken)) continue;
         for (const { get } of TEXTURE_SLOTS) {
           const tex = get(mat);
           if (tex) textures.add(tex);
