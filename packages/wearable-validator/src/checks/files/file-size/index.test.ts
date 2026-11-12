@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validate } from "../../../index.js";
+import { loadInput, manifest, validate } from "../../../index.js";
+import type { CheckContext, Finding } from "../../../types.js";
+import { fileSize } from "./index.js";
 import { syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
 import { padBytes } from "#test/helpers/bytes.js";
 import { only } from "#test/helpers/findings.js";
@@ -51,6 +53,19 @@ describe("file-size (S-05)", () => {
     const glb = padBytes(await syntheticGlb(), 2_500_000);
     const result = await validate(await syntheticZip({ glb }), { checks: ["file-size"] });
     assert.equal(only(result.findings, "file-size").length, 0);
+  });
+
+  it("holds the model alone under the ceiling when a rule book sets a headroom", async () => {
+    // both headrooms are 0 today; the branch stays for a manifest that brings the cap back
+    const { ctx } = await loadInput(await syntheticZip({ glb: padBytes(await syntheticGlb(), 2_500_000) }), {});
+    assert.ok(ctx);
+    const run = (context: CheckContext) => fileSize.run(context) as Finding[];
+    assert.deepEqual(run(ctx), [], "no per-model finding with the released manifest");
+    ctx.manifest = { ...manifest, fileSize: { ...manifest.fileSize, modelHeadroomBytes: 1048576 } };
+    const [model] = run(ctx);
+    assert.equal(model.severity, "error");
+    assert.equal(model.limit, 3145728 - 1048576);
+    assert.equal(model.where, "model.glb");
   });
 
   it("warns once with category-unknown on a bare GLB without a hint", async () => {
