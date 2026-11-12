@@ -1,5 +1,5 @@
 {
-  "version": "0.8.0",
+  "version": "0.8.6",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -31,6 +31,7 @@
   },
   "materials": {
     "default": 2,
+    "extraWithEmissionOrAlpha": 1,
     "skin": 5,
     "avatarSkinMat": "AvatarSkin_MAT",
     "forbiddenMeshNamePatterns": [

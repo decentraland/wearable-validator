@@ -43,3 +43,13 @@ export function textureLabel(doc: Document, tex: Texture, index: number): string
   );
   return `${name} (${uses.length ? uses.join(", ") : `image ${twins.indexOf(tex) + 1} of ${twins.length}`})`;
 }
+
+/** A material that glows: an emissive texture, or an emissive colour that is not black. */
+export function isEmissive(material: Material): boolean {
+  return material.getEmissiveTexture() !== null || material.getEmissiveFactor().some((channel) => channel > 0);
+}
+
+/** A material drawn with transparency: alpha blend or alpha cutout. */
+export function isTransparent(material: Material): boolean {
+  return material.getAlphaMode() !== "OPAQUE";
+}

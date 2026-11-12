@@ -12,7 +12,11 @@ export interface Manifest {
     /** Eyes, eyebrows and mouth PNGs: 512×512 since the curators' decision (Nov 2026); it was 256×256. */
     facialMaxSize: number;
   };
-  materials: { default: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
+  /**
+   * extraWithEmissionOrAlpha: materials allowed on top of `default` when the model uses emission or transparency, which
+   * need a material of their own (curators' decision, Nov 2026). It does not apply to skins, which already get `skin`.
+   */
+  materials: { default: number; extraWithEmissionOrAlpha: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];
   fileSize: {
     wearableBytes: number; skinBytes: number; emoteBytes: number;
