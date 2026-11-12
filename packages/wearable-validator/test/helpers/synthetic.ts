@@ -20,6 +20,9 @@ export interface SyntheticTextureImage {
 export interface SyntheticMaterialDef {
   name: string;
   textures?: SyntheticTextureImage[];
+  /** Emissive factor, e.g. [1, 1, 1] for a glowing material with no emissive texture. */
+  emissiveFactor?: [number, number, number];
+  alphaMode?: "OPAQUE" | "MASK" | "BLEND";
 }
 
 export interface SyntheticAnimationOptions {
@@ -177,6 +180,8 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
   for (const def of options.extraMaterialDefs ?? []) {
     const extra = doc.createMaterial(def.name);
     for (const img of def.textures ?? []) attachTexture(extra, img);
+    if (def.emissiveFactor) extra.setEmissiveFactor(def.emissiveFactor);
+    if (def.alphaMode) extra.setAlphaMode(def.alphaMode);
     const extraPrim = doc.createPrimitive().setMode(4).setAttribute("POSITION", position).setMaterial(extra);
     mesh.addPrimitive(extraPrim);
   }
