@@ -1,5 +1,5 @@
 {
-  "version": "0.8.0",
+  "version": "0.8.5",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -33,6 +33,7 @@
     "default": 2,
     "skin": 5,
     "avatarSkinMat": "AvatarSkin_MAT",
+    "skinNameToken": "skin",
     "forbiddenMeshNamePatterns": [
       "_mouth",
       "_eyebrows",

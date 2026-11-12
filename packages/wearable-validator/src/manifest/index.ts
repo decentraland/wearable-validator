@@ -12,7 +12,11 @@ export interface Manifest {
     /** Eyes, eyebrows and mouth PNGs: 512×512 since the curators' decision (Nov 2026); it was 256×256. */
     facialMaxSize: number;
   };
-  materials: { default: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
+  /**
+   * avatarSkinMat is the name creators should use. skinNameToken is what the engine looks for: any material whose name
+   * contains it (any case) is tinted as skin, so those are the ones left out of the material and texture counts.
+   */
+  materials: { default: number; skin: number; avatarSkinMat: string; skinNameToken: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];
   fileSize: {
     wearableBytes: number; skinBytes: number; emoteBytes: number;
