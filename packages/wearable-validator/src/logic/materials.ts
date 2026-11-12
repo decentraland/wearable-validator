@@ -1,5 +1,6 @@
 /** Material/texture bookkeeping shared by the model checks and their measures — colliders never count. */
 import type { Document, Material, Texture } from "@gltf-transform/core";
+import type { EmissiveStrength } from "@gltf-transform/extensions";
 import { colliderNodes } from "./gltf.js";
 
 /** Materials that count toward limits: used by primitives of meshes on non-collider nodes. */
@@ -44,9 +45,14 @@ export function textureLabel(doc: Document, tex: Texture, index: number): string
   return `${name} (${uses.length ? uses.join(", ") : `image ${twins.indexOf(tex) + 1} of ${twins.length}`})`;
 }
 
-/** A material that glows: an emissive texture, or an emissive colour that is not black. */
+/**
+ * A material that glows. glTF emission is emissiveTexture × emissiveFactor and the default factor is black, so a
+ * texture alone does not glow: the factor decides. An emissive strength of 0 (KHR_materials_emissive_strength) turns it off.
+ */
 export function isEmissive(material: Material): boolean {
-  return material.getEmissiveTexture() !== null || material.getEmissiveFactor().some((channel) => channel > 0);
+  const strength = material.getExtension<EmissiveStrength>("KHR_materials_emissive_strength");
+  if (strength && strength.getEmissiveStrength() <= 0) return false;
+  return material.getEmissiveFactor().some((channel) => channel > 0);
 }
 
 /** A material drawn with transparency: alpha blend or alpha cutout. */

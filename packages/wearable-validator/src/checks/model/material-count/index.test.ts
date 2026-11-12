@@ -27,7 +27,7 @@ describe("material-count (M-06)", () => {
       [{ name: "Glow_MAT", emissiveFactor: [1, 1, 1] as [number, number, number] }, { name: "Third_MAT" }],
       [{ name: "Glass_MAT", alphaMode: "BLEND" as const }, { name: "Third_MAT" }],
       [{ name: "Cutout_MAT", alphaMode: "MASK" as const }, { name: "Third_MAT" }],
-      [{ name: "GlowTex_MAT", textures: [{ slot: "emissive" as const, size: 16 }] }, { name: "Third_MAT" }]
+      [{ name: "GlowTex_MAT", emissiveFactor: [1, 1, 1] as [number, number, number], textures: [{ slot: "emissive" as const, size: 16 }] }, { name: "Third_MAT" }]
     ];
     for (const extraMaterialDefs of cases) {
       const glb = await syntheticGlb({ extraMaterialDefs });
@@ -41,6 +41,20 @@ describe("material-count (M-06)", () => {
     const [finding] = found(await validate(await syntheticZip({ glb }), { checks: ["material-count"] }), "material-count");
     assert.equal(finding.limit, 2);
     assert.match(finding.message, /Up to 3 are accepted only when one of them is emissive or transparent/);
+  });
+
+  it("does not count an emissive texture with a black factor as emission: nothing glows", async () => {
+    const glb = await syntheticGlb({ extraMaterialDefs: [{ name: "DeadGlow_MAT", textures: [{ slot: "emissive", size: 16 }] }, { name: "Third_MAT" }] });
+    const [finding] = found(await validate(await syntheticZip({ glb }), { checks: ["material-count"] }), "material-count");
+    assert.equal(finding.severity, "error");
+    assert.equal(finding.limit, 2);
+  });
+
+  it("leaves the hint out when emission or transparency would not be enough", async () => {
+    const glb = await syntheticGlb({ extraMaterialDefs: [{ name: "Second_MAT" }, { name: "Third_MAT" }, { name: "Fourth_MAT" }] });
+    const [finding] = found(await validate(await syntheticZip({ glb }), { checks: ["material-count"] }), "material-count");
+    assert.equal(finding.measured, 4);
+    assert.doesNotMatch(finding.message, /emissive or transparent/);
   });
 
   it("rejects a fourth material even with emission and transparency", async () => {
