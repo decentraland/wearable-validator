@@ -2,12 +2,9 @@
 import type { Node } from "@gltf-transform/core";
 import { channelKeys, emoteOnly, keyValue, parentNode, round3, type ChannelKeys } from "../../../logic/animation.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
-import { manifest } from "../../../manifest/index.js";
 import { EMOTES } from "../../docs.js";
 
 const meta: CheckMeta = { name: "root-motion", group: "emote", rule: "E-05", docs: `${EMOTES}#the-animation-specifications` };
-
-const RM = manifest.emote.rootMotion;
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -23,8 +20,8 @@ export const rootMotion: CheckDefinition = {
   ...meta,
   title: "Root motion",
   describe: "the hips stay inside the animation area: a cylinder around the avatar's origin, and near the ground",
-  explanation: `The animation must keep the avatar inside the animation area: within ${RM.horizontalWarnMeters} m of the centre (the cylinder in the reference file and the Builder) and near the ground. Up to ${RM.horizontalErrorMeters} m is a warning, for a curator to judge whether the motion has a reason; further is rejected.`,
-  fix: `Keep the hips within ${RM.horizontalWarnMeters} m of the centre of the animation area and near the ground — remove keys that walk the avatar away, or start the emote closer to the centre.`,
+  explanation: "The animation must keep the avatar inside the animation area: within the documented radius of its centre (the cylinder in the reference file and the Builder) and near the ground. A little past the radius is a warning, for a curator to judge whether the motion has a reason; further is rejected.",
+  fix: "Keep the hips within the animation area's radius of its centre and near the ground — remove keys that walk the avatar away, or start the emote closer to the centre.",
   details: "Follows the hips translation channel through the rig's rest transforms. Horizontally it measures every key's distance from the vertical axis through the origin, the centre of the animation area, so where the emote starts counts: over emote.rootMotion.horizontalWarnMeters warns, over horizontalErrorMeters fails. Vertically it measures the travel from the first key: over verticalWarnMeters warns, over verticalErrorMeters fails.",
   appliesTo: emoteOnly,
   run: (ctx) => {

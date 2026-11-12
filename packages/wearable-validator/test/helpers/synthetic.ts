@@ -76,6 +76,8 @@ export interface SyntheticOptions {
    * `skinned: false` the bones still stand, and the unskinned cube is drawn where its node puts it.
    */
   standing?: boolean;
+  /** Move the Armature node off the origin, as a rig exported away from the centre would be. */
+  armatureTranslation?: [number, number, number];
   /** Bones created as nodes but left out of the skin's joints (an exporter that drops bones the mesh doesn't use). */
   unskinnedBones?: string[];
   /** Uniform scale on the cube's node: where an unskinned cube is drawn (a skinned mesh ignores its node). */
@@ -204,6 +206,7 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
   if (options.skinned !== false || options.standing) {
     const armature = doc.createNode("Armature");
     scene.addChild(armature);
+    if (options.armatureTranslation) armature.setTranslation(options.armatureTranslation);
     boneNodes = boneNames.map((name) => doc.createNode(name));
     // flat hierarchy under Armature — enough for joint-name checks
     for (const b of boneNodes) armature.addChild(b);

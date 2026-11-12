@@ -5,15 +5,15 @@ import { of, runChecks } from "#test/helpers/emote.js";
 
 describe("root-motion (E-05)", () => {
   it("warns between the documented radius and the hard limit (curators: 1 m, with leeway when the motion has a reason)", async () => {
-    // like The Re-Animator / Reanimated!: starts at the centre, ends 1.48 m away
+    // like The Re-Animator / Reanimated!: starts at the centre, gets 1.48 m away
     const result = await runChecks(
-      { animations: [{ name: "Walk_Avatar", seconds: 2, values: [0, 0, 0, 1.2, 0, 0, 0, 0, 0] }] },
+      { animations: [{ name: "Walk_Avatar", seconds: 2, values: [0, 0, 0, 1.48, 0, 0, 0, 0, 0] }] },
       ["root-motion"]
     );
     const findings = of(result, "root-motion");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "warning");
-    assert.equal(findings[0].measured, 1.2);
+    assert.equal(findings[0].measured, 1.48);
     assert.equal(findings[0].limit, manifest.emote.rootMotion.horizontalWarnMeters);
   });
 
@@ -32,6 +32,17 @@ describe("root-motion (E-05)", () => {
     const errors = of(startsOutside, "root-motion").filter((f) => f.severity === "error");
     assert.equal(errors.length, 1);
     assert.equal(errors[0].measured, 2.1);
+  });
+
+  it("counts an armature that sits away from the origin", async () => {
+    // real rigs carry the offset on the Armature node, not in the hips keys: the hips never move, but they are 2 m out
+    const result = await runChecks(
+      { armatureTranslation: [2, 0, 0], animations: [{ name: "Idle_Avatar", seconds: 2, values: [0, 0, 0, 0, 0, 0, 0, 0, 0] }] },
+      ["root-motion"]
+    );
+    const errors = of(result, "root-motion").filter((f) => f.severity === "error");
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].measured, 2);
   });
 
   it("errors when the hips travel too far horizontally", async () => {
