@@ -47,7 +47,11 @@ export interface Manifest {
     maxClipsBasic: number; maxClipsWithProps: number;
     propMaxTriangles: number; propMaxMaterials: number; propMaxTextures: number; propMaxBones: number;
     propClipLengthToleranceSeconds: number; audioDurationToleranceSeconds: number;
-    rootMotion: { horizontalErrorMeters: number; verticalWarnMeters: number; verticalErrorMeters: number; hipsPattern: string };
+    /**
+     * The hips' distance from the centre of the animation area: over horizontalWarnMeters (the documented 1 m) warns, over
+     * horizontalErrorMeters fails. Vertical travel from the first key: over verticalWarnMeters warns, over verticalErrorMeters fails.
+     */
+    rootMotion: { horizontalWarnMeters: number; horizontalErrorMeters: number; verticalWarnMeters: number; verticalErrorMeters: number; hipsPattern: string };
     maxSocialOutcomes: number;
   };
   epsilons: { loopSeamTranslation: number; loopSeamQuaternionDot: number; loopSeamScale: number; zUpRotationToleranceDegrees: number };

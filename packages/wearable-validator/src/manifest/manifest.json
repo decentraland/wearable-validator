@@ -1,5 +1,5 @@
 {
-  "version": "0.8.0",
+  "version": "0.8.4",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -119,7 +119,8 @@
     "propClipLengthToleranceSeconds": 0.0333333,
     "audioDurationToleranceSeconds": 0.5,
     "rootMotion": {
-      "horizontalErrorMeters": 1,
+      "horizontalWarnMeters": 1,
+      "horizontalErrorMeters": 1.5,
       "verticalWarnMeters": 1,
       "verticalErrorMeters": 4,
       "hipsPattern": "hips"

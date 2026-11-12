@@ -1,4 +1,4 @@
-/** E-05 Root motion — an emote that walks the avatar away from its start breaks collision and camera in-world. */
+/** E-05 Root motion — an emote that walks the avatar out of its animation area breaks collision and camera in-world. */
 import type { Node } from "@gltf-transform/core";
 import { channelKeys, emoteOnly, keyValue, parentNode, round3, type ChannelKeys } from "../../../logic/animation.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
@@ -19,10 +19,10 @@ function applyMat4(m: number[], p: number[]): [number, number, number] {
 export const rootMotion: CheckDefinition = {
   ...meta,
   title: "Root motion",
-  describe: "hips displacement stays within the allowed horizontal radius and vertical range",
-  explanation: "The animation must keep the avatar within 1 m of its starting position and near the ground.",
-  fix: "Keep the hips within 1 m of the starting position and near the ground — remove keys that walk the avatar away.",
-  details: "Follows the hips translation channel through the rig's rest transforms: over 1 m horizontal fails; over 1 m vertical warns; over 4 m fails.",
+  describe: "the hips stay inside the animation area: a cylinder around the avatar's origin, and near the ground",
+  explanation: "The animation must keep the avatar inside the animation area: within the documented radius of its centre (the cylinder in the reference file and the Builder) and near the ground. A little past the radius is a warning, for a curator to judge whether the motion has a reason; further is rejected.",
+  fix: "Keep the hips within the animation area's radius of its centre and near the ground — remove keys that walk the avatar away, or start the emote closer to the centre.",
+  details: "Follows the hips translation channel through the rig's rest transforms. Horizontally it measures every key's distance from the vertical axis through the origin, the centre of the animation area, so where the emote starts counts: over emote.rootMotion.horizontalWarnMeters warns, over horizontalErrorMeters fails. Vertically it measures the travel from the first key: over verticalWarnMeters warns, over verticalErrorMeters fails.",
   appliesTo: emoteOnly,
   run: (ctx) => {
     const findings: Finding[] = [];
@@ -51,22 +51,31 @@ export const rootMotion: CheckDefinition = {
         let base: [number, number, number] | null = null;
         for (let i = 0; i < keys.count; i++) {
           const p = applyMat4(world, keyValue(keys, i, 3));
+          // the animation area is a cylinder around the origin, so every key counts, the first one included
+          const h = Math.hypot(p[0], p[2]);
+          if (h > horizontal) horizontal = h;
           if (!base) {
             base = p;
             continue;
           }
-          const h = Math.hypot(p[0] - base[0], p[2] - base[2]);
-          if (h > horizontal) horizontal = h;
           const v = Math.abs(p[1] - base[1]);
           if (v > vertical) vertical = v;
         }
       }
       if (horizontal > rm.horizontalErrorMeters) {
         findings.push(
-          finding(meta, "error", `The hips travel ${round3(horizontal)} m horizontally — emotes must stay within a ${rm.horizontalErrorMeters} m radius of the start position. Reduce the root motion.`, {
+          finding(meta, "error", `The hips get ${round3(horizontal)} m away from the centre of the animation area — emotes must stay within ${rm.horizontalWarnMeters} m of it, and up to ${rm.horizontalErrorMeters} m is accepted with a warning. Reduce the root motion.`, {
             where: model.mainFile,
             measured: round3(horizontal),
             limit: rm.horizontalErrorMeters
+          })
+        );
+      } else if (horizontal > rm.horizontalWarnMeters) {
+        findings.push(
+          finding(meta, "warning", `The hips get ${round3(horizontal)} m away from the centre of the animation area — emotes should stay within ${rm.horizontalWarnMeters} m of it. Up to ${rm.horizontalErrorMeters} m is accepted when the motion has a reason; a curator decides.`, {
+            where: model.mainFile,
+            measured: round3(horizontal),
+            limit: rm.horizontalWarnMeters
           })
         );
       }
