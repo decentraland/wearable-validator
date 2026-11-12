@@ -69,7 +69,8 @@ describe("texture-size (M-03)", () => {
 
   it("facial features one pixel over the limit are errors", async () => {
     const result = await validate(pngBytes(FACIAL_MAX + 1, FACIAL_MAX + 1), { category: "eyes", checks: ["texture-size"] });
-    const findings = found(result, "texture-size");
+    // an odd size also gets the power-of-two warning; only the size error matters here
+    const findings = found(result, "texture-size").filter((f) => f.severity === "error");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "error");
     assert.equal(findings[0].limit, `${FACIAL_MAX}×${FACIAL_MAX}`);
