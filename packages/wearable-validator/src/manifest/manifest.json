@@ -1,5 +1,5 @@
 {
-  "version": "0.8.0",
+  "version": "0.8.2",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -27,7 +27,7 @@
     "default": 2,
     "skin": 5,
     "maxSize": 1024,
-    "facialMaxSize": 512
+    "facialMaxSize": 1024
   },
   "materials": {
     "default": 2,

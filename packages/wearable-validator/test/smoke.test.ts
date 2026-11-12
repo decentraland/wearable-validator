@@ -25,7 +25,7 @@ describe("plumbing smoke", () => {
   };
 
   it("fails a full run on an error even when some checks could not run (a facial feature over the size limit)", async () => {
-    const result = await validate(await facial(600));
+    const result = await validate(await facial(1100));
     assert.ok(result.checks.some((row) => row.status === "skipped"), "the model checks skip a PNG set");
     assert.ok(result.findings.some((finding) => finding.severity === "error"));
     assert.equal(result.passed, false);
@@ -38,13 +38,13 @@ describe("plumbing smoke", () => {
   });
 
   it("still never mints a verdict for a subset of checks, errors or not", async () => {
-    const result = await validate(await facial(600), { checks: ["file-format"] });
+    const result = await validate(await facial(1100), { checks: ["file-format"] });
     assert.ok(result.findings.some((finding) => finding.severity === "error"));
     assert.equal(result.passed, null);
   });
 
   it("still never mints a verdict for a subset of groups, errors or not", async () => {
-    const result = await validate(await facial(600), { groups: ["files"] });
+    const result = await validate(await facial(1100), { groups: ["files"] });
     assert.ok(result.findings.some((finding) => finding.severity === "error"));
     assert.equal(result.passed, null);
   });
