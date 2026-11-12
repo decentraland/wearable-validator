@@ -37,7 +37,7 @@
   },
   "root-motion": {
     "file": "src/checks/emote/root-motion/index.ts",
-    "line": 7
+    "line": 8
   },
   "social-outcomes": {
     "file": "src/checks/emote/social-outcomes/index.ts",
