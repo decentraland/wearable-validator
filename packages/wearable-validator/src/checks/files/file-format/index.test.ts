@@ -46,16 +46,19 @@ describe("file-format (S-01)", () => {
     assert.match(findings[0].message, /not GLB binary/);
   });
 
-  it("errors on facial-feature PNGs over 512×512", async () => {
-    const findings = only((await validate(pngBytes(600, 600), { category: "eyes", checks: ["file-format"] })).findings, "file-format");
+  it("errors on facial-feature PNGs over 1024×1024", async () => {
+    const findings = only((await validate(pngBytes(1100, 1100), { category: "eyes", checks: ["file-format"] })).findings, "file-format");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "error");
-    assert.equal(findings[0].limit, "512×512");
+    assert.equal(findings[0].limit, "1024×1024");
   });
 
-  it("accepts facial-feature PNGs up to 512×512 (curators' decision; it was 256×256)", async () => {
-    const result = await validate(pngBytes(512, 512), { category: "eyes", checks: ["file-format"] });
-    assert.equal(only(result.findings, "file-format").length, 0);
+  it("accepts facial-feature PNGs up to 1024×1024 (curators' decision; it was 256×256, then 512×512)", async () => {
+    for (const size of [1000, 1024]) {
+      // 1000×1000 is what the approved facial items the old limit failed use (Too Much Chaos, Simple Eyes, Wazzup)
+      const result = await validate(pngBytes(size, size), { category: "eyes", checks: ["file-format"] });
+      assert.equal(only(result.findings, "file-format").length, 0);
+    }
   });
 
   it("errors from the header alone on a facial-feature PNG claiming bomb-sized dimensions", async () => {
@@ -63,7 +66,7 @@ describe("file-format (S-01)", () => {
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "error");
     assert.equal(findings[0].measured, "12000×12000");
-    assert.equal(findings[0].limit, "512×512");
+    assert.equal(findings[0].limit, "1024×1024");
   });
 
   it("passes a valid facial-feature PNG and a valid wearable zip", async () => {

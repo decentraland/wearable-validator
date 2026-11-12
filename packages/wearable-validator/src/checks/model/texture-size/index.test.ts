@@ -65,16 +65,16 @@ describe("texture-size (M-03)", () => {
     assert.equal(found(result, "texture-size").length, 0);
   });
 
-  it("facial features over 512 are errors", async () => {
-    const result = await validate(pngBytes(1024, 1024), { category: "eyes", checks: ["texture-size"] });
+  it("facial features over 1024 are errors", async () => {
+    const result = await validate(pngBytes(2048, 2048), { category: "eyes", checks: ["texture-size"] });
     const findings = found(result, "texture-size");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "error");
-    assert.equal(findings[0].limit, "512×512");
+    assert.equal(findings[0].limit, "1024×1024");
   });
 
-  it("facial features up to 512×512 pass (curators' decision; it was 256×256)", async () => {
-    const result = await validate(pngBytes(512, 512), { category: "eyes", checks: ["texture-size"] });
+  it("facial features up to 1024×1024 pass (curators' decision; it was 256×256, then 512×512)", async () => {
+    const result = await validate(pngBytes(1024, 1024), { category: "eyes", checks: ["texture-size"] });
     assert.equal(found(result, "texture-size").length, 0);
   });
 

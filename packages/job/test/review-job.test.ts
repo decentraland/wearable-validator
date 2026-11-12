@@ -352,7 +352,7 @@ describe("the review job", () => {
   it("rejects a facial feature with errors instead of calling it undecided, so the Builder doesn't retry it", async () => {
     const representation = { bodyShapes: ["urn:decentraland:off-chain:base-avatars:BaseMale"], mainFile: "eyebrows.png", contents: ["eyebrows.png", "eyebrows_mask.png"] };
     const manifest = { name: "Big Brows", description: "synthetic", rarity: "common", data: { category: "eyebrows", tags: [], hides: [], replaces: [], representations: [representation] } };
-    const big = await syntheticEntity(await syntheticZip({ manifest, extraFiles: { "eyebrows.png": pngBytes(600, 600), "eyebrows_mask.png": pngBytes(600, 600) } }), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:4`);
+    const big = await syntheticEntity(await syntheticZip({ manifest, extraFiles: { "eyebrows.png": pngBytes(1100, 1100), "eyebrows_mask.png": pngBytes(1100, 1100) } }), `urn:decentraland:amoy:collections-v2:0x${"ab".repeat(20)}:4`);
     big.files.delete("model.glb");
     big.content = big.content.filter(({ file }) => file !== "model.glb");
     const slack = fakeSlack();

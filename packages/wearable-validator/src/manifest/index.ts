@@ -9,7 +9,7 @@ export interface Manifest {
   };
   textures: {
     default: number; skin: number; maxSize: number;
-    /** Eyes, eyebrows and mouth PNGs: 512×512 since the curators' decision (Nov 2026); it was 256×256. */
+    /** Eyes, eyebrows and mouth PNGs: 1024×1024, the same as any other texture, since the curators' decision (Nov 2026). It was 256×256, then 512×512. */
     facialMaxSize: number;
   };
   materials: { default: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
