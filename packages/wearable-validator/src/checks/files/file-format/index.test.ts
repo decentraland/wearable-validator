@@ -1,12 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { manifest, validate } from "../../../index.js";
-
-const FACIAL_MAX = manifest.textures.facialMaxSize;
 import { pngBytes, pngHeaderBytes, syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
 import { enc } from "#test/helpers/bytes.js";
 import { only } from "#test/helpers/findings.js";
 import { wearableManifest } from "#test/helpers/manifest.js";
+
+const FACIAL_MAX = manifest.textures.facialMaxSize;
 
 describe("file-format (S-01)", () => {
   // the GLB's JSON with its binary chunk inlined as a data: URI: a .gltf exported as "glTF Embedded"
@@ -55,9 +55,9 @@ describe("file-format (S-01)", () => {
     assert.equal(findings[0].limit, `${FACIAL_MAX}×${FACIAL_MAX}`);
   });
 
-  it("accepts facial-feature PNGs up to 1024×1024 (curators' decision; it was 256×256, then 512×512)", async () => {
+  it("accepts facial-feature PNGs up to the limit (curators' decision: 1024×1024; it was 256×256, then 512×512)", async () => {
     for (const size of [1000, FACIAL_MAX]) {
-      // 1000×1000 is what the approved facial items the old limit failed use (Too Much Chaos, Simple Eyes, Wazzup)
+      // 1000×1000 is what the approved facial items the old limit failed use (Too Much Chaos, DCL Vision, Wazzup, Simple Eyes)
       const result = await validate(pngBytes(size, size), { category: "eyes", checks: ["file-format"] });
       assert.equal(only(result.findings, "file-format").length, 0);
     }

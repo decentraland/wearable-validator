@@ -1,10 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { manifest, validate } from "../../../index.js";
-
-const FACIAL_MAX = manifest.textures.facialMaxSize;
 import { found } from "#test/helpers/findings.js";
 import { pngBytes, syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
+
+const FACIAL_MAX = manifest.textures.facialMaxSize;
 
 describe("texture-size (M-03)", () => {
   it("errors on textures over 1024", async () => {
@@ -76,7 +76,7 @@ describe("texture-size (M-03)", () => {
     assert.equal(findings[0].limit, `${FACIAL_MAX}×${FACIAL_MAX}`);
   });
 
-  it("facial features up to 1024×1024 pass (curators' decision; it was 256×256, then 512×512)", async () => {
+  it("facial features up to the limit pass (curators' decision: 1024×1024; it was 256×256, then 512×512)", async () => {
     const result = await validate(pngBytes(FACIAL_MAX, FACIAL_MAX), { category: "eyes", checks: ["texture-size"] });
     assert.equal(found(result, "texture-size").length, 0);
   });

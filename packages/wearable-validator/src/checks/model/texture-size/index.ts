@@ -9,6 +9,8 @@ import { WEARABLES } from "../../docs.js";
 const meta: CheckMeta = { name: "texture-size", group: "model", rule: "M-03", docs: `${WEARABLES}#base-materials-and-textures` };
 
 const { maxSize: MAX, facialMaxSize: FACIAL_MAX } = manifest.textures;
+// said only when facial features have a limit of their own; with the same limit the aside would just repeat the number
+const FACIAL_NOTE = FACIAL_MAX === MAX ? "" : ` (${FACIAL_MAX}×${FACIAL_MAX} for facial features)`;
 
 const isPowerOfTwo = (n: number): boolean => n > 0 && (n & (n - 1)) === 0;
 
@@ -56,8 +58,8 @@ export const textureSize: CheckDefinition = {
   ...meta,
   title: "Texture size",
   describe: `textures are square, within the size limit (${MAX}², facial features ${FACIAL_MAX}² with alpha), and warn when not power-of-two`,
-  explanation: `Textures must be square and at most ${MAX}×${MAX} pixels (${FACIAL_MAX}×${FACIAL_MAX} for facial features).`,
-  fix: `Resize the texture to ${MAX}×${MAX} or smaller (${FACIAL_MAX}×${FACIAL_MAX} for facial features) and make it square — re-bake or scale it in any image editor.`,
+  explanation: `Textures must be square and at most ${MAX}×${MAX} pixels${FACIAL_NOTE}.`,
+  fix: `Resize the texture to ${MAX}×${MAX} or smaller${FACIAL_NOTE} and make it square — re-bake or scale it in any image editor.`,
   details: "Reads each image's dimensions from its header: over the limit or non-square fails; non-power-of-two dimensions warn.",
   categoryDependent: true,
   appliesTo: wearableMaterialsOnly,
