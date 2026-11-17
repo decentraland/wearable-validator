@@ -153,3 +153,6 @@ function isColourKey(key: Uint16Array | undefined, channels: number, r: number, 
   if (!key || key.length !== channels) return false;
   return channels === 1 ? key[0] === r : key[0] === r && key[1] === g && key[2] === b;
 }
+
+/** GPUs handle power-of-two texture sizes (512, 1024) best; anything else is worth a warning. */
+export const isPowerOfTwo = (n: number): boolean => n > 0 && (n & (n - 1)) === 0;

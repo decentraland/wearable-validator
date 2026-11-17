@@ -59,8 +59,27 @@ describe("file-format (S-01)", () => {
     for (const size of [1000, FACIAL_MAX]) {
       // 1000×1000 is what the approved facial items the old limit failed use (Too Much Chaos, DCL Vision, Wazzup, Simple Eyes)
       const result = await validate(pngBytes(size, size), { category: "eyes", checks: ["file-format"] });
-      assert.equal(only(result.findings, "file-format").length, 0);
+      assert.equal(only(result.findings, "file-format").filter((f) => f.severity === "error").length, 0);
     }
+  });
+
+  it("warns on a facial-feature PNG whose size is not a power of two, on the item as it is published", async () => {
+    // a facial item has no model, so texture-size (which warns on this inside a GLB) is skipped: file-format has to say it
+    const facialItem = (size: number) =>
+      syntheticZip({
+        manifest: wearableManifest({}, { category: "eyes", representations: [{ bodyShapes: ["urn:decentraland:off-chain:base-avatars:BaseMale"], mainFile: "eyes.png", contents: ["eyes.png", "eyes_mask.png"], overrideHides: [], overrideReplaces: [] }] }),
+        extraFiles: { "eyes.png": pngBytes(size, size), "eyes_mask.png": pngBytes(size, size) }
+      });
+    const odd = await validate(await facialItem(1000));
+    const warnings = only(odd.findings, "file-format");
+    assert.equal(warnings.length, 2, "one for each PNG of the set");
+    for (const w of warnings) {
+      assert.equal(w.severity, "warning");
+      assert.match(w.message, /1000×1000, which is not a power of two/);
+    }
+    assert.equal(odd.findings.filter((f) => f.severity === "error").length, 0, "a warning does not stop the item");
+    const even = await validate(await facialItem(FACIAL_MAX));
+    assert.equal(only(even.findings, "file-format").length, 0);
   });
 
   it("errors on a facial-feature PNG that is under the limit but not square", async () => {
