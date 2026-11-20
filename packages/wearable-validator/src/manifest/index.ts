@@ -141,7 +141,7 @@ export interface Manifest {
   smartWearableCode: { promptVersion: number; maxFindings: number; maxCodeBytes: number; maxInputTokens: number };
   /**
    * D-01: an upload against the published catalog, calibrated on the 11,231 approved items of Nov 2026 (10,594 comparable):
-   * at warnShare 0.9, 743 match an earlier item by another creator, 45 of them from the last 12 months.
+   * at warnShare 0.85, 795 match an earlier item by another creator, 46 of them from the last 12 months.
    */
   similarItems: {
     /** Position signal: the grid a vertex is snapped to. 2 and 4 mm found nothing 1 mm missed. */

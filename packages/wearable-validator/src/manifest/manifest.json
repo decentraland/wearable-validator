@@ -363,7 +363,7 @@
     "minTriangles": 100,
     "ratioTolerance": 0.02,
     "commonCreators": 50,
-    "warnShare": 0.9,
+    "warnShare": 0.85,
     "containsShare": 0.95,
     "templateCreators": 10,
     "maxFindings": 3
