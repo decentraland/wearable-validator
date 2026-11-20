@@ -1,7 +1,8 @@
 import type { Document } from "@gltf-transform/core";
+import type { ModelFingerprint } from "./logic/fingerprint.js";
 import type { Manifest } from "./manifest/index.js";
 
-export type Group = "files" | "model" | "emote" | "rendering" | "content" | "code";
+export type Group = "files" | "model" | "emote" | "rendering" | "content" | "code" | "catalog";
 export type Severity = "error" | "warning";
 export type CheckStatus = "passed" | "failed" | "warning" | "skipped" | "errored";
 export type ItemType = "wearable" | "emote";
@@ -307,8 +308,44 @@ export interface Reviewer {
   review(request: ReviewRequest, signal?: AbortSignal): Promise<ReviewResult>;
 }
 
+/** A published item an upload's geometry was found in, or that was found inside the upload. Shares are 0 to 1. */
+export interface CatalogMatch {
+  urn: string;
+  name: string;
+  /** Creator wallet. */
+  creator: string;
+  /** Unix seconds: when the item's collection was created on-chain. */
+  publishedAt: number;
+  /** The item's public marketplace page. */
+  url: string;
+  /** Which of the uploaded models matched (index into the fingerprints sent). */
+  model: number;
+  /** Share of the upload's own geometry found in the item: the larger of position and shape. */
+  share: number;
+  position: number;
+  shape: number;
+  /** Share of the item's own geometry found inside the upload. */
+  contains: number;
+}
+
+export interface CatalogAnswer {
+  /** false when no uploaded model has enough geometry of its own to compare (a retextured base wearable, an emote without props). */
+  compared: boolean;
+  /** Earliest published first. Never the uploader's own items: the host tells its catalog whose upload it is. */
+  matches: CatalogMatch[];
+}
+
+/**
+ * The published items an upload is compared with. The check sends fingerprints (logic/fingerprint.ts), never the files.
+ * createCatalog() in logic/similarity.ts answers from an index in memory; a host may answer from a server instead.
+ */
+export interface Catalog {
+  match(models: ModelFingerprint[], signal?: AbortSignal): Promise<CatalogAnswer>;
+}
+
 export interface Services {
   renderer?: Renderer;
   reviewer?: Reviewer;
+  catalog?: Catalog;
 }
 

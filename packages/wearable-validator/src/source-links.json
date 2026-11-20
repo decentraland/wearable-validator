@@ -1,4 +1,8 @@
 {
+  "similar-items": {
+    "file": "src/checks/catalog/similar-items/index.ts",
+    "line": 10
+  },
   "smart-wearable-code": {
     "file": "src/checks/code/smart-wearable-code/index.ts",
     "line": 11

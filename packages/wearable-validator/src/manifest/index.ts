@@ -139,6 +139,31 @@ export interface Manifest {
   emoteQuality: { promptVersion: number; maxFindings: number };
   /** S-12: one model call reads a smart wearable's code; its own input budget, since a bundle carries the SDK. Minified JS runs near 1.7 characters a token (DJ Cat: 372 KB, 219k tokens), so 1.5 MB fills most of the model's 1M-token context. */
   smartWearableCode: { promptVersion: number; maxFindings: number; maxCodeBytes: number; maxInputTokens: number };
+  /**
+   * D-01: an upload against the published catalog, calibrated on the 11,231 approved items of Nov 2026 (10,594 comparable):
+   * at warnShare 0.9, 743 match an earlier item by another creator, 45 of them from the last 12 months.
+   */
+  similarItems: {
+    /** Position signal: the grid a vertex is snapped to. 2 and 4 mm found nothing 1 mm missed. */
+    gridMillimeters: number;
+    /** Own cells a model needs for the position signal: fewer match by accident. */
+    minCells: number;
+    /** A connected part needs this many triangles and this many different corner-valence triples for its shape to mean anything (a UV sphere has 4). */
+    minPartTriangles: number; minPartKinds: number;
+    /** Triangles in such parts a model needs for the shape signal. */
+    minTriangles: number;
+    /** Two parts with the same signature are the same shape when both axis ratios agree within this. */
+    ratioTolerance: number;
+    /** Geometry in the items of this many creators is nobody's (the reference body): removed before comparing. */
+    commonCreators: number;
+    /** Warn when this share of the upload's own geometry is in a published item. */
+    warnShare: number;
+    /** Warn when this share of a published item sits inside the upload. */
+    containsShare: number;
+    /** Geometry already published by this many creators is a shared template: no warning (decided Nov 2026). */
+    templateCreators: number;
+    maxFindings: number;
+  };
   receipts: Record<string, string>;
 }
 

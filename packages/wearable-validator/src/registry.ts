@@ -1,6 +1,6 @@
 /**
  * The rule book as one ordered list. Registry order IS execution and reporting order —
- * stable across runs (files → model → emote → content → rendering → code; within a group, rule-book table order).
+ * stable across runs (files → model → emote → content → rendering → code → catalog; within a group, rule-book table order).
  * Every creator-facing surface (explanations, fixes, details, docs links) is derived from the
  * definitions here, so nothing can drift from the check that runs.
  */
@@ -11,6 +11,7 @@ import { emoteChecks } from "./checks/emote/index.js";
 import { contentChecks } from "./checks/content/index.js";
 import { renderingChecks } from "./checks/rendering/index.js";
 import { codeChecks } from "./checks/code/index.js";
+import { catalogChecks } from "./checks/catalog/index.js";
 
 export const registry: CheckDefinition[] = [
   ...filesChecks,
@@ -18,7 +19,8 @@ export const registry: CheckDefinition[] = [
   ...emoteChecks,
   ...contentChecks,
   ...renderingChecks,
-  ...codeChecks
+  ...codeChecks,
+  ...catalogChecks
 ];
 
 const byName = new Map(registry.map((c) => [c.name, c]));

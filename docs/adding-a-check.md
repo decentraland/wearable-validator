@@ -14,6 +14,7 @@ A check is one folder. Open `packages/wearable-validator/src/checks/files/catego
 | `content` | P5 content policy (`F-xx`) | `src/checks/content/` |
 | `rendering` | P4 visual QA (`V-xx`) | `src/checks/rendering/` |
 | `code` | smart wearable code review (`S-12`), opt-in like `rendering` | `src/checks/code/` |
+| `catalog` | comparison with published items (`D-xx`), opt-in: needs `services.catalog` | `src/checks/catalog/` |
 
 The name is the API: readable kebab-case that says what is checked (`triangle-count`, `loop-seam`), never the rule ID. The rule ID is metadata; get it from the rule book.
 

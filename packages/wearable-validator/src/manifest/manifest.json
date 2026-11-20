@@ -1,5 +1,5 @@
 {
-  "version": "0.8.6",
+  "version": "0.9.0",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -354,6 +354,19 @@
     "maxFindings": 8,
     "maxCodeBytes": 1572864,
     "maxInputTokens": 950000
+  },
+  "similarItems": {
+    "gridMillimeters": 1,
+    "minCells": 30,
+    "minPartTriangles": 50,
+    "minPartKinds": 10,
+    "minTriangles": 100,
+    "ratioTolerance": 0.02,
+    "commonCreators": 50,
+    "warnShare": 0.9,
+    "containsShare": 0.95,
+    "templateCreators": 10,
+    "maxFindings": 3
   },
   "receipts": {
     "trianglesAndBones": "builder src/lib/glbValidation/constants.ts",

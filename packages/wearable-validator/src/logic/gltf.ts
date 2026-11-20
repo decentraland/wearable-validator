@@ -190,7 +190,7 @@ function walkDown(doc: Document, visit: (node: Node, parent: Node | null) => voi
 }
 
 /** Column-major a × b. */
-function multiply(a: number[], b: number[]): number[] {
+export function multiply(a: number[], b: number[]): number[] {
   const out = new Array<number>(16);
   for (let col = 0; col < 4; col++) {
     for (let row = 0; row < 4; row++) {
