@@ -1,10 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validate } from "../../../index.js";
+import { manifest, validate } from "../../../index.js";
 import { pngBytes, pngHeaderBytes, syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
 import { enc } from "#test/helpers/bytes.js";
 import { only } from "#test/helpers/findings.js";
 import { wearableManifest } from "#test/helpers/manifest.js";
+
+const FACIAL_MAX = manifest.textures.facialMaxSize;
 
 describe("file-format (S-01)", () => {
   // the GLB's JSON with its binary chunk inlined as a data: URI: a .gltf exported as "glTF Embedded"
@@ -46,16 +48,45 @@ describe("file-format (S-01)", () => {
     assert.match(findings[0].message, /not GLB binary/);
   });
 
-  it("errors on facial-feature PNGs over 512×512", async () => {
-    const findings = only((await validate(pngBytes(600, 600), { category: "eyes", checks: ["file-format"] })).findings, "file-format");
+  it("errors on facial-feature PNGs one pixel over the limit", async () => {
+    const findings = only((await validate(pngBytes(FACIAL_MAX + 1, FACIAL_MAX + 1), { category: "eyes", checks: ["file-format"] })).findings, "file-format");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "error");
-    assert.equal(findings[0].limit, "512×512");
+    assert.equal(findings[0].limit, `${FACIAL_MAX}×${FACIAL_MAX}`);
   });
 
-  it("accepts facial-feature PNGs up to 512×512 (curators' decision; it was 256×256)", async () => {
-    const result = await validate(pngBytes(512, 512), { category: "eyes", checks: ["file-format"] });
-    assert.equal(only(result.findings, "file-format").length, 0);
+  it("accepts facial-feature PNGs up to the limit (curators' decision: 1024×1024; it was 256×256, then 512×512)", async () => {
+    for (const size of [1000, FACIAL_MAX]) {
+      // 1000×1000 is what the approved facial items the old limit failed use (Too Much Chaos, DCL Vision, Wazzup, Simple Eyes)
+      const result = await validate(pngBytes(size, size), { category: "eyes", checks: ["file-format"] });
+      assert.equal(only(result.findings, "file-format").filter((f) => f.severity === "error").length, 0);
+    }
+  });
+
+  it("warns on a facial-feature PNG whose size is not a power of two, on the item as it is published", async () => {
+    // a facial item has no model, so texture-size (which warns on this inside a GLB) is skipped: file-format has to say it
+    const facialItem = (size: number) =>
+      syntheticZip({
+        manifest: wearableManifest({}, { category: "eyes", representations: [{ bodyShapes: ["urn:decentraland:off-chain:base-avatars:BaseMale"], mainFile: "eyes.png", contents: ["eyes.png", "eyes_mask.png"], overrideHides: [], overrideReplaces: [] }] }),
+        extraFiles: { "eyes.png": pngBytes(size, size), "eyes_mask.png": pngBytes(size, size) }
+      });
+    const odd = await validate(await facialItem(1000));
+    const warnings = only(odd.findings, "file-format");
+    assert.equal(warnings.length, 2, "one for each PNG of the set");
+    for (const w of warnings) {
+      assert.equal(w.severity, "warning");
+      assert.match(w.message, /1000×1000, which is not a power of two/);
+    }
+    assert.equal(odd.findings.filter((f) => f.severity === "error").length, 0, "a warning does not stop the item");
+    const even = await validate(await facialItem(FACIAL_MAX));
+    assert.equal(only(even.findings, "file-format").length, 0);
+  });
+
+  it("errors on a facial-feature PNG that is under the limit but not square", async () => {
+    const findings = only((await validate(pngBytes(FACIAL_MAX, FACIAL_MAX / 2), { category: "eyes", checks: ["file-format"] })).findings, "file-format");
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].severity, "error");
+    assert.match(findings[0].message, /must be square/);
   });
 
   it("errors from the header alone on a facial-feature PNG claiming bomb-sized dimensions", async () => {
@@ -63,7 +94,7 @@ describe("file-format (S-01)", () => {
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "error");
     assert.equal(findings[0].measured, "12000×12000");
-    assert.equal(findings[0].limit, "512×512");
+    assert.equal(findings[0].limit, `${FACIAL_MAX}×${FACIAL_MAX}`);
   });
 
   it("passes a valid facial-feature PNG and a valid wearable zip", async () => {

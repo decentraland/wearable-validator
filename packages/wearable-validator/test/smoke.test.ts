@@ -1,7 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { checks, validate } from "../src/index.js";
+import { checks, manifest, validate } from "../src/index.js";
 import { pngBytes, syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
+
+// one pixel over the facial texture limit, so these keep exercising the error path if the limit moves
+const TOO_BIG = manifest.textures.facialMaxSize + 1;
 
 describe("plumbing smoke", () => {
   it("runs on a synthetic wearable zip and returns a result", async () => {
@@ -25,7 +28,7 @@ describe("plumbing smoke", () => {
   };
 
   it("fails a full run on an error even when some checks could not run (a facial feature over the size limit)", async () => {
-    const result = await validate(await facial(600));
+    const result = await validate(await facial(TOO_BIG));
     assert.ok(result.checks.some((row) => row.status === "skipped"), "the model checks skip a PNG set");
     assert.ok(result.findings.some((finding) => finding.severity === "error"));
     assert.equal(result.passed, false);
@@ -38,13 +41,13 @@ describe("plumbing smoke", () => {
   });
 
   it("still never mints a verdict for a subset of checks, errors or not", async () => {
-    const result = await validate(await facial(600), { checks: ["file-format"] });
+    const result = await validate(await facial(TOO_BIG), { checks: ["file-format"] });
     assert.ok(result.findings.some((finding) => finding.severity === "error"));
     assert.equal(result.passed, null);
   });
 
   it("still never mints a verdict for a subset of groups, errors or not", async () => {
-    const result = await validate(await facial(600), { groups: ["files"] });
+    const result = await validate(await facial(TOO_BIG), { groups: ["files"] });
     assert.ok(result.findings.some((finding) => finding.severity === "error"));
     assert.equal(result.passed, null);
   });
