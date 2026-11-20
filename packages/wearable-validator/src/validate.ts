@@ -20,6 +20,7 @@ export async function validate(input: Input, options: Options = {}): Promise<Res
   }
   const ctx = loaded.ctx!;
   ctx.services = options.services;
+  ctx.ownCreators = options.ownCreators;
   ctx.signal = options.signal;
   ctx.captures = options.captures ? structuredClone(options.captures) : [];
 

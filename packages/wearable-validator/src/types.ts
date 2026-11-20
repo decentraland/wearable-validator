@@ -83,8 +83,10 @@ export interface Options {
   maxInputBytes?: number;
   /** Previously rendered views; only stale or missing ones are rendered again. */
   captures?: CaptureRecord[];
-  /** Renderer/reviewer adapters for the rendering group — see /rendering and /ai. */
+  /** Renderer/reviewer adapters for the rendering group — see /rendering and /ai; the catalog for the catalog group. */
   services?: Services;
+  /** The uploader's wallets: the catalog group never reports a creator's own published items. */
+  ownCreators?: string[];
   signal?: AbortSignal;
   /** Called as each check starts and finishes — for live UIs; never affects the result. When set, validate() yields to the event loop after every check so the page can paint. */
   onProgress?: (event: ProgressEvent) => void;
@@ -156,6 +158,7 @@ export interface CheckContext {
   embeddedManifest?: NormalizedItem;
   captures?: CaptureRecord[];
   services?: Services;
+  ownCreators?: string[];
   signal?: AbortSignal;
   /** How many rendering-group rules this run executes — with more than one, the first render takes the whole recipe. */
   renderingRules?: number;
@@ -331,8 +334,14 @@ export interface CatalogMatch {
 export interface CatalogAnswer {
   /** false when no uploaded model has enough geometry of its own to compare (a retextured base wearable, an emote without props). */
   compared: boolean;
-  /** Earliest published first. Never the uploader's own items: the host tells its catalog whose upload it is. */
+  /** One row per uploaded model and published item. Never an item by a wallet in CatalogRequest.ownCreators. */
   matches: CatalogMatch[];
+}
+
+export interface CatalogRequest {
+  /** Wallets whose items are never a match: the uploader's own (Options.ownCreators). */
+  ownCreators?: string[];
+  signal?: AbortSignal;
 }
 
 /**
@@ -340,7 +349,7 @@ export interface CatalogAnswer {
  * createCatalog() in logic/similarity.ts answers from an index in memory; a host may answer from a server instead.
  */
 export interface Catalog {
-  match(models: ModelFingerprint[], signal?: AbortSignal): Promise<CatalogAnswer>;
+  match(models: ModelFingerprint[], request?: CatalogRequest): Promise<CatalogAnswer>;
 }
 
 export interface Services {

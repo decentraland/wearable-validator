@@ -366,7 +366,8 @@
     "warnShare": 0.85,
     "containsShare": 0.95,
     "templateCreators": 10,
-    "maxFindings": 3
+    "maxFindings": 3,
+    "maxVertices": 300000
   },
   "receipts": {
     "trianglesAndBones": "builder src/lib/glbValidation/constants.ts",

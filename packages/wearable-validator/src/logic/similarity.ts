@@ -10,8 +10,8 @@
  * Common geometry is removed from both sides first: nobody owns it. commonGeometry() derives it when the catalog is built.
  */
 import type { Manifest } from "../manifest/index.js";
-import type { Catalog, CatalogAnswer, CatalogMatch } from "../types.js";
-import type { ModelFingerprint, PartFingerprint } from "./fingerprint.js";
+import type { Catalog, CatalogAnswer, CatalogMatch, CatalogRequest } from "../types.js";
+import { fingerprintVersion, type ModelFingerprint, type PartFingerprint } from "./fingerprint.js";
 
 type Rules = Manifest["similarItems"];
 
@@ -33,6 +33,8 @@ export interface CommonGeometry {
 }
 
 export interface CatalogIndex {
+  /** fingerprintVersion(rules) of the code that fingerprinted the entries: cells and signatures from another version never match. */
+  fingerprint: string;
   entries: CatalogEntry[];
   common: CommonGeometry;
 }
@@ -106,18 +108,20 @@ function sharedTriangles(a: Own, b: Own, tolerance: number): number {
 
 export interface CatalogOptions {
   rules: Rules;
-  /** Wallets whose items are never a match: the uploader's own, and any other the host knows to be theirs. */
-  ownCreators?: string[];
 }
 
-/** An in-memory catalog. Building it is the slow part (one pass over every model); a lookup reads only what the upload touches. */
+/**
+ * An in-memory catalog. Building it is the slow part (one pass over every model), done once; a lookup reads only what
+ * the upload touches and says whose upload it is.
+ */
 export function createCatalog(index: CatalogIndex, options: CatalogOptions): Catalog {
   const { rules } = options;
-  const mine = new Set((options.ownCreators ?? []).map((creator) => creator.toLowerCase()));
+  if (index.fingerprint !== fingerprintVersion(rules)) {
+    throw new Error(`The catalog index was built with fingerprint version "${index.fingerprint}" and this validator uses "${fingerprintVersion(rules)}": nothing would match. Rebuild the index with this version.`);
+  }
   const common = { cells: new Set(index.common.cells), signatures: new Set(index.common.signatures) };
   const models: { entry: number; own: Own }[] = [];
   index.entries.forEach((entry, e) => {
-    if (mine.has(entry.creator.toLowerCase())) return;
     for (const model of entry.models) models.push({ entry: e, own: own(model, common, rules) });
   });
 
@@ -153,11 +157,14 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
   });
 
   return {
-    async match(uploaded: ModelFingerprint[], signal?: AbortSignal): Promise<CatalogAnswer> {
-      const best = new Map<number, CatalogMatch>();
+    async match(uploaded: ModelFingerprint[], request: CatalogRequest = {}): Promise<CatalogAnswer> {
+      const mine = new Set((request.ownCreators ?? []).map((creator) => creator.toLowerCase()));
+      const matches: CatalogMatch[] = [];
       let compared = false;
       uploaded.forEach((fingerprint, modelIndex) => {
-        signal?.throwIfAborted();
+        request.signal?.throwIfAborted();
+        // per uploaded model: what one model matched must not hide what another did
+        const best = new Map<number, CatalogMatch>();
         const upload = own(fingerprint, common, rules);
         if (upload.cells.length === 0 && upload.triangles === 0) return;
         compared = true;
@@ -168,6 +175,8 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
         const candidates = new Set(sharedCells.keys());
         for (const signature of upload.parts.keys()) for (const m of bySignature.get(signature) ?? []) candidates.add(m);
         for (const m of candidates) {
+          const entry = index.entries[models[m].entry];
+          if (mine.has(entry.creator.toLowerCase())) continue;
           const other = models[m].own;
           const cells = sharedCells.get(m) ?? 0;
           const position = upload.cells.length ? cells / upload.cells.length : 0;
@@ -175,13 +184,18 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
           const contains = Math.max(other.cells.length ? cells / other.cells.length : 0, other.triangles ? sharedTriangles(other, upload, rules.ratioTolerance) / other.triangles : 0);
           const share = Math.max(position, shape);
           if (share < rules.warnShare && contains < rules.containsShare) continue;
-          const entry = index.entries[models[m].entry];
+          // an item with several models: its strongest similarity and its strongest containment, whichever model gave each
           const current = best.get(models[m].entry);
-          if (current && Math.max(current.share, current.contains) >= Math.max(share, contains)) continue;
+          if (current) {
+            if (share > current.share) Object.assign(current, { share, position, shape });
+            current.contains = Math.max(current.contains, contains);
+            continue;
+          }
           best.set(models[m].entry, { urn: entry.urn, name: entry.name, creator: entry.creator, publishedAt: entry.publishedAt, url: entry.url, model: modelIndex, share, position, shape, contains });
         }
+        matches.push(...best.values());
       });
-      return { compared, matches: [...best.values()].sort((a, b) => a.publishedAt - b.publishedAt) };
+      return { compared, matches: matches.sort((a, b) => a.publishedAt - b.publishedAt || a.model - b.model) };
     }
   };
 }

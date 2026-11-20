@@ -3,8 +3,8 @@
  * recolour of a mesh has the fingerprint of the mesh.
  *
  *   cells   where the vertices are: every distinct grid cell (manifest similarItems.gridMillimeters) a vertex falls in,
- *           at the file's rest pose in the avatar's frame. Survives a retexture, a trim, parts added. Lost when the mesh
- *           is moved.
+ *           in the avatar's frame at bind pose, whatever pose the file was saved in. Survives a retexture, a trim, parts
+ *           added. Lost when the mesh is moved.
  *   parts   how the mesh is built: each connected piece (vertices at the same place welded, then joined through
  *           triangles) with a signature of how its triangles connect and the proportions of its vertex cloud. Survives
  *           being moved, turned or scaled. Lost when the mesh is rebuilt with other triangles.
@@ -35,6 +35,13 @@ export interface ModelFingerprint {
 
 type Rules = Manifest["similarItems"];
 
+/**
+ * What an index must have been built with to be comparable: the weld distance, the cell packing, the signature and its
+ * hash are all in here. Bump it when any of them changes; the grid size travels next to it.
+ */
+export const FINGERPRINT_FORMAT = 1;
+export const fingerprintVersion = (rules: Rules): string => `${FINGERPRINT_FORMAT}:${rules.gridMillimeters}mm`;
+
 // A cell coordinate takes 17 bits (±65 m at 1 mm), so three fit a double's 53 exact bits; anything further is clamped.
 const AXIS = 1 << 17;
 const HALF = AXIS / 2;
@@ -46,7 +53,12 @@ export function cellKey(x: number, y: number, z: number, gridMillimeters: number
   return (axis(x) * AXIS + axis(y)) * AXIS + axis(z);
 }
 
-export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: string): ModelFingerprint {
+/**
+ * Null when the model draws more than rules.maxVertices vertices (each node that reuses a mesh counts again): the work
+ * grows with that number, and a file built to be slow is not worth comparing.
+ */
+export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: string, signal?: AbortSignal): ModelFingerprint | null {
+  let budget = rules.maxVertices;
   const cells = new Set<number>();
   const parts: PartFingerprint[] = [];
   const colliders = colliderNodes(doc);
@@ -60,8 +72,12 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
     const corners: number[] = [];
     for (const prim of mesh.listPrimitives()) {
       const material = prim.getMaterial();
-      if (prim.getMode() !== 4 || (material && isSkinMaterial(material, skinNameToken))) continue;
-      const local = restPositions(prim, place);
+      const mode = prim.getMode();
+      if (mode < 4 || mode > 6 || (material && isSkinMaterial(material, skinNameToken))) continue; // points and lines draw no surface
+      signal?.throwIfAborted();
+      budget -= prim.getAttribute("POSITION")?.getCount() ?? 0;
+      if (budget < 0) return null;
+      const local = bindPositions(prim, place);
       const vertex = new Array<number>(local.length / 3);
       for (let i = 0; i < vertex.length; i++) {
         const x = local[i * 3], y = local[i * 3 + 1], z = local[i * 3 + 2];
@@ -77,8 +93,11 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
       }
       const indices = prim.getIndices();
       const count = indices ? indices.getCount() : vertex.length;
-      for (let i = 0; i + 2 < count; i += 3) {
-        const a = vertex[indices ? indices.getScalar(i) : i], b = vertex[indices ? indices.getScalar(i + 1) : i + 1], c = vertex[indices ? indices.getScalar(i + 2) : i + 2];
+      const at = (i: number): number | undefined => vertex[indices ? indices.getScalar(i) : i];
+      // strips and fans are the same surface as a triangle list: a copy re-exported as one must not come out empty
+      const step = mode === 4 ? 3 : 1;
+      for (let i = 0; i + 2 < count; i += step) {
+        const a = mode === 6 ? at(0) : at(i), b = at(i + 1), c = at(i + 2);
         if (a === undefined || b === undefined || c === undefined || a === b || b === c || a === c) continue; // out of range or collapsed
         corners.push(a, b, c);
       }
@@ -88,50 +107,44 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
   return { cells: [...cells].sort((a, b) => a - b), parts };
 }
 
-/** Where a mesh node's vertices end up: through its skin's joints when it has one, else through its own world matrix. */
-function placement(node: Node, worlds: Map<Node, number[]>): { world: number[]; joints: number[][] | null } {
+/**
+ * The one matrix that places a mesh node's stored positions in the avatar's frame.
+ *
+ * A skinned mesh ignores its node: the engine moves each vertex by joint × inverse bind. In a file saved at bind pose
+ * that product is the same matrix for every joint (identity, or the armature's scale when it was exported in
+ * centimetres). In a file saved with bones moved, the moved bones give other products, and following them would make a
+ * copy saved in another pose look like another mesh. So the product most joints agree on is taken as the bind placement
+ * and applied to every vertex. A mesh without a skin is drawn where its node puts it.
+ */
+function placement(node: Node, worlds: Map<Node, number[]>): number[] {
   const skin = node.getSkin();
-  if (!skin) return { world: worlds.get(node)!, joints: null };
+  if (!skin) return worlds.get(node)!;
   const inverseBind = skin.getInverseBindMatrices();
   const element: number[] = [];
-  const joints = skin.listJoints().map((joint, j) => {
+  const votes = new Map<string, { matrix: number[]; count: number }>();
+  let best: { matrix: number[]; count: number } | undefined;
+  skin.listJoints().forEach((joint, j) => {
     const world = worlds.get(joint)!;
-    return inverseBind ? multiply(world, [...inverseBind.getElement(j, element)]) : world;
+    const matrix = inverseBind ? multiply(world, [...inverseBind.getElement(j, element)]) : world;
+    const key = matrix.map((value) => Math.round(value * 1000)).join(",");
+    let vote = votes.get(key);
+    if (!vote) votes.set(key, (vote = { matrix, count: 0 }));
+    vote.count++;
+    if (!best || vote.count > best.count) best = vote;
   });
-  return { world: worlds.get(node)!, joints };
+  return best ? best.matrix : worlds.get(node)!;
 }
 
-function restPositions(prim: Primitive, place: { world: number[]; joints: number[][] | null }): Float64Array {
+function bindPositions(prim: Primitive, m: number[]): Float64Array {
   const position = prim.getAttribute("POSITION");
   if (!position) return new Float64Array(0);
-  const joints = place.joints ? prim.getAttribute("JOINTS_0") : null;
-  const weights = place.joints ? prim.getAttribute("WEIGHTS_0") : null;
   const out = new Float64Array(position.getCount() * 3);
-  const p: number[] = [], jj: number[] = [], ww: number[] = [];
+  const p: number[] = [];
   for (let i = 0; i < position.getCount(); i++) {
     position.getElement(i, p);
-    let x = 0, y = 0, z = 0, total = 0;
-    if (place.joints && joints && weights) {
-      joints.getElement(i, jj);
-      weights.getElement(i, ww);
-      for (let k = 0; k < 4; k++) {
-        const m = place.joints[jj[k]];
-        if (!ww[k] || !m) continue;
-        total += ww[k];
-        x += ww[k] * (m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12]);
-        y += ww[k] * (m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13]);
-        z += ww[k] * (m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]);
-      }
-    }
-    if (total > 0) {
-      x /= total; y /= total; z /= total;
-    } else {
-      const m = place.world;
-      x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
-      y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
-      z = m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14];
-    }
-    out[i * 3] = x; out[i * 3 + 1] = y; out[i * 3 + 2] = z;
+    out[i * 3] = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
+    out[i * 3 + 1] = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
+    out[i * 3 + 2] = m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14];
   }
   return out;
 }
@@ -152,11 +165,12 @@ function connectedParts(points: number[], corners: number[]): PartFingerprint[] 
   }
   const triples = new Map<number, number[]>();
   for (let t = 0; t < corners.length; t += 3) {
-    const [a, b, c] = [valence[corners[t]], valence[corners[t + 1]], valence[corners[t + 2]]].sort((u, v) => u - v);
+    // a vertex shared by 4,096 triangles does not happen in a modelled mesh; past that the triples only blur
+    const [a, b, c] = [valence[corners[t]], valence[corners[t + 1]], valence[corners[t + 2]]].map((v) => Math.min(v, 4095)).sort((u, v) => u - v);
     const root = find(corners[t]);
     let list = triples.get(root);
     if (!list) triples.set(root, (list = []));
-    list.push((a * 4096 + b) * 4096 + c); // a vertex shared by 4,096 triangles does not happen under the triangle caps
+    list.push((a * 4096 + b) * 4096 + c);
   }
   const members = new Map<number, number[]>();
   for (let v = 0; v < vertexCount; v++) {

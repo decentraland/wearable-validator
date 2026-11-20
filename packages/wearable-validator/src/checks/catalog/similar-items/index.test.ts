@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { BodyShape } from "@dcl/schemas";
-import { validate, manifest, fingerprintModel, createCatalog, type Catalog, type CatalogEntry, type ModelFingerprint } from "../../../index.js";
+import { validate, manifest, fingerprintModel, fingerprintVersion, createCatalog, type Catalog, type CatalogEntry, type ModelFingerprint } from "../../../index.js";
 import { parseGlb } from "../../../logic/gltf.js";
 import { found, status } from "#test/helpers/findings.js";
 import { syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
@@ -10,11 +10,19 @@ import { bumpySheet, merged, shifted } from "#test/helpers/meshes.js";
 const rules = manifest.similarItems;
 type Mesh = ReturnType<typeof bumpySheet>;
 const glb = (geometry: Mesh) => syntheticGlb({ geometry, skinned: false });
-const print = async (geometry: Mesh): Promise<ModelFingerprint> => fingerprintModel((await parseGlb(await glb(geometry))).doc, rules, manifest.materials.skinNameToken);
+const print = async (geometry: Mesh): Promise<ModelFingerprint> => fingerprintModel((await parseGlb(await glb(geometry))).doc, rules, manifest.materials.skinNameToken)!;
 const entry = (n: number, creator: string, models: ModelFingerprint[], publishedAt = 1_650_000_000 + n * 86_400): CatalogEntry =>
   ({ urn: `urn:test:${n}`, name: `Hoodie ${n}`, creator, publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${n}/items/0`, models });
-const catalogOf = (entries: CatalogEntry[]): Catalog => createCatalog({ entries, common: { cells: [], signatures: [] } }, { rules });
-const run = async (geometry: Mesh, catalog?: Catalog) => validate(await syntheticZip({ glb: await glb(geometry) }), { checks: ["similar-items"], services: { catalog } });
+const catalogOf = (entries: CatalogEntry[]): Catalog => createCatalog({ fingerprint: fingerprintVersion(rules), entries, common: { cells: [], signatures: [] } }, { rules });
+const run = async (geometry: Mesh, catalog?: Catalog, ownCreators?: string[]) =>
+  validate(await syntheticZip({ glb: await glb(geometry) }), { checks: ["similar-items"], services: { catalog }, ownCreators });
+const two = async (male: Uint8Array, female: Uint8Array) => syntheticZip({
+  manifest: { name: "Test Wearable", description: "synthetic", rarity: "common", data: { category: "upper_body", tags: ["test"], hides: [], replaces: [], representations: [
+    { bodyShapes: [BodyShape.MALE], mainFile: "male.glb", contents: ["male.glb"] },
+    { bodyShapes: [BodyShape.FEMALE], mainFile: "female.glb", contents: ["female.glb"] }
+  ] } },
+  extraFiles: { "male.glb": male, "female.glb": female }
+});
 
 describe("similar-items (D-01)", () => {
   it("warns, naming the earliest published item with its link", async () => {
@@ -63,14 +71,57 @@ describe("similar-items (D-01)", () => {
 
   it("warns once when both body shapes carry the same mesh", async () => {
     const bytes = await glb(bumpySheet());
-    const manifest = { name: "Test Wearable", description: "synthetic", rarity: "common", data: { category: "upper_body", tags: ["test"], hides: [], replaces: [], representations: [
-      { bodyShapes: [BodyShape.MALE], mainFile: "male.glb", contents: ["male.glb"] },
-      { bodyShapes: [BodyShape.FEMALE], mainFile: "female.glb", contents: ["female.glb"] }
-    ] } };
-    const zip = await syntheticZip({ manifest, extraFiles: { "male.glb": bytes, "female.glb": bytes } });
+    const zip = await two(bytes, bytes);
     const result = await validate(zip, { checks: ["similar-items"], services: { catalog: catalogOf([entry(1, "0xaaa", [await print(bumpySheet())])]) } });
     assert.equal(found(result, "similar-items").length, 1);
     assert.equal(found(result, "similar-items")[0].where, "male.glb");
+  });
+
+  it("judges each body shape's model on its own", async () => {
+    const sheet = await print(bumpySheet());
+    const big = merged(bumpySheet(), shifted(bumpySheet(3, 24), [0, -0.6, 0]), shifted(bumpySheet(4, 24), [0, -1.0, 0]));
+    // male only contains the published item, female is it: the stronger "contains" must not swallow the "similar" warning
+    const result = await validate(await two(await glb(big), await glb(bumpySheet())), { checks: ["similar-items"], services: { catalog: catalogOf([entry(1, "0xaaa", [sheet])]) } });
+    const findings = found(result, "similar-items");
+    assert.equal(findings.length, 1); // one published item, one warning
+    // and a template stays a template when both models carry it
+    const many = Array.from({ length: rules.templateCreators }, (_, n) => entry(n + 1, `0x${n}`, [sheet]));
+    const bytes = await glb(bumpySheet());
+    const template = await validate(await two(bytes, bytes), { checks: ["similar-items"], services: { catalog: catalogOf(many) } });
+    assert.equal(found(template, "similar-items").length, 0);
+  });
+
+  it("names the earliest item even when the catalog answers in another order", async () => {
+    const sheet = await print(bumpySheet());
+    const sorted = catalogOf([entry(1, "0xaaa", [sheet]), entry(2, "0xbbb", [sheet])]);
+    const reversed: Catalog = { match: async (models, request) => { const answer = await sorted.match(models, request); return { ...answer, matches: answer.matches.reverse() }; } };
+    assert.match(found(await run(bumpySheet(), reversed), "similar-items")[0].message, /"Hoodie 1"/);
+  });
+
+  it("never reports the uploader's own items", async () => {
+    const catalog = catalogOf([entry(1, "0xAAA", [await print(bumpySheet())])]);
+    assert.equal(status(await run(bumpySheet(), catalog, ["0xaaa"]), "similar-items"), "passed");
+    assert.equal(status(await run(bumpySheet(), catalog, ["0xbbb"]), "similar-items"), "warning");
+  });
+
+  it("says nothing about a contained part many creators already published", async () => {
+    const sheet = await print(bumpySheet());
+    const upload = merged(bumpySheet(), shifted(bumpySheet(3, 24), [0, -0.6, 0]), shifted(bumpySheet(4, 24), [0, -1.0, 0]));
+    const many = Array.from({ length: rules.templateCreators }, (_, n) => entry(n + 1, `0x${n}`, [sheet]));
+    assert.equal(found(await run(upload, catalogOf(many)), "similar-items").length, 0);
+    assert.equal(found(await run(upload, catalogOf(many.slice(1))), "similar-items").length, rules.maxFindings);
+  });
+
+  it("is skipped for a model over the vertex budget", async () => {
+    const before = manifest.similarItems.maxVertices;
+    manifest.similarItems.maxVertices = 10;
+    try {
+      const result = await run(bumpySheet(), catalogOf([]));
+      assert.equal(status(result, "similar-items"), "skipped");
+      assert.match(result.checks[0].skipReason ?? "", /draws more than 10 vertices/);
+    } finally {
+      manifest.similarItems.maxVertices = before;
+    }
   });
 
   it("passes a model with too little geometry of its own", async () => {

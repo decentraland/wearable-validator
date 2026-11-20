@@ -162,7 +162,10 @@ export interface Manifest {
     containsShare: number;
     /** Geometry already published by this many creators is a shared template: no warning (decided Nov 2026). */
     templateCreators: number;
+    /** Warnings one item can get from this check, in all. */
     maxFindings: number;
+    /** Vertices a model may draw (a mesh reused by several nodes counts each time) before the check declines to fingerprint it: about 20 times the largest model in the approved catalog (14,698). */
+    maxVertices: number;
   };
   receipts: Record<string, string>;
 }

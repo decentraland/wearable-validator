@@ -80,15 +80,16 @@ await renderer.stop(); // on shutdown
 ```ts
 import { validate, createCatalog, manifest } from "@dcl-regenesislabs/wearable-validator";
 
-// index: { entries: [{ urn, name, creator, publishedAt, url, models }], common } built from published items
-const catalog = createCatalog(index, { rules: manifest.similarItems, ownCreators: [uploaderWallet] });
-const result = await validate(zip, { groups: ["catalog"], services: { catalog } });
+// index: { fingerprint, entries: [{ urn, name, creator, publishedAt, url, models }], common } built from published items
+const catalog = createCatalog(index, { rules: manifest.similarItems }); // once: this is the slow part
+const result = await validate(zip, { groups: ["catalog"], services: { catalog }, ownCreators: [uploaderWallet] });
 ```
 
 - `createCatalog` answers from an index held in memory. A host that keeps the index on a server implements `Catalog.match(fingerprints)` with a request instead: only fingerprints travel, never the files.
 - `fingerprintModel(doc, manifest.similarItems, manifest.materials.skinNameToken)` is the fingerprint of one model, and `commonGeometry(entries, baseAvatarModels, rules)` derives the geometry nobody owns (base avatars, the reference body) when an index is built.
-- Pass the uploader's wallets as `ownCreators`: a creator's own earlier items are never a match.
-- Without a catalog the check is `skipped`. The group is not part of the default run, so it never changes `passed`.
+- Pass the uploader's wallets as `ownCreators`: a creator's own earlier items are never a match. They travel with each lookup, so one catalog serves every uploader.
+- `index.fingerprint` must equal `fingerprintVersion(manifest.similarItems)`: `createCatalog` refuses an index built by another version instead of silently matching nothing.
+- Without a catalog the check is `skipped`. The default run does not include the group, so `passed` is unchanged there. A run that asks for the core groups **and** `catalog` gets `passed: null` when the check is skipped or errors, like any row that could not be asserted, although the check itself can only warn.
 
 ## Options
 

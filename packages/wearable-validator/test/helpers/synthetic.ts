@@ -57,7 +57,7 @@ export interface SyntheticOptions {
   /** Triangles for the cube mesh (default 12 — a plain cube). */
   triangles?: number;
   /** Use this mesh instead of the cube: positions (metres, xyz per vertex) and, optionally, triangle indices. */
-  geometry?: { positions: Float32Array; indices?: Uint32Array };
+  geometry?: { positions: Float32Array; indices?: Uint32Array; mode?: 4 | 5 | 6 };
   /** Skin the mesh to the canonical skeleton (default true). */
   skinned?: boolean;
   /** Bone names to create (default: the canonical 62). */
@@ -169,6 +169,7 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
   for (const img of options.textureImages ?? []) attachTexture(material, img);
 
   const prim = doc.createPrimitive().setMode(4).setAttribute("POSITION", position).setMaterial(material);
+  if (options.geometry?.mode) prim.setMode(options.geometry.mode);
   if (options.geometry?.indices) prim.setIndices(doc.createAccessor("indices").setType("SCALAR").setArray(options.geometry.indices).setBuffer(buffer));
   const mesh = doc.createMesh(options.meshName ?? "cube").addPrimitive(prim);
   const meshNode = doc.createNode("cube_node").setMesh(mesh);
