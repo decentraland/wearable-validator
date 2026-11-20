@@ -1,6 +1,6 @@
 /** S-01 File format — the engine loads self-contained models (GLB, or glTF with everything embedded); facial features are PNG sets, so anything else never renders. */
 import { isGlb, readSelfContainedGltf } from "../../../logic/gltf.js";
-import { decodePngSafe, imageDimensions, isPngBytes } from "../../../logic/images.js";
+import { decodePngSafe, imageDimensions, isPngBytes, isPowerOfTwo } from "../../../logic/images.js";
 import { isFacial } from "../../../logic/facial.js";
 import { manifest } from "../../../manifest/index.js";
 import { modelFileCandidates } from "../../../logic/model-files.js";
@@ -35,6 +35,11 @@ function facialPngFindings(ctx: CheckContext, path: string): Finding[] {
   }
   if (img.width !== img.height) {
     f("error", `"${path}" is ${img.width}×${img.height} — facial-feature textures must be square.`, { measured: `${img.width}×${img.height}` });
+  } else if (!isPowerOfTwo(img.width)) {
+    // texture-size gives this warning for textures inside a model, but it does not run on a PNG set (no model to read)
+    f("warning", `"${path}" is ${img.width}×${img.height}, which is not a power of two — GPUs handle sizes like 512×512 or 1024×1024 far better. Resize to the nearest power of two.`, {
+      measured: `${img.width}×${img.height}`
+    });
   }
   if (img.width > max || img.height > max) {
     f("error", `"${path}" is ${img.width}×${img.height} — facial-feature textures must be at most ${max}×${max}.`, {
@@ -56,7 +61,7 @@ export const fileFormat: CheckDefinition = {
     "Wearables must be exported as a single .glb file (a .gltf works too when everything is embedded in it). Eyebrows, eyes and mouth items are PNG images with a transparent background instead of a 3D model.",
   fix: "In Blender: File → Export → glTF 2.0, format 'glTF Binary (.glb)'. For eyebrows/eyes/mouth, export a square PNG with a transparent background instead.",
   details:
-    `Reads the model files' magic bytes — a real GLB starts with the 'glTF' header; a .gltf must embed every buffer and image (data: URIs), since a file it names elsewhere cannot be loaded from the item. Facial-feature categories route to the PNG path instead (square, ≤${manifest.textures.facialMaxSize}×${manifest.textures.facialMaxSize}, alpha channel) and skip every mesh rule.`,
+    `Reads the model files' magic bytes — a real GLB starts with the 'glTF' header; a .gltf must embed every buffer and image (data: URIs), since a file it names elsewhere cannot be loaded from the item. Facial-feature categories route to the PNG path instead (square, ≤${manifest.textures.facialMaxSize}×${manifest.textures.facialMaxSize}, alpha channel; a size that is not a power of two warns, since texture-size does not run without a model) and skip every mesh rule.`,
   measure: (ctx) => {
     const models = [...ctx.files.keys()].filter((p) => p.endsWith(".glb") || p.endsWith(".gltf"));
     return models.length > 0 ? `${models.length} model file${models.length > 1 ? "s" : ""}` : undefined;
