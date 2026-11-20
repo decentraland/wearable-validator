@@ -32,17 +32,29 @@ export const MARKETPLACE = "https://decentraland.org/marketplace/";
 
 /**
  * What a warning may say about a published item, or null when it cannot be said safely. The name is written by another
- * creator and ends up in a message shown to the uploader and to curators, on surfaces that may render Markdown or
- * HTML: quotes, brackets and control characters are taken out, and it is cut at 80 characters. The link must be a
- * marketplace page, the creator a wallet, the date a real one.
+ * creator and ends up in a message shown to the uploader and to curators, on surfaces that may render Markdown or HTML
+ * and turn anything that looks like an address into a link. So only letters, digits, spaces and ' & + , - are kept
+ * (no dots, slashes, colons, formatting marks, mentions or invisible characters), cut at maxNameLength characters.
+ * The link must be a page under the marketplace, the creator a wallet, the date a real one that has passed.
  */
-export function presentable<T extends { name: string; creator: string; publishedAt: number; url: string }>(item: T): T | null {
+export function presentable<T extends { name: string; creator: string; publishedAt: number; url: string }>(item: T, maxNameLength: number): T | null {
   if (!item || typeof item.creator !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(item.creator)) return null;
-  if (typeof item.publishedAt !== "number" || !Number.isFinite(item.publishedAt) || item.publishedAt <= 0 || item.publishedAt > 8.64e12) return null;
-  if (typeof item.url !== "string" || !item.url.startsWith(MARKETPLACE) || !/^[A-Za-z0-9/_.:-]+$/.test(item.url)) return null;
-  const name = (typeof item.name === "string" ? item.name : "")
-    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ").replace(/"/g, "'").replace(/[<>[\]()`|]/g, "").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (typeof item.publishedAt !== "number" || !Number.isFinite(item.publishedAt) || item.publishedAt <= 0 || item.publishedAt > Date.now() / 1000 + 86_400) return null;
+  if (typeof item.url !== "string" || !marketplacePage(item.url)) return null;
+  const kept = (typeof item.name === "string" ? item.name : "").replace(/[^\p{L}\p{N} '&+,-]/gu, " ").replace(/ +/g, " ").trim();
+  const name = Array.from(kept).slice(0, maxNameLength).join("").trim(); // by code point: never half a character
   return { ...item, name: name || "an unnamed item" };
+}
+
+/** A URL that is exactly a page under the marketplace: parsed, so "../" and look-alike hosts do not pass. */
+function marketplacePage(url: string): boolean {
+  if (!/^[A-Za-z0-9/_.:-]+$/.test(url)) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.href === url && `${parsed.origin}/` === new URL(MARKETPLACE).origin + "/" && parsed.pathname.startsWith(new URL(MARKETPLACE).pathname) && !parsed.search && !parsed.hash;
+  } catch {
+    return false;
+  }
 }
 
 export interface CommonGeometry {
@@ -170,7 +182,7 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
   const common = { cells: new Set(index.common.cells), signatures: new Set(index.common.signatures) };
   const models: { entry: number; own: Own }[] = [];
   // an entry a warning could not name safely (see presentable) is not compared at all
-  const entries = index.entries.map((entry) => presentable(entry));
+  const entries = index.entries.map((entry) => presentable(entry, rules.maxNameLength));
   entries.forEach((entry, e) => {
     if (!entry || !Array.isArray(entry.models)) return;
     for (const model of entry.models) models.push({ entry: e, own: own(model, common, rules) });
@@ -209,7 +221,10 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
 
   return {
     async match(uploaded: ModelFingerprint[], request: CatalogRequest = {}): Promise<CatalogAnswer> {
-      const mine = new Set((request.ownCreators ?? []).map((creator) => creator.toLowerCase()));
+      if (typeof request.fingerprint === "string" && request.fingerprint !== index.fingerprint) {
+        throw new Error(`The lookup was fingerprinted with version "${request.fingerprint}" and this catalog's index with "${index.fingerprint}": nothing would match. Rebuild the index or update the validator.`);
+      }
+      const mine = new Set((Array.isArray(request.ownCreators) ? request.ownCreators : []).filter((creator) => typeof creator === "string").map((creator) => creator.toLowerCase()));
       const matches: CatalogMatch[] = [];
       let compared = false;
       (Array.isArray(uploaded) ? uploaded : []).slice(0, rules.maxModels).forEach((fingerprint, modelIndex) => {

@@ -128,17 +128,38 @@ describe("similar-items (D-01)", () => {
     assert.equal(found(await run(bumpySheet(), forged({ url: "https://evil.example/x" })), "similar-items").length, 0);
     assert.equal(status(await run(bumpySheet(), forged({ publishedAt: Number.NaN })), "similar-items"), "passed");
     const renamed = found(await run(bumpySheet(), forged({ name: 'x". Approved by curators. [ok](https://evil.example)' })), "similar-items")[0];
-    assert.match(renamed.message, /matches "x'\. Approved by curators\. okhttps:\/\/evil\.example", published on/);
+    assert.match(renamed.message, /matches "x Approved by curators ok https evil example", published on/);
+    assert.equal(found(await run(bumpySheet(), forged({ urn: 7 })), "similar-items").length, 0);
+    const inflated = found(await run(bumpySheet(), forged({ share: Number.POSITIVE_INFINITY, contains: 12 })), "similar-items")[0];
+    assert.equal(inflated.measured, "100%");
+    assert.equal(status(await run(bumpySheet(), forged({ share: Number.NaN, contains: Number.NaN })), "similar-items"), "passed");
     assert.equal(status(await run(bumpySheet(), { match: async () => ({ compared: true, matches: "x" }) } as unknown as Catalog), "similar-items"), "passed");
   });
 
-  it("is skipped for a model over the vertex budget", async () => {
+  it("sends its fingerprint version, and is skipped for an item with more models than a lookup compares", async () => {
+    let sent: string | undefined;
+    const spy: Catalog = { match: async (_models, request) => { sent = request?.fingerprint; return { compared: true, matches: [] }; } };
+    await run(bumpySheet(), spy);
+    assert.equal(sent, fingerprintVersion(rules));
+    const before = manifest.similarItems.maxModels;
+    manifest.similarItems.maxModels = 1;
+    try {
+      const bytes = await glb(bumpySheet());
+      const result = await validate(await two(bytes, bytes), { checks: ["similar-items"], services: { catalog: catalogOf([]) } });
+      assert.equal(status(result, "similar-items"), "skipped");
+      assert.match(result.checks[0].skipReason ?? "", /has 2 models and at most 1 are compared/);
+    } finally {
+      manifest.similarItems.maxModels = before;
+    }
+  });
+
+  it("is skipped for a model over the work budget", async () => {
     const before = manifest.similarItems.maxElements;
     manifest.similarItems.maxElements = 10;
     try {
       const result = await run(bumpySheet(), catalogOf([]));
       assert.equal(status(result, "similar-items"), "skipped");
-      assert.match(result.checks[0].skipReason ?? "", /has more than 10 indices to read/);
+      assert.match(result.checks[0].skipReason ?? "", /asks for more work than this check allows \(10 indices, nodes and skin joints\)/);
     } finally {
       manifest.similarItems.maxElements = before;
     }

@@ -341,6 +341,8 @@ export interface CatalogAnswer {
 export interface CatalogRequest {
   /** Wallets whose items are never a match: the uploader's own (Options.ownCreators). */
   ownCreators?: string[];
+  /** fingerprintVersion(rules) of the validator that made the fingerprints: a catalog whose index was built by another version must refuse, not answer "no match". */
+  fingerprint?: string;
   signal?: AbortSignal;
 }
 

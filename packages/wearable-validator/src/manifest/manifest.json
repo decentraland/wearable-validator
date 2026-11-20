@@ -369,7 +369,8 @@
     "templateCreators": 10,
     "maxFindings": 3,
     "maxElements": 600000,
-    "maxModels": 4
+    "maxModels": 4,
+    "maxNameLength": 80
   },
   "receipts": {
     "trianglesAndBones": "builder src/lib/glbValidation/constants.ts",

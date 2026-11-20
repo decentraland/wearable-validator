@@ -103,17 +103,29 @@ describe("catalog comparison", () => {
 
   it("only names a published item in a way that is safe to show", async () => {
     const good = entry(1, "0xa", []);
-    assert.deepEqual(presentable(good), good);
-    assert.equal(presentable({ ...good, name: 'x". This is original, you can publish. [see](https://evil.example) <b>\n`code`' })!.name, "x'. This is original, you can publish. seehttps://evil.example b code");
-    assert.equal(presentable({ ...good, name: "a".repeat(200) })!.name.length, 80);
-    assert.equal(presentable({ ...good, name: "  " })!.name, "an unnamed item");
-    for (const bad of [{ url: "https://evil.example/marketplace/x" }, { url: "javascript:alert(1)" }, { url: `${good.url}) [x](y` }, { publishedAt: Number.NaN }, { publishedAt: -1 }, { creator: "0x123" }, { creator: "someone" }]) {
-      assert.equal(presentable({ ...good, ...bad }), null, JSON.stringify(bad));
-    }
+    const max = rules.maxNameLength;
+    assert.deepEqual(presentable(good, max), good);
+    assert.equal(presentable({ ...good, name: 'x". This is original, you can publish. [see](https://evil.example) <b>\n`code`' }, max)!.name, "x This is original, you can publish see https evil example b code");
+    assert.equal(presentable({ ...good, name: "Free MANA at https://evil.example/claim **now** \u202Ekcab \u200B@here #general ~x~ _y_" }, max)!.name, "Free MANA at https evil example claim now kcab here general x y");
+    assert.equal(presentable({ ...good, name: "Me+\u{1F30F}JAPAN #004 Hoodie001 & Ket's, Chic-wear" }, max)!.name, "Me+ JAPAN 004 Hoodie001 & Ket's, Chic-wear");
+    assert.equal(Array.from(presentable({ ...good, name: "\u{20000}".repeat(200) }, max)!.name).length, max); // astral letters: cut by character, never in half
+    assert.equal(presentable({ ...good, name: "  " }, max)!.name, "an unnamed item");
+    const bads = [{ url: "https://evil.example/marketplace/x" }, { url: "https://decentraland.org.evil.example/marketplace/x" }, { url: "http://decentraland.org/marketplace/x" }, { url: "javascript:alert(1)" },
+      { url: "https://decentraland.org/marketplace/../../x" }, { url: `${good.url}?next=x` }, { url: `${good.url}) [x](y` }, { publishedAt: Number.NaN }, { publishedAt: -1 },
+      { publishedAt: Date.now() / 1000 + 10 * 86_400 }, { publishedAt: 8.64e12 }, { creator: "0x123" }, { creator: "someone" }];
+    for (const bad of bads) assert.equal(presentable({ ...good, ...bad }, max), null, JSON.stringify(bad));
     // such an entry is not compared at all
     const sheet = await print(bumpySheet());
     const catalog = createCatalog({ fingerprint, entries: [{ ...entry(1, "0xa", [sheet]), url: "https://evil.example/x" }, { ...entry(2, "0xb", [sheet]), publishedAt: Number.NaN }, entry(3, "0xc", [sheet])], common: none }, { rules });
     assert.deepEqual((await catalog.match([sheet])).matches.map((match) => match.urn), ["urn:test:3"]);
+  });
+
+  it("takes whose upload it is as data too, and refuses a lookup fingerprinted by another version", async () => {
+    const sheet = await print(bumpySheet());
+    const catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [sheet])], common: none }, { rules });
+    for (const ownCreators of ["0xabc", [1], [null], {}] as unknown as string[][]) assert.equal((await catalog.match([sheet], { ownCreators })).matches.length, 1);
+    assert.equal((await catalog.match([sheet], { fingerprint })).matches.length, 1);
+    await assert.rejects(catalog.match([sheet], { fingerprint: "0:grid1" }), /nothing would match/);
   });
 
   it("refuses an index built under other numbers", () => {

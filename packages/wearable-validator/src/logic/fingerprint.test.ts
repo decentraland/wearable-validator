@@ -91,7 +91,7 @@ describe("model fingerprints", () => {
     const sheet = bumpySheet();
     const cost = sheet.indices.length;
     assert.equal(await print({ geometry: sheet, skinned: false }, { ...rules, maxElements: cost - 1 }), null);
-    assert.notEqual(await print({ geometry: sheet, skinned: false }, { ...rules, maxElements: cost }), null);
+    assert.notEqual(await print({ geometry: sheet, skinned: false }, { ...rules, maxElements: cost + 1000 }), null); // plus the file's nodes and joints
     const { doc } = await parseGlb(await syntheticGlb({ geometry: sheet, skinned: false }));
     assert.throws(() => fingerprintModel(doc, rules, manifest.materials.skinNameToken, AbortSignal.abort()), /abort/i);
   });
@@ -112,17 +112,18 @@ describe("model fingerprints", () => {
       return doc;
     };
     const one = sheet.indices.length;
+    const overhead = (nodes: number, joints = 0) => nodes + joints + joints; // every node once, every skin joint once
     const fits = (doc: Document, maxElements: number) => fingerprintModel(doc, { ...rules, maxElements }, manifest.materials.skinNameToken) !== null;
     // three vertices drawn a million times is a million triangles of work
     const repeated = Uint32Array.from({ length: 30_000 }, (_, i) => i % 3);
-    assert.equal(fits(build(1, repeated), repeated.length - 1), false);
-    assert.equal(fits(build(1, repeated), repeated.length), true);
+    assert.equal(fits(build(1, repeated), repeated.length + overhead(1) - 1), false);
+    assert.equal(fits(build(1, repeated), repeated.length + overhead(1)), true);
     // the same mesh on four nodes is read four times
-    assert.equal(fits(build(4, sheet.indices), 4 * one - 1), false);
-    assert.equal(fits(build(4, sheet.indices), 4 * one), true);
+    assert.equal(fits(build(4, sheet.indices), 4 * one + overhead(4) - 1), false);
+    assert.equal(fits(build(4, sheet.indices), 4 * one + overhead(4)), true);
     // a skin is read once, however many nodes use it
-    assert.equal(fits(build(4, sheet.indices, 50), 4 * one + 49), false);
-    assert.equal(fits(build(4, sheet.indices, 50), 4 * one + 50), true);
+    assert.equal(fits(build(4, sheet.indices, 50), 4 * one + overhead(4, 50) - 1), false);
+    assert.equal(fits(build(4, sheet.indices, 50), 4 * one + overhead(4, 50)), true);
   });
 
   it("places a rigged mesh at bind pose when a whole bone chain was saved rotated", () => {
@@ -187,6 +188,25 @@ describe("model fingerprints", () => {
     assert.ok(atBind.cells.length >= rules.minCells);
     assert.deepEqual(build([0, Math.sin(0.4), 0, Math.cos(0.4)]).cells, atBind.cells);
     assert.deepEqual(build([0, 0, 0, 1], true).cells, atBind.cells);
+  });
+
+  it("costs what it reads: small primitives on a huge shared accessor, and a deep chain of nodes", () => {
+    const doc = new Document();
+    const buffer = doc.createBuffer();
+    const scene = doc.createScene();
+    const big = doc.createAccessor().setType("VEC3").setArray(Float32Array.from({ length: 250_000 * 3 }, (_, i) => (i % 997) * 0.001)).setBuffer(buffer);
+    const mesh = doc.createMesh();
+    for (let n = 0; n < 4_000; n++) {
+      mesh.addPrimitive(doc.createPrimitive().setMode(4).setAttribute("POSITION", big).setIndices(doc.createAccessor().setType("SCALAR").setArray(Uint32Array.from([n, n + 1, n + 2])).setBuffer(buffer)));
+    }
+    // 3,000 nodes in one chain, each drawing the mesh... of its own: one small primitive at the bottom of the chain is enough to walk it
+    let parent = doc.createNode("n0");
+    scene.addChild(parent);
+    for (let n = 1; n < 3_000; n++) { const child = doc.createNode(`n${n}`); parent.addChild(child); parent = child; if (n % 10 === 0) child.setMesh(doc.createMesh().addPrimitive(mesh.listPrimitives()[n])); }
+    scene.addChild(doc.createNode("many").setMesh(mesh));
+    const started = Date.now();
+    assert.notEqual(fingerprintModel(doc, rules, manifest.materials.skinNameToken), null);
+    assert.ok(Date.now() - started < 3_000, `took ${Date.now() - started} ms`);
   });
 
   it("ignores vertices that are nowhere", async () => {
