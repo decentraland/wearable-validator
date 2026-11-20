@@ -9,16 +9,16 @@ export interface Manifest {
   };
   textures: {
     default: number; skin: number; maxSize: number;
-    /** Eyes, eyebrows and mouth PNGs: 512×512 since the curators' decision (Nov 2026); it was 256×256. */
+    /** Eyes, eyebrows and mouth PNGs: 1024×1024, the same as any other texture, since the curators' decision (Nov 2026). It was 256×256, then 512×512. */
     facialMaxSize: number;
   };
   materials: { default: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];
   fileSize: {
     wearableBytes: number; skinBytes: number; emoteBytes: number;
-    /** A wearable's model alone must stay this far under the item ceiling. 0 means no per-model rule: only the total counts. */
+    /** A wearable's model alone would have to stay this far under the item ceiling. 0 since the curators' decision (Nov 2026): no per-model rule, only the total counts. It was 1 MB. */
     modelHeadroomBytes: number;
-    /** The same for emotes: 0, so an emote is held only to its item total, thumbnail included (curators' decision, Nov 2026). */
+    /** The same for emotes: 0 too, so every item is held only to its total, thumbnail included. */
     emoteModelHeadroomBytes: number;
     thumbnailBytes: number; thumbnailMaxSize: number;
     smartWearableVideoBytes: number; audioBytes: number; maxInputBytes: number;
