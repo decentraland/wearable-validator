@@ -15,8 +15,10 @@ export interface Manifest {
   /**
    * avatarSkinMat is the name creators should use. skinNameToken is what the engine looks for: any material whose name
    * contains it (any case) is tinted as skin, so those are the ones left out of the material and texture counts.
+   * extraWithEmissionOrAlpha: materials allowed on top of `default` when the model uses emission or transparency, which
+   * need a material of their own (curators' decision, Nov 2026). It does not apply to skins, which already get `skin`.
    */
-  materials: { default: number; skin: number; avatarSkinMat: string; skinNameToken: string; forbiddenMeshNamePatterns: string[] };
+  materials: { default: number; extraWithEmissionOrAlpha: number; skin: number; avatarSkinMat: string; skinNameToken: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];
   fileSize: {
     wearableBytes: number; skinBytes: number; emoteBytes: number;
