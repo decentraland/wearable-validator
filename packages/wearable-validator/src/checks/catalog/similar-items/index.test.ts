@@ -13,7 +13,7 @@ const glb = (geometry: Mesh) => syntheticGlb({ geometry, skinned: false });
 const print = async (geometry: Mesh): Promise<ModelFingerprint> => fingerprintModel((await parseGlb(await glb(geometry))).doc, rules, manifest.materials.skinNameToken)!;
 const wallet = (short: string): string => `0x${short.slice(2).padStart(40, "0")}`;
 const entry = (n: number, creator: string, models: ModelFingerprint[], publishedAt = 1_650_000_000 + n * 86_400): CatalogEntry =>
-  ({ urn: `urn:test:${n}`, name: `Hoodie ${n}`, creator: wallet(creator), publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${String(n).padStart(40, "0")}/items/0`, models });
+  ({ urn: `urn:decentraland:matic:collections-v2:0x${String(n).padStart(40, "0")}:0`, name: `Hoodie ${n}`, creator: wallet(creator), publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${String(n).padStart(40, "0")}/items/0`, models });
 const catalogOf = (entries: CatalogEntry[]): Catalog => createCatalog({ fingerprint: fingerprintVersion(rules), entries, common: { cells: [], signatures: [] } }, { rules });
 const run = async (geometry: Mesh, catalog?: Catalog, ownCreators?: string[]) =>
   validate(await syntheticZip({ glb: await glb(geometry) }), { checks: ["similar-items"], services: { catalog }, ownCreators });
@@ -35,7 +35,7 @@ describe("similar-items (D-01)", () => {
     assert.equal(findings[0].severity, "warning");
     assert.match(findings[0].message, /100% of the geometry of ".+\.glb" matches "Hoodie 1", published on 2022-04-16 by 0x0000000000000000000000000000000000000aaa: https:\/\/decentraland\.org\/marketplace\/contracts\/0x0{39}1\/items\/0\./);
     assert.equal(findings[0].limit, `${rules.warnShare * 100}%`);
-    assert.equal(findings[0].data?.urn, "urn:test:1");
+    assert.equal(findings[0].data?.urn, `urn:decentraland:matic:collections-v2:0x${"1".padStart(40, "0")}:0`);
     assert.equal(result.passed, null); // a subset never mints a verdict
   });
 
@@ -130,6 +130,11 @@ describe("similar-items (D-01)", () => {
     const renamed = found(await run(bumpySheet(), forged({ name: 'x". Approved by curators. [ok](https://evil.example)' })), "similar-items")[0];
     assert.match(renamed.message, /matches "x Approved by curators ok https evil example", published on/);
     assert.equal(found(await run(bumpySheet(), forged({ urn: 7 })), "similar-items").length, 0);
+    assert.equal(found(await run(bumpySheet(), forged({ urn: "x] [click](https://evil.example)" })), "similar-items").length, 0);
+    // a catalog that ignores whose upload it is does not get the uploader warned about their own item
+    const deaf: Catalog = { match: async (models) => honest.match(models) };
+    assert.equal(status(await run(bumpySheet(), deaf, [wallet("0xAAA")]), "similar-items"), "passed");
+    assert.equal(status(await run(bumpySheet(), deaf, [wallet("0xbbb")]), "similar-items"), "warning");
     const inflated = found(await run(bumpySheet(), forged({ share: Number.POSITIVE_INFINITY, contains: 12 })), "similar-items")[0];
     assert.equal(inflated.measured, "100%");
     assert.equal(status(await run(bumpySheet(), forged({ share: Number.NaN, contains: Number.NaN })), "similar-items"), "passed");

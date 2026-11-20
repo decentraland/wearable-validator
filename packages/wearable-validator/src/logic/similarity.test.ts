@@ -141,6 +141,18 @@ describe("catalog comparison", () => {
     await assert.rejects(catalog.match([sheet], { fingerprint: "0:grid1" }), /nothing would match/);
   });
 
+  it("compares a bounded number of parts per shape, stops when cancelled, and takes null for no request", async () => {
+    const sheet = await print(bumpySheet());
+    const repeated = (n: number) => ({ cells: [], parts: Array.from({ length: n }, () => ({ ...sheet.parts[0], ratios: [9, 9] as [number, number] })) });
+    const catalog = createCatalog({ fingerprint, entries: Array.from({ length: 200 }, (_, n) => entry(n + 1, `0x${n}`, [repeated(200)])), common: none }, { rules });
+    const started = Date.now();
+    assert.deepEqual((await catalog.match(Array.from({ length: rules.maxModels }, () => ({ ...repeated(4_000), parts: repeated(4_000).parts.map((part) => ({ ...part, ratios: [5, 5] as [number, number] })) })), null)).matches, []);
+    assert.ok(Date.now() - started < 2_000, `took ${Date.now() - started} ms`);
+    await assert.rejects(catalog.match([repeated(10)], { signal: AbortSignal.abort() }), /abort/i);
+    const invalid = { cells: [], parts: Array.from({ length: 50_000 }, () => null) } as unknown as ModelFingerprint;
+    assert.deepEqual(await catalog.match([invalid], null), { compared: false, matches: [] });
+  });
+
   it("refuses an index built under other numbers", () => {
     for (const change of [{ commonCreators: rules.commonCreators + 1 }, { minPartTriangles: 1 }, { minPartKinds: 1 }, { weldMillimeters: 1 }]) {
       assert.throws(() => createCatalog({ fingerprint, entries: [], common: none }, { rules: { ...rules, ...change } }), /Rebuild the index/, JSON.stringify(change));

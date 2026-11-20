@@ -125,7 +125,7 @@ interface Own {
  */
 function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: Set<string> }, rules: Rules): Own {
   const sentCells = Array.isArray(model?.cells) ? model.cells.slice(0, rules.maxElements) : [];
-  const sentParts = Array.isArray(model?.parts) ? model.parts : [];
+  const sentParts = Array.isArray(model?.parts) ? model.parts.slice(0, rules.maxElements) : [];
   const cells = [...new Set(sentCells)].filter((cell) => typeof cell === "number" && Number.isFinite(cell) && !common.cells.has(cell)).sort((a, b) => a - b);
   const parts = new Map<string, PartFingerprint[]>();
   // a part that counts has minPartTriangles triangles, so a model within the work budget cannot have more of them than this
@@ -138,6 +138,8 @@ function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: 
     if (!counts(part, rules) || common.signatures.has(part.signature)) continue;
     room--;
     const list = parts.get(part.signature);
+    // a model repeats a part (a spike, a button) a handful of times; past maxPartsPerShape more copies only cost comparisons
+    if (list && list.length >= rules.maxPartsPerShape) continue;
     if (list) list.push(part);
     else parts.set(part.signature, [part]);
     triangles += part.triangles;
@@ -219,7 +221,8 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
   });
 
   return {
-    async match(uploaded: ModelFingerprint[], request: CatalogRequest = {}): Promise<CatalogAnswer> {
+    async match(uploaded: ModelFingerprint[], sent?: CatalogRequest | null): Promise<CatalogAnswer> {
+      const request: CatalogRequest = sent ?? {}; // a host may hand over parsed JSON, where "nothing" is null
       if (typeof request.fingerprint === "string" && request.fingerprint !== index.fingerprint) {
         throw new Error(`The lookup was fingerprinted with version "${request.fingerprint}" and this catalog's index with "${index.fingerprint}": nothing would match. Rebuild the index or update the validator.`);
       }
@@ -240,6 +243,7 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
         const candidates = new Set(sharedCells.keys());
         for (const signature of upload.parts.keys()) for (const m of bySignature.get(signature) ?? []) candidates.add(m);
         for (const m of candidates) {
+          request.signal?.throwIfAborted();
           const entry = entries[models[m].entry]!;
           if (mine.has(entry.creator.toLowerCase())) continue;
           const other = models[m].own;

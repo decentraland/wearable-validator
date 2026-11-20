@@ -172,8 +172,12 @@ export interface Manifest {
     maxModels: number;
     /** Characters of a published item's name a warning quotes. */
     maxNameLength: number;
-    /** A published item's date (unix seconds) is believed from here (2020-01-01, before the first collection) up to now plus the clock skew. */
-    earliestPublishedAt: number; clockSkewSeconds: number;
+    /** Parts with one signature compared per model: a real model repeats a part a handful of times. */
+    maxPartsPerShape: number;
+    /** A published item's date (unix seconds) is believed from here on: 2020-01-01, before the first Polygon collection. The catalog holds Polygon collections only; an index builder leaves the 2019 Ethereum ones out. */
+    earliestPublishedAt: number;
+    /** How far past now a published item's date may be: clocks differ. */
+    clockSkewSeconds: number;
   };
   receipts: Record<string, string>;
 }

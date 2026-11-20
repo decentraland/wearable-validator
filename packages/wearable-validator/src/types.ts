@@ -351,7 +351,7 @@ export interface CatalogRequest {
  * createCatalog() in logic/similarity.ts answers from an index in memory; a host may answer from a server instead.
  */
 export interface Catalog {
-  match(models: ModelFingerprint[], request?: CatalogRequest): Promise<CatalogAnswer>;
+  match(models: ModelFingerprint[], request?: CatalogRequest | null): Promise<CatalogAnswer>;
 }
 
 export interface Services {

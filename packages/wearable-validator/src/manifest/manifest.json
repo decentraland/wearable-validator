@@ -370,6 +370,7 @@
     "maxFindings": 3,
     "maxElements": 600000,
     "maxModels": 4,
+    "maxPartsPerShape": 32,
     "maxNameLength": 80,
     "earliestPublishedAt": 1577836800,
     "clockSkewSeconds": 86400

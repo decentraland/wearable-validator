@@ -15,11 +15,12 @@ const day = (unixSeconds: number): string => new Date(unixSeconds * 1000).toISOS
 const source = (match: CatalogMatch): string => `"${match.name}", published on ${day(match.publishedAt)} by ${match.creator}: ${match.url}`;
 const PERMISSION = "If it is your own work, or you have that creator's permission, you can publish. If it is based on that item without permission, change the model or ask its creator first.";
 
+const URN = /^urn:decentraland:[A-Za-z0-9:_-]{1,200}$/; // what an item's urn looks like; it goes into the finding's data
 const share = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
 
 /** A catalog answering from a server is another party's data: a row is used only when it can be named safely, with its shares within 0 to 1. */
 function sound(match: CatalogMatch, rules: CheckContext["manifest"]["similarItems"]): CatalogMatch | null {
-  if (!match || typeof match.urn !== "string") return null;
+  if (!match || typeof match.urn !== "string" || !URN.test(match.urn)) return null;
   const named = presentable(match, rules);
   return named && { ...named, share: share(match.share), position: share(match.position), shape: share(match.shape), contains: share(match.contains) };
 }
@@ -60,11 +61,13 @@ export const similarItems: CheckDefinition = {
     }
     const answer = await catalog.match(fingerprints, { ownCreators: ctx.ownCreators, fingerprint: fingerprintVersion(rules), signal: ctx.signal });
     if (!answer.compared) return { status: "passed", coverage: "complete", findings: [], measured: "too little geometry of its own to compare" };
+    const mine = new Set((ctx.ownCreators ?? []).filter((creator) => typeof creator === "string").map((creator) => creator.toLowerCase()));
     const findings: Finding[] = [];
     const seen = new Set<string>();
     let templates = 0;
     ctx.models.forEach((model, index) => {
-      const matches = (Array.isArray(answer.matches) ? answer.matches : []).filter((match) => match?.model === index).map((match) => sound(match, rules)).filter((match) => match !== null);
+      const matches = (Array.isArray(answer.matches) ? answer.matches : []).filter((match) => match?.model === index).map((match) => sound(match, rules)).filter((match) => match !== null)
+        .filter((match) => !mine.has(match.creator.toLowerCase())); // whatever the catalog did with ownCreators
       const { similar, template, contained } = judge(matches, rules);
       if (template) templates++;
       // both body shapes usually carry the same mesh: one warning per published item, not one per file
