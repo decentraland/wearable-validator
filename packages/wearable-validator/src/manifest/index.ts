@@ -164,8 +164,10 @@ export interface Manifest {
     templateCreators: number;
     /** Warnings one item can get from this check, in all. */
     maxFindings: number;
-    /** Vertices a model may draw (a mesh reused by several nodes counts each time) before the check declines to fingerprint it: about 20 times the largest model in the approved catalog (14,698). */
-    maxVertices: number;
+    /** Vertices closer than this are one vertex when a mesh's parts are found: exporters split a vertex per UV seam and per normal. */
+    weldMillimeters: number;
+    /** Vertices plus indices plus skin joints a model may make the fingerprint read (a mesh reused by several nodes counts each time) before the check declines: about 10 times the largest model in the approved catalog (14,698 vertices). */
+    maxElements: number;
   };
   receipts: Record<string, string>;
 }

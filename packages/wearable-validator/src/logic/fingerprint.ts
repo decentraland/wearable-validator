@@ -12,7 +12,7 @@
  * Colliders are left out, and so are primitives drawn with the skin material: the avatar's own arms, hands and head ship
  * inside many files and belong to nobody.
  */
-import type { Document, Node, Primitive } from "@gltf-transform/core";
+import type { Accessor, Document, Node, Skin } from "@gltf-transform/core";
 import type { Manifest } from "../manifest/index.js";
 import { colliderNodes, multiply, worldMatrices } from "./gltf.js";
 import { isSkinMaterial } from "./materials.js";
@@ -36,16 +36,18 @@ export interface ModelFingerprint {
 type Rules = Manifest["similarItems"];
 
 /**
- * What an index must have been built with to be comparable: the weld distance, the cell packing, the signature and its
- * hash are all in here. Bump it when any of them changes; the grid size travels next to it.
+ * What an index must have been built with to be comparable. The format number covers the cell packing, the signature
+ * and its hash: bump it when any of them changes. The rest are the manifest numbers a fingerprint, or the common
+ * geometry stored next to the entries, depends on.
  */
 export const FINGERPRINT_FORMAT = 1;
-export const fingerprintVersion = (rules: Rules): string => `${FINGERPRINT_FORMAT}:${rules.gridMillimeters}mm`;
+export const fingerprintVersion = (rules: Rules): string =>
+  `${FINGERPRINT_FORMAT}:grid${rules.gridMillimeters}:weld${rules.weldMillimeters}:part${rules.minPartTriangles}/${rules.minPartKinds}:common${rules.commonCreators}`;
 
 // A cell coordinate takes 17 bits (±65 m at 1 mm), so three fit a double's 53 exact bits; anything further is clamped.
 const AXIS = 1 << 17;
 const HALF = AXIS / 2;
-const WELD = 10000; // vertices closer than 0.1 mm are the same vertex: exporters split one vertex per UV seam and normal
+const SIGNAL_EVERY = 1 << 16; // loop turns between two looks at the abort signal
 
 /** One number for the grid cell a point (metres) falls in. */
 export function cellKey(x: number, y: number, z: number, gridMillimeters: number): number {
@@ -54,35 +56,54 @@ export function cellKey(x: number, y: number, z: number, gridMillimeters: number
 }
 
 /**
- * Null when the model draws more than rules.maxVertices vertices (each node that reuses a mesh counts again): the work
- * grows with that number, and a file built to be slow is not worth comparing.
+ * Null when the model asks for more work than rules.maxElements: every vertex read, every index read and every joint of
+ * a skin that places a drawn mesh counts, and a mesh reused by several nodes counts each time. The work grows with that
+ * number, and a file built to be slow is not worth comparing.
  */
 export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: string, signal?: AbortSignal): ModelFingerprint | null {
-  let budget = rules.maxVertices;
+  let budget = rules.maxElements;
+  const weld = 1000 / rules.weldMillimeters;
   const cells = new Set<number>();
   const parts: PartFingerprint[] = [];
   const colliders = colliderNodes(doc);
   const worlds = worldMatrices(doc);
+  const skinPlacements = new Map<Skin, number[]>();
   for (const node of doc.getRoot().listNodes()) {
     const mesh = node.getMesh();
     if (!mesh || colliders.has(node)) continue;
-    const place = placement(node, worlds);
+    let place: number[] | undefined;
     const welded = new Map<string, number>();
     const points: number[] = [];
     const corners: number[] = [];
     for (const prim of mesh.listPrimitives()) {
       const material = prim.getMaterial();
       const mode = prim.getMode();
-      if (mode < 4 || mode > 6 || (material && isSkinMaterial(material, skinNameToken))) continue; // points and lines draw no surface
+      const position = prim.getAttribute("POSITION");
+      if (!position || mode < 4 || mode > 6 || (material && isSkinMaterial(material, skinNameToken))) continue; // points and lines draw no surface
       signal?.throwIfAborted();
-      budget -= prim.getAttribute("POSITION")?.getCount() ?? 0;
+      const indices = prim.getIndices();
+      const count = indices ? indices.getCount() : position.getCount();
+      budget -= position.getCount() + count;
       if (budget < 0) return null;
-      const local = bindPositions(prim, place);
-      const vertex = new Array<number>(local.length / 3);
+      if (!place) {
+        // only now: a node whose mesh draws nothing must not cost a pass over its skin's joints
+        const skin = node.getSkin();
+        place = skin ? skinPlacements.get(skin) : worlds.get(node)!;
+        if (!place && skin) {
+          budget -= skin.listJoints().length;
+          if (budget < 0) return null;
+          skinPlacements.set(skin, (place = bindPlacement(skin, worlds) ?? worlds.get(node)!));
+        }
+      }
+      const local = bindPositions(position, place!);
+      const vertex = new Array<number | undefined>(local.length / 3);
       for (let i = 0; i < vertex.length; i++) {
+        if (i % SIGNAL_EVERY === SIGNAL_EVERY - 1) signal?.throwIfAborted();
         const x = local[i * 3], y = local[i * 3 + 1], z = local[i * 3 + 2];
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue; // a NaN position is nowhere: no cell, no triangle
         cells.add(cellKey(x, y, z, rules.gridMillimeters));
-        const key = `${Math.round(x * WELD)},${Math.round(y * WELD)},${Math.round(z * WELD)}`;
+        // vertices closer than the weld distance are one vertex: exporters split a vertex per UV seam and per normal
+        const key = `${Math.round(x * weld)},${Math.round(y * weld)},${Math.round(z * weld)}`;
         let id = welded.get(key);
         if (id === undefined) {
           id = points.length / 3;
@@ -91,14 +112,13 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
         }
         vertex[i] = id;
       }
-      const indices = prim.getIndices();
-      const count = indices ? indices.getCount() : vertex.length;
       const at = (i: number): number | undefined => vertex[indices ? indices.getScalar(i) : i];
       // strips and fans are the same surface as a triangle list: a copy re-exported as one must not come out empty
       const step = mode === 4 ? 3 : 1;
       for (let i = 0; i + 2 < count; i += step) {
+        if (i % SIGNAL_EVERY < step) signal?.throwIfAborted();
         const a = mode === 6 ? at(0) : at(i), b = at(i + 1), c = at(i + 2);
-        if (a === undefined || b === undefined || c === undefined || a === b || b === c || a === c) continue; // out of range or collapsed
+        if (a === undefined || b === undefined || c === undefined || a === b || b === c || a === c) continue; // out of range, nowhere or collapsed
         corners.push(a, b, c);
       }
     }
@@ -108,22 +128,25 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
 }
 
 /**
- * The one matrix that places a mesh node's stored positions in the avatar's frame.
+ * The one matrix that places a skin's stored positions in the avatar's frame.
  *
  * A skinned mesh ignores its node: the engine moves each vertex by joint × inverse bind. In a file saved at bind pose
  * that product is the same matrix for every joint (identity, or the armature's scale when it was exported in
- * centimetres). In a file saved with bones moved, the moved bones give other products, and following them would make a
- * copy saved in another pose look like another mesh. So the product most joints agree on is taken as the bind placement
- * and applied to every vertex. A mesh without a skin is drawn where its node puts it.
+ * centimetres). In a file saved with bones moved, a moved bone and every bone under it give another product, and
+ * following them would make a copy saved in another pose look like another mesh. The skeleton's root joints (those whose
+ * parent is not a joint) are above every chain, so their product is the bind placement; with several roots, the one most
+ * of them agree on. Null for a skin without joints.
  */
-function placement(node: Node, worlds: Map<Node, number[]>): number[] {
-  const skin = node.getSkin();
-  if (!skin) return worlds.get(node)!;
+function bindPlacement(skin: Skin, worlds: Map<Node, number[]>): number[] | null {
+  const joints = skin.listJoints();
+  const isJoint = new Set(joints);
   const inverseBind = skin.getInverseBindMatrices();
   const element: number[] = [];
   const votes = new Map<string, { matrix: number[]; count: number }>();
   let best: { matrix: number[]; count: number } | undefined;
-  skin.listJoints().forEach((joint, j) => {
+  joints.forEach((joint, j) => {
+    const parent = joint.getParentNode();
+    if (parent && isJoint.has(parent)) return;
     const world = worlds.get(joint)!;
     const matrix = inverseBind ? multiply(world, [...inverseBind.getElement(j, element)]) : world;
     const key = matrix.map((value) => Math.round(value * 1000)).join(",");
@@ -132,12 +155,10 @@ function placement(node: Node, worlds: Map<Node, number[]>): number[] {
     vote.count++;
     if (!best || vote.count > best.count) best = vote;
   });
-  return best ? best.matrix : worlds.get(node)!;
+  return best ? best.matrix : null;
 }
 
-function bindPositions(prim: Primitive, m: number[]): Float64Array {
-  const position = prim.getAttribute("POSITION");
-  if (!position) return new Float64Array(0);
+function bindPositions(position: Accessor, m: number[]): Float64Array {
   const out = new Float64Array(position.getCount() * 3);
   const p: number[] = [];
   for (let i = 0; i < position.getCount(); i++) {

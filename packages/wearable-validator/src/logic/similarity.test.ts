@@ -68,8 +68,30 @@ describe("catalog comparison", () => {
     assert.equal(matches[1].share, 1);
   });
 
+  it("reads a fingerprint it did not make as data", async () => {
+    const sheet = await print(bumpySheet());
+    const catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [sheet])], common: none }, { rules });
+    const padded = { cells: [...sheet.cells, ...sheet.cells, Number.NaN, Number.POSITIVE_INFINITY], parts: [...sheet.parts, { signature: "x", triangles: Number.NaN, kinds: 99, ratios: [0, 0] as [number, number] }] };
+    const { matches } = await catalog.match([padded]);
+    assert.equal(matches[0].position, 1);
+    assert.equal(matches[0].contains, 1); // repeated cells do not count twice
+  });
+
+  it("finds exact copies in an index that holds a broken entry", async () => {
+    const sheet = await print(bumpySheet());
+    const broken = { cells: [Number.NaN, ...(await print(bumpySheet(4))).cells], parts: [] };
+    const catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [broken]), entry(2, "0xb", [sheet]), entry(3, "0xc", [await print(bumpySheet(6))])], common: none }, { rules });
+    assert.deepEqual((await catalog.match([sheet])).matches.map((match) => match.urn), ["urn:test:2"]);
+  });
+
+  it("refuses an index built under other numbers", () => {
+    for (const change of [{ commonCreators: rules.commonCreators + 1 }, { minPartTriangles: 1 }, { minPartKinds: 1 }, { weldMillimeters: 1 }]) {
+      assert.throws(() => createCatalog({ fingerprint, entries: [], common: none }, { rules: { ...rules, ...change } }), /Rebuild the index/, JSON.stringify(change));
+    }
+  });
+
   it("refuses an index fingerprinted by another version", () => {
-    assert.throws(() => createCatalog({ fingerprint: "0:1mm", entries: [], common: none }, { rules }), /Rebuild the index/);
+    assert.throws(() => createCatalog({ fingerprint: "0:grid1", entries: [], common: none }, { rules }), /Rebuild the index/);
     assert.throws(() => createCatalog({ fingerprint, entries: [], common: none }, { rules: { ...rules, gridMillimeters: 4 } }), /Rebuild the index/);
   });
 

@@ -46,20 +46,37 @@ export interface CatalogIndex {
 export function commonGeometry(entries: CatalogEntry[], baseModels: ModelFingerprint[], rules: Rules): CommonGeometry {
   const cells = new Set<number>(baseModels.flatMap((model) => model.cells));
   const signatures = new Set<string>(baseModels.flatMap((model) => model.parts.filter((part) => counts(part, rules)).map((part) => part.signature)));
-  const cellCreators = new Map<number, Set<string>>();
+  // signatures are few (one per part); cells are millions, past what a Map holds: flat (cell, creator) arrays, sorted, then runs counted
   const signatureCreators = new Map<string, Set<string>>();
-  const note = <K>(map: Map<K, Set<string>>, key: K, creator: string) => {
-    let set = map.get(key);
-    if (!set) map.set(key, (set = new Set()));
-    set.add(creator);
-  };
+  const creatorIds = new Map<string, number>();
+  let pairs = 0;
+  for (const entry of entries) for (const model of entry.models) pairs += model.cells.length;
+  const cellOf = new Float64Array(pairs);
+  const creatorOf = new Uint32Array(pairs);
+  let at = 0;
   for (const entry of entries) {
+    let creator = creatorIds.get(entry.creator.toLowerCase());
+    if (creator === undefined) creatorIds.set(entry.creator.toLowerCase(), (creator = creatorIds.size));
     for (const model of entry.models) {
-      for (const cell of model.cells) if (!cells.has(cell)) note(cellCreators, cell, entry.creator);
-      for (const part of model.parts) if (counts(part, rules) && !signatures.has(part.signature)) note(signatureCreators, part.signature, entry.creator);
+      for (const cell of model.cells) {
+        if (cells.has(cell) || !Number.isFinite(cell)) continue;
+        cellOf[at] = cell; creatorOf[at++] = creator;
+      }
+      for (const part of model.parts) {
+        if (!counts(part, rules) || signatures.has(part.signature)) continue;
+        let set = signatureCreators.get(part.signature);
+        if (!set) signatureCreators.set(part.signature, (set = new Set()));
+        set.add(entry.creator.toLowerCase());
+      }
     }
   }
-  for (const [cell, creators] of cellCreators) if (creators.size >= rules.commonCreators) cells.add(cell);
+  const order = Uint32Array.from({ length: at }, (_, i) => i).sort((a, b) => cellOf[a] - cellOf[b] || creatorOf[a] - creatorOf[b]);
+  for (let start = 0; start < at; ) {
+    let end = start, distinct = 0;
+    for (; end < at && cellOf[order[end]] === cellOf[order[start]]; end++) if (end === start || creatorOf[order[end]] !== creatorOf[order[end - 1]]) distinct++;
+    if (distinct >= rules.commonCreators) cells.add(cellOf[order[start]]);
+    start = end;
+  }
   for (const [signature, creators] of signatureCreators) if (creators.size >= rules.commonCreators) signatures.add(signature);
   return { cells: [...cells].sort((a, b) => a - b), signatures: [...signatures].sort() };
 }
@@ -78,11 +95,17 @@ interface Own {
   triangles: number;
 }
 
+/**
+ * A fingerprint may come from anyone (a server answering lookups receives them from browsers), so it is read as data:
+ * cells are deduplicated and must be finite, parts must carry finite numbers, and neither list may be longer than the
+ * work budget a real fingerprint fits in.
+ */
 function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: Set<string> }, rules: Rules): Own {
-  const cells = model.cells.filter((cell) => !common.cells.has(cell));
+  const cells = [...new Set(model.cells.slice(0, rules.maxElements))].filter((cell) => Number.isFinite(cell) && !common.cells.has(cell)).sort((a, b) => a - b);
   const parts = new Map<string, PartFingerprint[]>();
   let triangles = 0;
-  for (const part of model.parts) {
+  for (const part of model.parts.slice(0, rules.maxElements)) {
+    if (!Number.isFinite(part.triangles) || !Number.isFinite(part.kinds) || !Number.isFinite(part.ratios?.[0]) || !Number.isFinite(part.ratios?.[1])) continue;
     if (!counts(part, rules) || common.signatures.has(part.signature)) continue;
     const list = parts.get(part.signature);
     if (list) list.push(part);

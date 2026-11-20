@@ -113,14 +113,14 @@ describe("similar-items (D-01)", () => {
   });
 
   it("is skipped for a model over the vertex budget", async () => {
-    const before = manifest.similarItems.maxVertices;
-    manifest.similarItems.maxVertices = 10;
+    const before = manifest.similarItems.maxElements;
+    manifest.similarItems.maxElements = 10;
     try {
       const result = await run(bumpySheet(), catalogOf([]));
       assert.equal(status(result, "similar-items"), "skipped");
-      assert.match(result.checks[0].skipReason ?? "", /draws more than 10 vertices/);
+      assert.match(result.checks[0].skipReason ?? "", /has more than 10 vertices and indices to read/);
     } finally {
-      manifest.similarItems.maxVertices = before;
+      manifest.similarItems.maxElements = before;
     }
   });
 

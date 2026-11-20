@@ -357,6 +357,7 @@
   },
   "similarItems": {
     "gridMillimeters": 1,
+    "weldMillimeters": 0.1,
     "minCells": 30,
     "minPartTriangles": 50,
     "minPartKinds": 10,
@@ -367,7 +368,7 @@
     "containsShare": 0.95,
     "templateCreators": 10,
     "maxFindings": 3,
-    "maxVertices": 300000
+    "maxElements": 600000
   },
   "receipts": {
     "trianglesAndBones": "builder src/lib/glbValidation/constants.ts",
