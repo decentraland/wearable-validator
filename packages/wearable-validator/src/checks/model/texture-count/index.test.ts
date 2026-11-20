@@ -34,6 +34,20 @@ describe("texture-count (M-02)", () => {
     assert.equal(found(result, "texture-count").length, 0);
   });
 
+  it("leaves out the textures of a skin copy (AvatarSkin_MAT.001), as the engine treats it as skin", async () => {
+    const defs = (skinName: string) => ({
+      texture: { size: 64 },
+      extraMaterialDefs: [
+        { name: skinName, textures: [{ size: 32 }] },
+        { name: "Detail_MAT", textures: [{ size: 8 }] }
+      ]
+    });
+    const copy = await validate(await syntheticZip({ glb: await syntheticGlb(defs("AvatarSkin_MAT.001")) }), { checks: ["texture-count"] });
+    assert.equal(found(copy, "texture-count").length, 0);
+    const other = await validate(await syntheticZip({ glb: await syntheticGlb(defs("Third_MAT")) }), { checks: ["texture-count"] });
+    assert.equal(found(other, "texture-count").length, 1, "three textures on ordinary materials still fail");
+  });
+
   it("is not applicable to emotes", async () => {
     const result = await validate(await syntheticZip({ kind: "emote" }), { checks: ["texture-count"] });
     assert.equal(result.checks.length, 0);
