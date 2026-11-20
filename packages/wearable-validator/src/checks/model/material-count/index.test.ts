@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validate } from "../../../index.js";
+import { manifest, validate } from "../../../index.js";
 import { found } from "#test/helpers/findings.js";
 import { syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
 
@@ -19,6 +19,29 @@ describe("material-count (M-06)", () => {
     const glb = await syntheticGlb({ extraMaterialDefs: [{ name: "Second_MAT" }, { name: "AvatarSkin_MAT" }] });
     const result = await validate(await syntheticZip({ glb }), { checks: ["material-count"] });
     assert.equal(found(result, "material-count").length, 0);
+  });
+
+  it("excludes every material the engine treats as skin, not only the exact name", async () => {
+    // Blender names a second copy AvatarSkin_MAT.001; the explorer tints any material with "skin" in its name
+    for (const name of ["AvatarSkin_MAT.001", "AvatarSkin_F_MAT.002", "Avatar_Skin", "skin"]) {
+      const glb = await syntheticGlb({ extraMaterialDefs: [{ name: "Second_MAT" }, { name }] });
+      const result = await validate(await syntheticZip({ glb }), { checks: ["material-count"] });
+      assert.equal(found(result, "material-count").length, 0, name);
+    }
+  });
+
+  it("an empty skin token exempts nothing", async () => {
+    const { isSkinMaterial } = await import("../../../logic/materials.js");
+    const { Document } = await import("@gltf-transform/core");
+    assert.equal(isSkinMaterial(new Document().createMaterial("AvatarSkin_MAT"), ""), false);
+    assert.notEqual(manifest.materials.skinNameToken, "");
+  });
+
+  it("still counts every other material when a skin copy is present", async () => {
+    const glb = await syntheticGlb({ extraMaterialDefs: [{ name: "Second_MAT" }, { name: "Third_MAT" }, { name: "AvatarSkin_MAT.001" }] });
+    const findings = found(await validate(await syntheticZip({ glb }), { checks: ["material-count"] }), "material-count");
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].measured, 3);
   });
 
   it("accepts a third material when one of them is emissive or transparent (curators' decision)", async () => {
@@ -65,6 +88,16 @@ describe("material-count (M-06)", () => {
     assert.equal(finding.severity, "error");
     assert.equal(finding.measured, 4);
     assert.equal(finding.limit, 3);
+  });
+
+  it("applies both rules together: a skin copy is left out and a glowing material earns the third", async () => {
+    // four materials in the file: the main one, a plain one, a glowing one and Blender's copy of the skin
+    const glb = await syntheticGlb({
+      extraMaterialDefs: [{ name: "Second_MAT" }, { name: "Glow_MAT", emissiveFactor: [1, 1, 1] }, { name: "AvatarSkin_MAT.001" }]
+    });
+    const result = await validate(await syntheticZip({ glb }), { checks: ["material-count"] });
+    assert.equal(found(result, "material-count").length, 0);
+    assert.equal(result.checks.find((c) => c.check === "material-count")?.measured, "3 materials");
   });
 
   it("allows 5 materials for skins", async () => {

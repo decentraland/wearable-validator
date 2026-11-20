@@ -9,20 +9,22 @@ export interface Manifest {
   };
   textures: {
     default: number; skin: number; maxSize: number;
-    /** Eyes, eyebrows and mouth PNGs: 512×512 since the curators' decision (Nov 2026); it was 256×256. */
+    /** Eyes, eyebrows and mouth PNGs: 1024×1024, the same as any other texture, since the curators' decision (Nov 2026). It was 256×256, then 512×512. */
     facialMaxSize: number;
   };
   /**
+   * avatarSkinMat is the name creators should use. skinNameToken is what the engine looks for: any material whose name
+   * contains it (any case) is tinted as skin, so those are the ones left out of the material and texture counts.
    * extraWithEmissionOrAlpha: materials allowed on top of `default` when the model uses emission or transparency, which
    * need a material of their own (curators' decision, Nov 2026). It does not apply to skins, which already get `skin`.
    */
-  materials: { default: number; extraWithEmissionOrAlpha: number; skin: number; avatarSkinMat: string; forbiddenMeshNamePatterns: string[] };
+  materials: { default: number; extraWithEmissionOrAlpha: number; skin: number; avatarSkinMat: string; skinNameToken: string; forbiddenMeshNamePatterns: string[] };
   facialCategories: string[];
   fileSize: {
     wearableBytes: number; skinBytes: number; emoteBytes: number;
-    /** A wearable's model alone must stay this far under the item ceiling. 0 means no per-model rule: only the total counts. */
+    /** A wearable's model alone would have to stay this far under the item ceiling. 0 since the curators' decision (Nov 2026): no per-model rule, only the total counts. It was 1 MB. */
     modelHeadroomBytes: number;
-    /** The same for emotes: 0, so an emote is held only to its item total, thumbnail included (curators' decision, Nov 2026). */
+    /** The same for emotes: 0 too, so every item is held only to its total, thumbnail included. */
     emoteModelHeadroomBytes: number;
     thumbnailBytes: number; thumbnailMaxSize: number;
     smartWearableVideoBytes: number; audioBytes: number; maxInputBytes: number;
@@ -51,7 +53,11 @@ export interface Manifest {
     maxClipsBasic: number; maxClipsWithProps: number;
     propMaxTriangles: number; propMaxMaterials: number; propMaxTextures: number; propMaxBones: number;
     propClipLengthToleranceSeconds: number; audioDurationToleranceSeconds: number;
-    rootMotion: { horizontalErrorMeters: number; verticalWarnMeters: number; verticalErrorMeters: number; hipsPattern: string };
+    /**
+     * The hips' distance from the centre of the animation area: over horizontalWarnMeters (the documented 1 m) warns, over
+     * horizontalErrorMeters fails. Vertical travel from the first key: over verticalWarnMeters warns, over verticalErrorMeters fails.
+     */
+    rootMotion: { horizontalWarnMeters: number; horizontalErrorMeters: number; verticalWarnMeters: number; verticalErrorMeters: number; hipsPattern: string };
     maxSocialOutcomes: number;
   };
   epsilons: { loopSeamTranslation: number; loopSeamQuaternionDot: number; loopSeamScale: number; zUpRotationToleranceDegrees: number };
