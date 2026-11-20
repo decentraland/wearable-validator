@@ -13,7 +13,7 @@ const glb = (geometry: Mesh) => syntheticGlb({ geometry, skinned: false });
 const print = async (geometry: Mesh): Promise<ModelFingerprint> => fingerprintModel((await parseGlb(await glb(geometry))).doc, rules, manifest.materials.skinNameToken)!;
 const wallet = (short: string): string => `0x${short.slice(2).padStart(40, "0")}`;
 const entry = (n: number, creator: string, models: ModelFingerprint[], publishedAt = 1_650_000_000 + n * 86_400): CatalogEntry =>
-  ({ urn: `urn:test:${n}`, name: `Hoodie ${n}`, creator: wallet(creator), publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${n}/items/0`, models });
+  ({ urn: `urn:test:${n}`, name: `Hoodie ${n}`, creator: wallet(creator), publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${String(n).padStart(40, "0")}/items/0`, models });
 const catalogOf = (entries: CatalogEntry[]): Catalog => createCatalog({ fingerprint: fingerprintVersion(rules), entries, common: { cells: [], signatures: [] } }, { rules });
 const run = async (geometry: Mesh, catalog?: Catalog, ownCreators?: string[]) =>
   validate(await syntheticZip({ glb: await glb(geometry) }), { checks: ["similar-items"], services: { catalog }, ownCreators });
@@ -33,7 +33,7 @@ describe("similar-items (D-01)", () => {
     const findings = found(result, "similar-items");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "warning");
-    assert.match(findings[0].message, /100% of the geometry of ".+\.glb" matches "Hoodie 1", published on 2022-04-16 by 0x0000000000000000000000000000000000000aaa: https:\/\/decentraland\.org\/marketplace\/contracts\/0x1\/items\/0\./);
+    assert.match(findings[0].message, /100% of the geometry of ".+\.glb" matches "Hoodie 1", published on 2022-04-16 by 0x0000000000000000000000000000000000000aaa: https:\/\/decentraland\.org\/marketplace\/contracts\/0x0{39}1\/items\/0\./);
     assert.equal(findings[0].limit, `${rules.warnShare * 100}%`);
     assert.equal(findings[0].data?.urn, "urn:test:1");
     assert.equal(result.passed, null); // a subset never mints a verdict
@@ -159,7 +159,7 @@ describe("similar-items (D-01)", () => {
     try {
       const result = await run(bumpySheet(), catalogOf([]));
       assert.equal(status(result, "similar-items"), "skipped");
-      assert.match(result.checks[0].skipReason ?? "", /asks for more work than this check allows \(10 indices, nodes and skin joints\)/);
+      assert.match(result.checks[0].skipReason ?? "", /asks for more work than this check allows \(10 primitives, indices, nodes and skin joints\)/);
     } finally {
       manifest.similarItems.maxElements = before;
     }

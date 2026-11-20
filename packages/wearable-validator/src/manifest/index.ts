@@ -172,6 +172,8 @@ export interface Manifest {
     maxModels: number;
     /** Characters of a published item's name a warning quotes. */
     maxNameLength: number;
+    /** A published item's date (unix seconds) is believed from here (2020-01-01, before the first collection) up to now plus the clock skew. */
+    earliestPublishedAt: number; clockSkewSeconds: number;
   };
   receipts: Record<string, string>;
 }

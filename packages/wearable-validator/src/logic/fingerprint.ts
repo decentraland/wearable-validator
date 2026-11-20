@@ -5,8 +5,8 @@
  *   cells   where the vertices are: every distinct grid cell (manifest similarItems.gridMillimeters) a drawn vertex falls
  *           in, in the avatar's frame at bind pose, whatever pose the file was saved in. Survives a retexture, a trim, parts
  *           added. Lost when the mesh is moved.
- *   parts   how the mesh is built: each connected piece (vertices at the same place welded, then joined through
- *           triangles) with a signature of how its triangles connect and the proportions of its vertex cloud. Survives
+ *   parts   how the mesh is built: each connected piece of at least similarItems.minPartTriangles triangles (vertices
+ *           at the same place welded, then joined through triangles) with a signature of how its triangles connect and the proportions of its vertex cloud. Survives
  *           being moved, turned or scaled. Lost when the mesh is rebuilt with other triangles.
  *
  * Colliders are left out, and so are primitives drawn with the skin material: the avatar's own arms, hands and head ship
@@ -56,8 +56,8 @@ function cellKey(x: number, y: number, z: number, gridMillimeters: number): numb
 }
 
 /**
- * Null when the model asks for more work than rules.maxElements: every index read (every vertex, for a mesh without
- * indices), every node and every joint of the file's skins counts, and a mesh reused by several nodes counts each time. The work
+ * Null when the model asks for more work than rules.maxElements: every primitive looked at, every index read (every
+ * vertex, for a mesh without indices), every node and every joint of the file's skins counts, and a mesh reused by several nodes counts each time. The work
  * grows with that number, and a file built to be slow is not worth comparing.
  */
 export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: string, signal?: AbortSignal): ModelFingerprint | null {
@@ -79,8 +79,10 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
       const material = prim.getMaterial();
       const mode = prim.getMode();
       const position = prim.getAttribute("POSITION");
-      if (!position || mode < 4 || mode > 6 || (material && isSkinMaterial(material, skinNameToken))) continue; // points and lines draw no surface
+      // every primitive looked at costs one, drawn or not: thousands of empty ones on thousands of nodes are work too
+      if (--budget < 0) return null;
       signal?.throwIfAborted();
+      if (!position || mode < 4 || mode > 6 || (material && isSkinMaterial(material, skinNameToken))) continue; // points and lines draw no surface
       const indices = prim.getIndices();
       const count = indices ? indices.getCount() : position.getCount();
       budget -= count;
@@ -130,7 +132,7 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
         corners.push(a, b, c);
       }
     }
-    parts.push(...connectedParts(points, corners));
+    for (const part of connectedParts(points, corners, rules.minPartTriangles)) parts.push(part);
   }
   return { cells: [...cells].sort((a, b) => a - b), parts };
 }
@@ -204,7 +206,7 @@ function placement(node: Node, worlds: Map<Node, number[]>, bind: BindFrames): n
 }
 
 /** Splits welded triangles into connected pieces and fingerprints each. */
-function connectedParts(points: number[], corners: number[]): PartFingerprint[] {
+function connectedParts(points: number[], corners: number[], minTriangles: number): PartFingerprint[] {
   const vertexCount = points.length / 3;
   const parent = Int32Array.from({ length: vertexCount }, (_, i) => i);
   const find = (v: number): number => {
@@ -236,6 +238,7 @@ function connectedParts(points: number[], corners: number[]): PartFingerprint[] 
   }
   const parts: PartFingerprint[] = [];
   for (const [root, list] of triples) {
+    if (list.length < minTriangles) continue; // too small to say anything (a button, a loose triangle): never compared, so not kept
     list.sort((a, b) => a - b);
     let kinds = 0;
     for (let i = 0; i < list.length; i++) if (i === 0 || list[i] !== list[i - 1]) kinds++;

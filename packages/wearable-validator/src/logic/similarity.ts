@@ -27,34 +27,27 @@ export interface CatalogEntry {
   models: ModelFingerprint[];
 }
 
-/** Where a published item has its public page: the only place a warning may link to. */
-export const MARKETPLACE = "https://decentraland.org/marketplace/";
+/** A published item's public page, exactly: the only thing a warning may link to. */
+const MARKETPLACE_ITEM = /^https:\/\/decentraland\.org\/marketplace\/contracts\/0x[0-9a-fA-F]{40}\/items\/[0-9]+$/;
 
 /**
  * What a warning may say about a published item, or null when it cannot be said safely. The name is written by another
  * creator and ends up in a message shown to the uploader and to curators, on surfaces that may render Markdown or HTML
- * and turn anything that looks like an address into a link. So only letters, digits, spaces and ' & + , - are kept
- * (no dots, slashes, colons, formatting marks, mentions or invisible characters), cut at maxNameLength characters.
- * The link must be a page under the marketplace, the creator a wallet, the date a real one that has passed.
+ * and turn anything that looks like an address into a link. So only letters with their accents and vowel signs,
+ * digits, spaces and ' & + , - are kept (no dots, slashes, colons, formatting marks, mentions or invisible
+ * characters), at most two marks stacked on a letter, cut at maxNameLength characters. The link must be the item's
+ * marketplace page, the creator a wallet, and the date one a collection can have: after earliestPublishedAt and not
+ * past now by more than clockSkewSeconds.
  */
-export function presentable<T extends { name: string; creator: string; publishedAt: number; url: string }>(item: T, maxNameLength: number): T | null {
+export function presentable<T extends { name: string; creator: string; publishedAt: number; url: string }>(item: T, rules: Rules): T | null {
   if (!item || typeof item.creator !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(item.creator)) return null;
-  if (typeof item.publishedAt !== "number" || !Number.isFinite(item.publishedAt) || item.publishedAt <= 0 || item.publishedAt > Date.now() / 1000 + 86_400) return null;
-  if (typeof item.url !== "string" || !marketplacePage(item.url)) return null;
-  const kept = (typeof item.name === "string" ? item.name : "").replace(/[^\p{L}\p{N} '&+,-]/gu, " ").replace(/ +/g, " ").trim();
-  const name = Array.from(kept).slice(0, maxNameLength).join("").trim(); // by code point: never half a character
+  if (typeof item.publishedAt !== "number" || !Number.isFinite(item.publishedAt)) return null;
+  if (item.publishedAt < rules.earliestPublishedAt || item.publishedAt > Date.now() / 1000 + rules.clockSkewSeconds) return null;
+  if (typeof item.url !== "string" || !MARKETPLACE_ITEM.test(item.url)) return null;
+  const kept = (typeof item.name === "string" ? item.name : "").normalize("NFC")
+    .replace(/[^\p{L}\p{M}\p{N} '&+,-]/gu, " ").replace(/(\p{M}{2})\p{M}+/gu, "$1").replace(/(^|[^\p{L}\p{M}\p{N}])\p{M}+/gu, "$1").replace(/ +/g, " ").trim();
+  const name = Array.from(kept).slice(0, rules.maxNameLength).join("").trim(); // by code point: never half a character
   return { ...item, name: name || "an unnamed item" };
-}
-
-/** A URL that is exactly a page under the marketplace: parsed, so "../" and look-alike hosts do not pass. */
-function marketplacePage(url: string): boolean {
-  if (!/^[A-Za-z0-9/_.:-]+$/.test(url)) return false;
-  try {
-    const parsed = new URL(url);
-    return parsed.href === url && `${parsed.origin}/` === new URL(MARKETPLACE).origin + "/" && parsed.pathname.startsWith(new URL(MARKETPLACE).pathname) && !parsed.search && !parsed.hash;
-  } catch {
-    return false;
-  }
 }
 
 export interface CommonGeometry {
@@ -181,10 +174,16 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
   }
   const common = { cells: new Set(index.common.cells), signatures: new Set(index.common.signatures) };
   const models: { entry: number; own: Own }[] = [];
-  // an entry a warning could not name safely (see presentable) is not compared at all
-  const entries = index.entries.map((entry) => presentable(entry, rules.maxNameLength));
+  // every entry must be one a warning can name (see presentable). The index is built by our own code, so one that is not
+  // means the build is wrong (seconds written as milliseconds, another link shape), and comparing against what is left
+  // would answer "no similar item" for everything.
+  const entries = index.entries.map((entry) => presentable(entry, rules));
+  const unusable = index.entries.filter((_, e) => !entries[e] || !Array.isArray(index.entries[e].models));
+  if (unusable.length > 0) {
+    throw new Error(`${unusable.length} of the catalog index's ${index.entries.length} entries cannot be named in a warning (first: ${String(unusable[0]?.urn)}): each needs a creator wallet, a publishedAt in unix seconds and its marketplace item page as url. Rebuild the index.`);
+  }
   entries.forEach((entry, e) => {
-    if (!entry || !Array.isArray(entry.models)) return;
+    if (!entry) return;
     for (const model of entry.models) models.push({ entry: e, own: own(model, common, rules) });
   });
 

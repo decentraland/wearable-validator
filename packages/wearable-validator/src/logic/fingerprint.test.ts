@@ -112,7 +112,7 @@ describe("model fingerprints", () => {
       return doc;
     };
     const one = sheet.indices.length;
-    const overhead = (nodes: number, joints = 0) => nodes + joints + joints; // every node once, every skin joint once
+    const overhead = (nodes: number, joints = 0) => nodes + (nodes + joints) + joints; // a primitive per mesh node, every node once, every skin joint once
     const fits = (doc: Document, maxElements: number) => fingerprintModel(doc, { ...rules, maxElements }, manifest.materials.skinNameToken) !== null;
     // three vertices drawn a million times is a million triangles of work
     const repeated = Uint32Array.from({ length: 30_000 }, (_, i) => i % 3);
@@ -207,6 +207,28 @@ describe("model fingerprints", () => {
     const started = Date.now();
     assert.notEqual(fingerprintModel(doc, rules, manifest.materials.skinNameToken), null);
     assert.ok(Date.now() - started < 3_000, `took ${Date.now() - started} ms`);
+  });
+
+  it("charges primitives that draw nothing, and takes a hundred thousand loose triangles in its stride", () => {
+    const doc = new Document();
+    const buffer = doc.createBuffer();
+    const scene = doc.createScene();
+    const empty = doc.createAccessor().setType("VEC3").setArray(new Float32Array(0)).setBuffer(buffer);
+    const some3 = doc.createAccessor().setType("VEC3").setArray(Float32Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0])).setBuffer(buffer);
+    const mesh = doc.createMesh();
+    for (let k = 0; k < 1_000; k++) mesh.addPrimitive(doc.createPrimitive().setMode(k % 2 ? 0 : 4).setAttribute("POSITION", k % 2 ? some3 : empty));
+    for (let n = 0; n < 1_000; n++) scene.addChild(doc.createNode(`n${n}`).setMesh(mesh));
+    const started = Date.now();
+    assert.equal(fingerprintModel(doc, rules, manifest.materials.skinNameToken), null); // a million primitives looked at is over the budget
+    assert.ok(Date.now() - started < 3_000, `took ${Date.now() - started} ms`);
+
+    const loose = new Document();
+    const triangles = 150_000;
+    const positions = new Float32Array(triangles * 9);
+    for (let t = 0; t < triangles; t++) positions.set([t * 0.01, 0, 0, t * 0.01 + 0.004, 0, 0, t * 0.01, 0.004, 0], t * 9);
+    const prim = loose.createPrimitive().setMode(4).setAttribute("POSITION", loose.createAccessor().setType("VEC3").setArray(positions).setBuffer(loose.createBuffer()));
+    loose.createScene().addChild(loose.createNode("loose").setMesh(loose.createMesh().addPrimitive(prim)));
+    assert.deepEqual(fingerprintModel(loose, rules, manifest.materials.skinNameToken)!.parts, []); // nothing big enough to be a part, and no crash
   });
 
   it("ignores vertices that are nowhere", async () => {

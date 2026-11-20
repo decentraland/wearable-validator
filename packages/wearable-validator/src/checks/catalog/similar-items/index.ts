@@ -18,9 +18,9 @@ const PERMISSION = "If it is your own work, or you have that creator's permissio
 const share = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
 
 /** A catalog answering from a server is another party's data: a row is used only when it can be named safely, with its shares within 0 to 1. */
-function sound(match: CatalogMatch, maxNameLength: number): CatalogMatch | null {
+function sound(match: CatalogMatch, rules: CheckContext["manifest"]["similarItems"]): CatalogMatch | null {
   if (!match || typeof match.urn !== "string") return null;
-  const named = presentable(match, maxNameLength);
+  const named = presentable(match, rules);
   return named && { ...named, share: share(match.share), position: share(match.position), shape: share(match.shape), contains: share(match.contains) };
 }
 
@@ -45,7 +45,7 @@ export const similarItems: CheckDefinition = {
   describe: "The model's geometry is compared with every published item by other creators; a model that is mostly an existing mesh, or contains one whole, gets a warning naming that item.",
   explanation: "Publishing someone else's model with a new texture is the most common way work gets copied in the marketplace. This compares your model's mesh with the items already published and tells you when it is nearly the same as one of them, or contains one of them, with a link so you can see which.",
   fix: "Open the linked item. If it is yours (another wallet, an earlier collection) or you have its creator's permission, you can publish: this is a warning, not a rejection. If your model is based on it without permission, model your own mesh or ask its creator before publishing.",
-  details: "Textures, materials, UVs and names are ignored; colliders and skin-material meshes are left out. Position: the share of the model's vertices, snapped to a similarItems.gridMillimeters grid at bind pose (whatever pose the file was saved in), that sit where a published model has one. Shape: the share of its triangles in connected parts (at least minPartTriangles triangles) whose triangles connect the same way and have the same proportions (within ratioTolerance) as a part of the published model, so a copy that was moved or scaled still matches. Base-avatar geometry and geometry found in the items of commonCreators or more creators are removed first. A warning when either share reaches warnShare against an item by another creator, naming the earliest; none when templateCreators or more creators had already published that geometry. A second kind of warning when containsShare of a published item sits inside the model, with the same template exemption. At most maxFindings warnings per item. The uploader's own items (Options.ownCreators) never match. Skipped without a catalog, for a model with more than maxElements indices, nodes and skin joints to read, and for an item with more than maxModels models. A copy saved with its root bone moved is seen by shape only.",
+  details: "Textures, materials, UVs and names are ignored; colliders and skin-material meshes are left out. Position: the share of the model's vertices, snapped to a similarItems.gridMillimeters grid at bind pose (whatever pose the file was saved in), that sit where a published model has one. Shape: the share of its triangles in connected parts (at least minPartTriangles triangles) whose triangles connect the same way and have the same proportions (within ratioTolerance) as a part of the published model, so a copy that was moved or scaled still matches. Base-avatar geometry and geometry found in the items of commonCreators or more creators are removed first. A warning when either share reaches warnShare against an item by another creator, naming the earliest; none when templateCreators or more creators had already published that geometry. A second kind of warning when containsShare of a published item sits inside the model, with the same template exemption. At most maxFindings warnings per item. The uploader's own items (Options.ownCreators) never match. Skipped without a catalog, for a model with more than maxElements primitives, indices, nodes and skin joints to read, and for an item with more than maxModels models. A copy saved with its root bone moved is seen by shape only.",
   appliesTo: (ctx) => (ctx.models.length > 0 || ctx.parseError ? true : "no model to compare"),
   run: async (ctx): Promise<Finding[] | CheckExecution> => {
     const catalog = ctx.services?.catalog;
@@ -55,7 +55,7 @@ export const similarItems: CheckDefinition = {
     const fingerprints = [];
     for (const model of ctx.models) {
       const fingerprint = fingerprintModel(model.doc, rules, ctx.manifest.materials.skinNameToken, ctx.signal);
-      if (!fingerprint) return skipped(`"${model.mainFile}" asks for more work than this check allows (${rules.maxElements.toLocaleString("en-US")} indices, nodes and skin joints), so it was not compared with published items.`);
+      if (!fingerprint) return skipped(`"${model.mainFile}" asks for more work than this check allows (${rules.maxElements.toLocaleString("en-US")} primitives, indices, nodes and skin joints), so it was not compared with published items.`);
       fingerprints.push(fingerprint);
     }
     const answer = await catalog.match(fingerprints, { ownCreators: ctx.ownCreators, fingerprint: fingerprintVersion(rules), signal: ctx.signal });
@@ -64,7 +64,7 @@ export const similarItems: CheckDefinition = {
     const seen = new Set<string>();
     let templates = 0;
     ctx.models.forEach((model, index) => {
-      const matches = (Array.isArray(answer.matches) ? answer.matches : []).filter((match) => match?.model === index).map((match) => sound(match, rules.maxNameLength)).filter((match) => match !== null);
+      const matches = (Array.isArray(answer.matches) ? answer.matches : []).filter((match) => match?.model === index).map((match) => sound(match, rules)).filter((match) => match !== null);
       const { similar, template, contained } = judge(matches, rules);
       if (template) templates++;
       // both body shapes usually carry the same mesh: one warning per published item, not one per file
