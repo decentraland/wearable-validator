@@ -56,6 +56,8 @@ export interface SyntheticPropOptions {
 export interface SyntheticOptions {
   /** Triangles for the cube mesh (default 12 — a plain cube). */
   triangles?: number;
+  /** Use this mesh instead of the cube: positions (metres, xyz per vertex) and, optionally, triangle indices. */
+  geometry?: { positions: Float32Array; indices?: Uint32Array; mode?: 4 | 5 | 6 };
   /** Skin the mesh to the canonical skeleton (default true). */
   skinned?: boolean;
   /** Bone names to create (default: the canonical 62). */
@@ -137,7 +139,7 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
   const scene = doc.createScene("Scene");
 
   const scale = options.scale ?? 1;
-  const positions = cubePositions(scale, options.triangles ?? 12);
+  const positions = options.geometry ? Float32Array.from(options.geometry.positions) : cubePositions(scale, options.triangles ?? 12);
   if (options.offset) for (let i = 0; i < positions.length; i++) positions[i] += options.offset[i % 3];
   const position = doc.createAccessor("POSITION").setType("VEC3").setBuffer(buffer);
   if (options.quantizedPositions) position.setArray(Int16Array.from(positions, (value) => Math.round(value * 32767))).setNormalized(true);
@@ -167,6 +169,8 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
   for (const img of options.textureImages ?? []) attachTexture(material, img);
 
   const prim = doc.createPrimitive().setMode(4).setAttribute("POSITION", position).setMaterial(material);
+  if (options.geometry?.mode) prim.setMode(options.geometry.mode);
+  if (options.geometry?.indices) prim.setIndices(doc.createAccessor("indices").setType("SCALAR").setArray(options.geometry.indices).setBuffer(buffer));
   const mesh = doc.createMesh(options.meshName ?? "cube").addPrimitive(prim);
   const meshNode = doc.createNode("cube_node").setMesh(mesh);
   if (options.rootRotation) meshNode.setRotation(options.rootRotation);

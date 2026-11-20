@@ -190,7 +190,7 @@ function walkDown(doc: Document, visit: (node: Node, parent: Node | null) => voi
 }
 
 /** Column-major a × b. */
-function multiply(a: number[], b: number[]): number[] {
+export function multiply(a: number[], b: number[]): number[] {
   const out = new Array<number>(16);
   for (let col = 0; col < 4; col++) {
     for (let row = 0; row < 4; row++) {
@@ -287,7 +287,7 @@ export function computeAabb(doc: Document): { width: number; height: number; dep
   return { width: max[0] - min[0], height: max[1] - min[1], depth: max[2] - min[2] };
 }
 
-function transformPoint(m: number[], p: [number, number, number]): [number, number, number] {
+export function transformPoint(m: number[], p: [number, number, number]): [number, number, number] {
   return [
     m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
     m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],

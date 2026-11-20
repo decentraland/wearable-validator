@@ -5,6 +5,7 @@ Decentraland's wearable and emote rule book as code. Hand it a Builder zip, a `.
 - **36 code checks** (files, model, emote, content) run anywhere: browser or Node.
 - **4 visual checks** render the item and ask Claude to judge it. They run on a Node server only (a native Unity render server).
 - **1 code review** (`smart-wearable-code`, group `code`) has Claude read a smart wearable's scene and bundle as text, never running it: it says what the code does, and malicious or spam code fails the item. It needs only the `/ai` reviewer.
+- **1 catalog check** (`similar-items`, group `catalog`) compares the model's mesh with the items already published and warns, with the item's marketplace link, when it is nearly the same as one or contains one. It runs anywhere and needs a catalog to ask.
 
 ```sh
 npm i @dcl-regenesislabs/wearable-validator
@@ -72,16 +73,35 @@ await renderer.stop(); // on shutdown
 - **Re-runs:** pass the earlier `result.captures` back as `captures` and only missing views are rendered again.
 - **Safe failure:** visual findings are warnings. A missing render, a refused or malformed answer, or no `reviewer` never passes; the row becomes `skipped` or `errored` with the reason. Each visual row carries `review` (model, prompt version, token usage).
 
+## Similar published items
+
+`similar-items` fingerprints each model (where its vertices sit on a 1 mm grid, and how each connected part is built) and asks `services.catalog` for published items with the same geometry. Textures, materials and names are ignored, so a recolour of someone else's mesh matches. It only ever warns.
+
+```ts
+import { validate, createCatalog, manifest } from "@dcl-regenesislabs/wearable-validator";
+
+// index: { fingerprint, entries: [{ urn, name, creator, publishedAt, url, models }], common } built from published items
+const catalog = createCatalog(index, { rules: manifest.similarItems }); // once: this is the slow part
+const result = await validate(zip, { groups: ["catalog"], services: { catalog }, ownCreators: [uploaderWallet] });
+```
+
+- `createCatalog` answers from an index held in memory. A host that keeps the index on a server implements `Catalog.match(fingerprints)` with a request instead: only fingerprints travel, never the files.
+- `fingerprintModel(doc, manifest.similarItems, manifest.materials.skinNameToken)` is the fingerprint of one model, and `commonGeometry(entries, baseAvatarModels, rules)` derives the geometry nobody owns (base avatars, the reference body) when an index is built.
+- Pass the uploader's wallets as `ownCreators`: a creator's own earlier items are never a match. They travel with each lookup, so one catalog serves every uploader.
+- `index.fingerprint` must equal `fingerprintVersion(manifest.similarItems)`: `createCatalog` refuses an index built by another version instead of silently matching nothing.
+- A host that answers lookups from browsers can pass what it receives straight to `match`: fingerprints are read as data (shape checked, deduplicated, capped), and a published item is only ever named through `presentable()`, which keeps only letters, digits and a few marks of its name and accepts only the item's marketplace page. `createCatalog` throws on an index with an entry that fails it, instead of comparing against what is left, so the index builder keeps to Polygon collections (the 2019 Ethereum ones have another link shape). The check sends its `fingerprintVersion` with each lookup; a catalog built by another version must refuse it rather than answer "no match".
+- Without a catalog the check is `skipped`. The default run does not include the group, so `passed` is unchanged there. A run that asks for the core groups **and** `catalog` gets `passed: null` when the check is skipped or errors, like any row that could not be asserted, although the check itself can only warn. A host that must never hold an item on this check runs it as its own pass (`groups: ["catalog"]`), the way the visual checks are run.
+
 ## Options
 
 | Option | What it does |
 | --- | --- |
 | `checks` | Run only these checks by name (`"triangle-count"`; rule ids like `"M-01"` work too). The verdict becomes `null`. |
-| `groups` | `files`, `model`, `emote`, `content` (the default set), `rendering` and `code`. |
+| `groups` | `files`, `model`, `emote`, `content` (the default set), `rendering`, `code` and `catalog` (opt-in: each needs a service). |
 | `category`, `itemType` | Hints for a bare `.glb`, which carries no metadata. |
 | `onProgress` | Called as each check starts and finishes, for a live UI. |
 | `signal` | An `AbortSignal` to cancel the run. |
-| `captures`, `services` | The visual checks, above. |
+| `captures`, `services` | The visual checks and the catalog, above. |
 
 ## The result
 
