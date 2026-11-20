@@ -27,6 +27,24 @@ export interface CatalogEntry {
   models: ModelFingerprint[];
 }
 
+/** Where a published item has its public page: the only place a warning may link to. */
+export const MARKETPLACE = "https://decentraland.org/marketplace/";
+
+/**
+ * What a warning may say about a published item, or null when it cannot be said safely. The name is written by another
+ * creator and ends up in a message shown to the uploader and to curators, on surfaces that may render Markdown or
+ * HTML: quotes, brackets and control characters are taken out, and it is cut at 80 characters. The link must be a
+ * marketplace page, the creator a wallet, the date a real one.
+ */
+export function presentable<T extends { name: string; creator: string; publishedAt: number; url: string }>(item: T): T | null {
+  if (!item || typeof item.creator !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(item.creator)) return null;
+  if (typeof item.publishedAt !== "number" || !Number.isFinite(item.publishedAt) || item.publishedAt <= 0 || item.publishedAt > 8.64e12) return null;
+  if (typeof item.url !== "string" || !item.url.startsWith(MARKETPLACE) || !/^[A-Za-z0-9/_.:-]+$/.test(item.url)) return null;
+  const name = (typeof item.name === "string" ? item.name : "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ").replace(/"/g, "'").replace(/[<>[\]()`|]/g, "").replace(/\s+/g, " ").trim().slice(0, 80);
+  return { ...item, name: name || "an unnamed item" };
+}
+
 export interface CommonGeometry {
   cells: number[];
   signatures: string[];
@@ -97,16 +115,23 @@ interface Own {
 
 /**
  * A fingerprint may come from anyone (a server answering lookups receives them from browsers), so it is read as data:
- * cells are deduplicated and must be finite, parts must carry finite numbers, and neither list may be longer than the
- * work budget a real fingerprint fits in.
+ * anything that is not the expected shape is left out, cells are deduplicated and must be finite, parts must carry
+ * finite numbers, and neither list may be longer than what a model within the work budget can produce.
  */
 function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: Set<string> }, rules: Rules): Own {
-  const cells = [...new Set(model.cells.slice(0, rules.maxElements))].filter((cell) => Number.isFinite(cell) && !common.cells.has(cell)).sort((a, b) => a - b);
+  const sentCells = Array.isArray(model?.cells) ? model.cells.slice(0, rules.maxElements) : [];
+  const sentParts = Array.isArray(model?.parts) ? model.parts : [];
+  const cells = [...new Set(sentCells)].filter((cell) => typeof cell === "number" && Number.isFinite(cell) && !common.cells.has(cell)).sort((a, b) => a - b);
   const parts = new Map<string, PartFingerprint[]>();
+  // a part that counts has minPartTriangles triangles, so a model within the work budget cannot have more of them than this
+  let room = Math.floor(rules.maxElements / (3 * rules.minPartTriangles));
   let triangles = 0;
-  for (const part of model.parts.slice(0, rules.maxElements)) {
-    if (!Number.isFinite(part.triangles) || !Number.isFinite(part.kinds) || !Number.isFinite(part.ratios?.[0]) || !Number.isFinite(part.ratios?.[1])) continue;
+  for (const part of sentParts) {
+    if (room <= 0) break;
+    if (!part || typeof part.signature !== "string" || !Array.isArray(part.ratios)) continue;
+    if (!Number.isFinite(part.triangles) || !Number.isFinite(part.kinds) || !Number.isFinite(part.ratios[0]) || !Number.isFinite(part.ratios[1])) continue;
     if (!counts(part, rules) || common.signatures.has(part.signature)) continue;
+    room--;
     const list = parts.get(part.signature);
     if (list) list.push(part);
     else parts.set(part.signature, [part]);
@@ -144,7 +169,10 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
   }
   const common = { cells: new Set(index.common.cells), signatures: new Set(index.common.signatures) };
   const models: { entry: number; own: Own }[] = [];
-  index.entries.forEach((entry, e) => {
+  // an entry a warning could not name safely (see presentable) is not compared at all
+  const entries = index.entries.map((entry) => presentable(entry));
+  entries.forEach((entry, e) => {
+    if (!entry || !Array.isArray(entry.models)) return;
     for (const model of entry.models) models.push({ entry: e, own: own(model, common, rules) });
   });
 
@@ -184,7 +212,7 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
       const mine = new Set((request.ownCreators ?? []).map((creator) => creator.toLowerCase()));
       const matches: CatalogMatch[] = [];
       let compared = false;
-      uploaded.forEach((fingerprint, modelIndex) => {
+      (Array.isArray(uploaded) ? uploaded : []).slice(0, rules.maxModels).forEach((fingerprint, modelIndex) => {
         request.signal?.throwIfAborted();
         // per uploaded model: what one model matched must not hide what another did
         const best = new Map<number, CatalogMatch>();
@@ -198,7 +226,7 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
         const candidates = new Set(sharedCells.keys());
         for (const signature of upload.parts.keys()) for (const m of bySignature.get(signature) ?? []) candidates.add(m);
         for (const m of candidates) {
-          const entry = index.entries[models[m].entry];
+          const entry = entries[models[m].entry]!;
           if (mine.has(entry.creator.toLowerCase())) continue;
           const other = models[m].own;
           const cells = sharedCells.get(m) ?? 0;

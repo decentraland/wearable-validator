@@ -368,7 +368,8 @@
     "containsShare": 0.95,
     "templateCreators": 10,
     "maxFindings": 3,
-    "maxElements": 600000
+    "maxElements": 600000,
+    "maxModels": 4
   },
   "receipts": {
     "trianglesAndBones": "builder src/lib/glbValidation/constants.ts",

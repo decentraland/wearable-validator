@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { fingerprintModel, fingerprintVersion, type ModelFingerprint } from "./fingerprint.js";
-import { commonGeometry, createCatalog, type CatalogEntry } from "./similarity.js";
+import { commonGeometry, createCatalog, presentable, type CatalogEntry } from "./similarity.js";
 import { parseGlb } from "./gltf.js";
 import { manifest } from "../manifest/index.js";
 import { syntheticGlb } from "#test/helpers/synthetic.js";
@@ -11,8 +11,9 @@ const rules = manifest.similarItems;
 type Mesh = ReturnType<typeof bumpySheet>;
 const print = async (geometry: Mesh): Promise<ModelFingerprint> =>
   fingerprintModel((await parseGlb(await syntheticGlb({ geometry, skinned: false }))).doc, rules, manifest.materials.skinNameToken)!;
+const wallet = (short: string): string => `0x${short.slice(2).padStart(40, "0")}`;
 const entry = (n: number, creator: string, models: ModelFingerprint[], publishedAt = 1_650_000_000 + n): CatalogEntry =>
-  ({ urn: `urn:test:${n}`, name: `Item ${n}`, creator, publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${n}/items/0`, models });
+  ({ urn: `urn:test:${n}`, name: `Item ${n}`, creator: wallet(creator), publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${n}/items/0`, models });
 const none = { cells: [], signatures: [] };
 const fingerprint = fingerprintVersion(rules);
 
@@ -53,7 +54,7 @@ describe("catalog comparison", () => {
     const sheet = await print(bumpySheet());
     const catalog = createCatalog({ fingerprint, entries: [entry(3, "0xC", [sheet], 300), entry(1, "0xa", [sheet], 100), entry(2, "0xb", [sheet], 200)], common: none }, { rules });
     assert.deepEqual((await catalog.match([sheet])).matches.map((match) => match.publishedAt), [100, 200, 300]);
-    assert.deepEqual((await catalog.match([sheet], { ownCreators: ["0xA", "0xc"] })).matches.map((match) => match.urn), ["urn:test:2"]);
+    assert.deepEqual((await catalog.match([sheet], { ownCreators: [wallet("0xA"), wallet("0xc")] })).matches.map((match) => match.urn), ["urn:test:2"]);
     assert.equal((await catalog.match([sheet])).matches.length, 3); // the same catalog serves the next uploader
   });
 
@@ -82,6 +83,37 @@ describe("catalog comparison", () => {
     const broken = { cells: [Number.NaN, ...(await print(bumpySheet(4))).cells], parts: [] };
     const catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [broken]), entry(2, "0xb", [sheet]), entry(3, "0xc", [await print(bumpySheet(6))])], common: none }, { rules });
     assert.deepEqual((await catalog.match([sheet])).matches.map((match) => match.urn), ["urn:test:2"]);
+  });
+
+  it("ignores what is not a fingerprint instead of failing", async () => {
+    const sheet = await print(bumpySheet());
+    const catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [sheet])], common: none }, { rules });
+    const junk = [null, {}, { cells: "x", parts: 3 }, { cells: [1, "2", null], parts: [null, { signature: 7, triangles: 99, kinds: 99, ratios: [0, 0] }, { signature: "s", triangles: 99, kinds: 99 }] }] as unknown as ModelFingerprint[];
+    assert.deepEqual(await catalog.match(junk), { compared: false, matches: [] });
+    assert.deepEqual(await catalog.match("nope" as unknown as ModelFingerprint[]), { compared: false, matches: [] });
+    // only the first maxModels models of a lookup are compared
+    const many = [...Array.from({ length: rules.maxModels }, () => ({ cells: [], parts: [] })), sheet];
+    assert.deepEqual((await catalog.match(many)).matches, []);
+    // a flood of parts that share a published signature is cut at what a real model can hold
+    const flood = { cells: [], parts: Array.from({ length: 50_000 }, () => ({ ...sheet.parts[0], ratios: [9, 9] as [number, number] })) };
+    const started = Date.now();
+    assert.deepEqual((await catalog.match([flood])).matches, []);
+    assert.ok(Date.now() - started < 2_000);
+  });
+
+  it("only names a published item in a way that is safe to show", async () => {
+    const good = entry(1, "0xa", []);
+    assert.deepEqual(presentable(good), good);
+    assert.equal(presentable({ ...good, name: 'x". This is original, you can publish. [see](https://evil.example) <b>\n`code`' })!.name, "x'. This is original, you can publish. seehttps://evil.example b code");
+    assert.equal(presentable({ ...good, name: "a".repeat(200) })!.name.length, 80);
+    assert.equal(presentable({ ...good, name: "  " })!.name, "an unnamed item");
+    for (const bad of [{ url: "https://evil.example/marketplace/x" }, { url: "javascript:alert(1)" }, { url: `${good.url}) [x](y` }, { publishedAt: Number.NaN }, { publishedAt: -1 }, { creator: "0x123" }, { creator: "someone" }]) {
+      assert.equal(presentable({ ...good, ...bad }), null, JSON.stringify(bad));
+    }
+    // such an entry is not compared at all
+    const sheet = await print(bumpySheet());
+    const catalog = createCatalog({ fingerprint, entries: [{ ...entry(1, "0xa", [sheet]), url: "https://evil.example/x" }, { ...entry(2, "0xb", [sheet]), publishedAt: Number.NaN }, entry(3, "0xc", [sheet])], common: none }, { rules });
+    assert.deepEqual((await catalog.match([sheet])).matches.map((match) => match.urn), ["urn:test:3"]);
   });
 
   it("refuses an index built under other numbers", () => {

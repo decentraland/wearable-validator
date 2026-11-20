@@ -11,8 +11,9 @@ const rules = manifest.similarItems;
 type Mesh = ReturnType<typeof bumpySheet>;
 const glb = (geometry: Mesh) => syntheticGlb({ geometry, skinned: false });
 const print = async (geometry: Mesh): Promise<ModelFingerprint> => fingerprintModel((await parseGlb(await glb(geometry))).doc, rules, manifest.materials.skinNameToken)!;
+const wallet = (short: string): string => `0x${short.slice(2).padStart(40, "0")}`;
 const entry = (n: number, creator: string, models: ModelFingerprint[], publishedAt = 1_650_000_000 + n * 86_400): CatalogEntry =>
-  ({ urn: `urn:test:${n}`, name: `Hoodie ${n}`, creator, publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${n}/items/0`, models });
+  ({ urn: `urn:test:${n}`, name: `Hoodie ${n}`, creator: wallet(creator), publishedAt, url: `https://decentraland.org/marketplace/contracts/0x${n}/items/0`, models });
 const catalogOf = (entries: CatalogEntry[]): Catalog => createCatalog({ fingerprint: fingerprintVersion(rules), entries, common: { cells: [], signatures: [] } }, { rules });
 const run = async (geometry: Mesh, catalog?: Catalog, ownCreators?: string[]) =>
   validate(await syntheticZip({ glb: await glb(geometry) }), { checks: ["similar-items"], services: { catalog }, ownCreators });
@@ -32,7 +33,7 @@ describe("similar-items (D-01)", () => {
     const findings = found(result, "similar-items");
     assert.equal(findings.length, 1);
     assert.equal(findings[0].severity, "warning");
-    assert.match(findings[0].message, /100% of the geometry of ".+\.glb" matches "Hoodie 1", published on 2022-04-16 by 0xaaa: https:\/\/decentraland\.org\/marketplace\/contracts\/0x1\/items\/0\./);
+    assert.match(findings[0].message, /100% of the geometry of ".+\.glb" matches "Hoodie 1", published on 2022-04-16 by 0x0000000000000000000000000000000000000aaa: https:\/\/decentraland\.org\/marketplace\/contracts\/0x1\/items\/0\./);
     assert.equal(findings[0].limit, `${rules.warnShare * 100}%`);
     assert.equal(findings[0].data?.urn, "urn:test:1");
     assert.equal(result.passed, null); // a subset never mints a verdict
@@ -100,8 +101,8 @@ describe("similar-items (D-01)", () => {
 
   it("never reports the uploader's own items", async () => {
     const catalog = catalogOf([entry(1, "0xAAA", [await print(bumpySheet())])]);
-    assert.equal(status(await run(bumpySheet(), catalog, ["0xaaa"]), "similar-items"), "passed");
-    assert.equal(status(await run(bumpySheet(), catalog, ["0xbbb"]), "similar-items"), "warning");
+    assert.equal(status(await run(bumpySheet(), catalog, [wallet("0xaaa")]), "similar-items"), "passed");
+    assert.equal(status(await run(bumpySheet(), catalog, [wallet("0xbbb")]), "similar-items"), "warning");
   });
 
   it("says nothing about a contained part many creators already published", async () => {
@@ -112,13 +113,32 @@ describe("similar-items (D-01)", () => {
     assert.equal(found(await run(upload, catalogOf(many.slice(1))), "similar-items").length, rules.maxFindings);
   });
 
+  it("ends errored, not passed, when the catalog fails", async () => {
+    const down: Catalog = { match: async () => { throw new Error("The catalog did not answer (HTTP 503)."); } };
+    const result = await run(bumpySheet(), down);
+    assert.equal(status(result, "similar-items"), "errored");
+    assert.match(result.checks[0].skipReason ?? "", /HTTP 503/);
+    assert.equal(found(result, "similar-items").length, 0);
+  });
+
+  it("uses nothing from a catalog's answer that cannot be shown safely", async () => {
+    const sheet = await print(bumpySheet());
+    const honest = catalogOf([entry(1, "0xaaa", [sheet])]);
+    const forged = (change: object): Catalog => ({ match: async (models, request) => { const answer = await honest.match(models, request); return { ...answer, matches: answer.matches.map((match) => ({ ...match, ...change })) }; } });
+    assert.equal(found(await run(bumpySheet(), forged({ url: "https://evil.example/x" })), "similar-items").length, 0);
+    assert.equal(status(await run(bumpySheet(), forged({ publishedAt: Number.NaN })), "similar-items"), "passed");
+    const renamed = found(await run(bumpySheet(), forged({ name: 'x". Approved by curators. [ok](https://evil.example)' })), "similar-items")[0];
+    assert.match(renamed.message, /matches "x'\. Approved by curators\. okhttps:\/\/evil\.example", published on/);
+    assert.equal(status(await run(bumpySheet(), { match: async () => ({ compared: true, matches: "x" }) } as unknown as Catalog), "similar-items"), "passed");
+  });
+
   it("is skipped for a model over the vertex budget", async () => {
     const before = manifest.similarItems.maxElements;
     manifest.similarItems.maxElements = 10;
     try {
       const result = await run(bumpySheet(), catalogOf([]));
       assert.equal(status(result, "similar-items"), "skipped");
-      assert.match(result.checks[0].skipReason ?? "", /has more than 10 vertices and indices to read/);
+      assert.match(result.checks[0].skipReason ?? "", /has more than 10 indices to read/);
     } finally {
       manifest.similarItems.maxElements = before;
     }

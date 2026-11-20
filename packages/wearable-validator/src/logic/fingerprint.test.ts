@@ -89,7 +89,7 @@ describe("model fingerprints", () => {
 
   it("declines a model that asks for more work than the budget, and stops when cancelled", async () => {
     const sheet = bumpySheet();
-    const cost = sheet.positions.length / 3 + sheet.indices.length;
+    const cost = sheet.indices.length;
     assert.equal(await print({ geometry: sheet, skinned: false }, { ...rules, maxElements: cost - 1 }), null);
     assert.notEqual(await print({ geometry: sheet, skinned: false }, { ...rules, maxElements: cost }), null);
     const { doc } = await parseGlb(await syntheticGlb({ geometry: sheet, skinned: false }));
@@ -98,7 +98,6 @@ describe("model fingerprints", () => {
 
   it("counts indices, every node that reuses a mesh, and a skin's joints against the budget", () => {
     const sheet = bumpySheet();
-    const vertices = sheet.positions.length / 3;
     const build = (nodes: number, indices: Uint32Array, joints = 0) => {
       const doc = new Document();
       const buffer = doc.createBuffer();
@@ -112,12 +111,12 @@ describe("model fingerprints", () => {
       for (let n = 0; n < nodes; n++) { const node = doc.createNode(`mesh${n}`).setMesh(mesh); if (skin) node.setSkin(skin); scene.addChild(node); }
       return doc;
     };
-    const one = vertices + sheet.indices.length;
+    const one = sheet.indices.length;
     const fits = (doc: Document, maxElements: number) => fingerprintModel(doc, { ...rules, maxElements }, manifest.materials.skinNameToken) !== null;
     // three vertices drawn a million times is a million triangles of work
     const repeated = Uint32Array.from({ length: 30_000 }, (_, i) => i % 3);
-    assert.equal(fits(build(1, repeated), vertices + repeated.length - 1), false);
-    assert.equal(fits(build(1, repeated), vertices + repeated.length), true);
+    assert.equal(fits(build(1, repeated), repeated.length - 1), false);
+    assert.equal(fits(build(1, repeated), repeated.length), true);
     // the same mesh on four nodes is read four times
     assert.equal(fits(build(4, sheet.indices), 4 * one - 1), false);
     assert.equal(fits(build(4, sheet.indices), 4 * one), true);
@@ -158,6 +157,36 @@ describe("model fingerprints", () => {
     const armDown = build([0, 0, Math.sin(-0.35), Math.cos(-0.35)]);
     assert.ok(atBind.cells.length >= rules.minCells);
     assert.deepEqual(armDown.cells, atBind.cells);
+  });
+
+  it("follows a rigid mesh's bone to where it stands at bind, and reads only the vertices its indices reach", () => {
+    const sheet = bumpySheet();
+    const build = (headRotation: [number, number, number, number], sharedWithSkin = false) => {
+      const doc = new Document();
+      const buffer = doc.createBuffer();
+      const scene = doc.createScene();
+      const hips = doc.createNode("Avatar_Hips").setTranslation([0, 1, 0]);
+      const head = doc.createNode("Avatar_Head").setTranslation([0, 0.6, 0]).setRotation(headRotation);
+      scene.addChild(hips.addChild(head));
+      const inverse = Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1.6, 0, 1]);
+      const skin = doc.createSkin().addJoint(hips).addJoint(head).setInverseBindMatrices(doc.createAccessor().setType("MAT4").setArray(inverse).setBuffer(buffer));
+      // a body mesh keeps the skin in the file; the hat is a plain mesh under the head bone
+      const body = doc.createPrimitive().setMode(4).setMaterial(doc.createMaterial("AvatarSkin_MAT"))
+        .setAttribute("POSITION", doc.createAccessor().setType("VEC3").setArray(Float32Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0])).setBuffer(buffer));
+      scene.addChild(doc.createNode("body").setMesh(doc.createMesh().addPrimitive(body)).setSkin(skin));
+      // optionally the hat shares one POSITION accessor with far-away skin vertices its indices never reach
+      const far = Float32Array.from({ length: 300 }, (_, i) => 5 + i * 0.01);
+      const positions = sharedWithSkin ? Float32Array.from([...sheet.positions, ...far]) : sheet.positions;
+      const hat = doc.createPrimitive().setMode(4)
+        .setAttribute("POSITION", doc.createAccessor().setType("VEC3").setArray(positions).setBuffer(buffer))
+        .setIndices(doc.createAccessor().setType("SCALAR").setArray(sheet.indices).setBuffer(buffer));
+      head.addChild(doc.createNode("hat").setMesh(doc.createMesh().addPrimitive(hat)));
+      return fingerprintModel(doc, rules, manifest.materials.skinNameToken)!;
+    };
+    const atBind = build([0, 0, 0, 1]);
+    assert.ok(atBind.cells.length >= rules.minCells);
+    assert.deepEqual(build([0, Math.sin(0.4), 0, Math.cos(0.4)]).cells, atBind.cells);
+    assert.deepEqual(build([0, 0, 0, 1], true).cells, atBind.cells);
   });
 
   it("ignores vertices that are nowhere", async () => {

@@ -166,8 +166,10 @@ export interface Manifest {
     maxFindings: number;
     /** Vertices closer than this are one vertex when a mesh's parts are found: exporters split a vertex per UV seam and per normal. */
     weldMillimeters: number;
-    /** Vertices plus indices plus skin joints a model may make the fingerprint read (a mesh reused by several nodes counts each time) before the check declines: about 10 times the largest model in the approved catalog (14,698 vertices). */
+    /** Indices (vertices, without indices) plus skin joints a model may make the fingerprint read (a mesh reused by several nodes counts each time) before the check declines: about 10 times the largest model in the approved catalog (14,698 vertices). */
     maxElements: number;
+    /** Models compared per lookup: an item has one per body shape. */
+    maxModels: number;
   };
   receipts: Record<string, string>;
 }

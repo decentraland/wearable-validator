@@ -2,8 +2,8 @@
  * What a model's geometry looks like to the similar-items check: textures, materials, UVs and names are left out, so a
  * recolour of a mesh has the fingerprint of the mesh.
  *
- *   cells   where the vertices are: every distinct grid cell (manifest similarItems.gridMillimeters) a vertex falls in,
- *           in the avatar's frame at bind pose, whatever pose the file was saved in. Survives a retexture, a trim, parts
+ *   cells   where the vertices are: every distinct grid cell (manifest similarItems.gridMillimeters) a drawn vertex falls
+ *           in, in the avatar's frame at bind pose, whatever pose the file was saved in. Survives a retexture, a trim, parts
  *           added. Lost when the mesh is moved.
  *   parts   how the mesh is built: each connected piece (vertices at the same place welded, then joined through
  *           triangles) with a signature of how its triangles connect and the proportions of its vertex cloud. Survives
@@ -12,9 +12,9 @@
  * Colliders are left out, and so are primitives drawn with the skin material: the avatar's own arms, hands and head ship
  * inside many files and belong to nobody.
  */
-import type { Accessor, Document, Node, Skin } from "@gltf-transform/core";
+import type { Document, Node, Skin } from "@gltf-transform/core";
 import type { Manifest } from "../manifest/index.js";
-import { colliderNodes, multiply, worldMatrices } from "./gltf.js";
+import { colliderNodes, invert, multiply, transformPoint, worldMatrices } from "./gltf.js";
 import { isSkinMaterial } from "./materials.js";
 
 export interface PartFingerprint {
@@ -56,9 +56,9 @@ export function cellKey(x: number, y: number, z: number, gridMillimeters: number
 }
 
 /**
- * Null when the model asks for more work than rules.maxElements: every vertex read, every index read and every joint of
- * a skin that places a drawn mesh counts, and a mesh reused by several nodes counts each time. The work grows with that
- * number, and a file built to be slow is not worth comparing.
+ * Null when the model asks for more work than rules.maxElements: every index read (every vertex, for a mesh without
+ * indices) and every joint of the file's skins counts, and a mesh reused by several nodes counts each time. The work
+ * grows with that number, and a file built to be slow is not worth comparing.
  */
 export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: string, signal?: AbortSignal): ModelFingerprint | null {
   let budget = rules.maxElements;
@@ -67,7 +67,7 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
   const parts: PartFingerprint[] = [];
   const colliders = colliderNodes(doc);
   const worlds = worldMatrices(doc);
-  const skinPlacements = new Map<Skin, number[]>();
+  let bind: BindFrames | undefined;
   for (const node of doc.getRoot().listNodes()) {
     const mesh = node.getMesh();
     if (!mesh || colliders.has(node)) continue;
@@ -83,24 +83,29 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
       signal?.throwIfAborted();
       const indices = prim.getIndices();
       const count = indices ? indices.getCount() : position.getCount();
-      budget -= position.getCount() + count;
+      budget -= count;
       if (budget < 0) return null;
       if (!place) {
-        // only now: a node whose mesh draws nothing must not cost a pass over its skin's joints
-        const skin = node.getSkin();
-        place = skin ? skinPlacements.get(skin) : worlds.get(node)!;
-        if (!place && skin) {
-          budget -= skin.listJoints().length;
+        // only now: a file whose meshes draw nothing must not cost a pass over its skins
+        if (!bind) {
+          for (const skin of doc.getRoot().listSkins()) budget -= skin.listJoints().length;
           if (budget < 0) return null;
-          skinPlacements.set(skin, (place = bindPlacement(skin, worlds) ?? worlds.get(node)!));
+          bind = bindFrames(doc, worlds);
         }
+        place = placement(node, worlds, bind);
       }
-      const local = bindPositions(position, place!);
-      const vertex = new Array<number | undefined>(local.length / 3);
-      for (let i = 0; i < vertex.length; i++) {
-        if (i % SIGNAL_EVERY === SIGNAL_EVERY - 1) signal?.throwIfAborted();
-        const x = local[i * 3], y = local[i * 3 + 1], z = local[i * 3 + 2];
-        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue; // a NaN position is nowhere: no cell, no triangle
+      // a vertex is read the first time an index reaches it: an accessor shared with the skin primitive gives only its own
+      const vertexCount = position.getCount();
+      const seen = new Int32Array(vertexCount).fill(-2); // -2 not read yet, -1 nowhere
+      const p: number[] = [];
+      const m = place;
+      const at = (i: number): number => {
+        const v = indices ? indices.getScalar(i) : i;
+        if (!(v >= 0 && v < vertexCount)) return -1;
+        if (seen[v] !== -2) return seen[v];
+        position.getElement(v, p);
+        const [x, y, z] = transformPoint(m, [p[0], p[1], p[2]]);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return (seen[v] = -1); // a NaN position is nowhere: no cell, no triangle
         cells.add(cellKey(x, y, z, rules.gridMillimeters));
         // vertices closer than the weld distance are one vertex: exporters split a vertex per UV seam and per normal
         const key = `${Math.round(x * weld)},${Math.round(y * weld)},${Math.round(z * weld)}`;
@@ -110,15 +115,14 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
           welded.set(key, id);
           points.push(x, y, z);
         }
-        vertex[i] = id;
-      }
-      const at = (i: number): number | undefined => vertex[indices ? indices.getScalar(i) : i];
+        return (seen[v] = id);
+      };
       // strips and fans are the same surface as a triangle list: a copy re-exported as one must not come out empty
       const step = mode === 4 ? 3 : 1;
       for (let i = 0; i + 2 < count; i += step) {
         if (i % SIGNAL_EVERY < step) signal?.throwIfAborted();
         const a = mode === 6 ? at(0) : at(i), b = at(i + 1), c = at(i + 2);
-        if (a === undefined || b === undefined || c === undefined || a === b || b === c || a === c) continue; // out of range, nowhere or collapsed
+        if (a < 0 || b < 0 || c < 0 || a === b || b === c || a === c) continue; // out of range, nowhere or collapsed
         corners.push(a, b, c);
       }
     }
@@ -128,46 +132,71 @@ export function fingerprintModel(doc: Document, rules: Rules, skinNameToken: str
 }
 
 /**
- * The one matrix that places a skin's stored positions in the avatar's frame.
+ * Where the file's skeletons stand at bind time, as far as the file can tell.
  *
  * A skinned mesh ignores its node: the engine moves each vertex by joint × inverse bind. In a file saved at bind pose
- * that product is the same matrix for every joint (identity, or the armature's scale when it was exported in
- * centimetres). In a file saved with bones moved, a moved bone and every bone under it give another product, and
- * following them would make a copy saved in another pose look like another mesh. The skeleton's root joints (those whose
- * parent is not a joint) are above every chain, so their product is the bind placement; with several roots, the one most
- * of them agree on. Null for a skin without joints.
+ * that product is one matrix for every joint: the placement of the stored positions (identity, a scale when the file
+ * was exported in centimetres, or whatever the exporter folded into the inverse bind matrices). In a file saved with
+ * bones moved, a moved bone and every bone under it give another product, and following them would make a copy saved
+ * in another pose look like another mesh. The skeleton's root joints (those whose parent is not a joint) sit above
+ * every chain, so their product is taken as the placement; with several roots, the one most of them agree on.
+ *
+ * What this cannot undo is a root joint that was itself moved: every product moves with it and nothing in the file
+ * says where bind was. Such a copy is seen by its shape, not by its position.
  */
-function bindPlacement(skin: Skin, worlds: Map<Node, number[]>): number[] | null {
-  const joints = skin.listJoints();
-  const isJoint = new Set(joints);
-  const inverseBind = skin.getInverseBindMatrices();
-  const element: number[] = [];
-  const votes = new Map<string, { matrix: number[]; count: number }>();
-  let best: { matrix: number[]; count: number } | undefined;
-  joints.forEach((joint, j) => {
-    const parent = joint.getParentNode();
-    if (parent && isJoint.has(parent)) return;
-    const world = worlds.get(joint)!;
-    const matrix = inverseBind ? multiply(world, [...inverseBind.getElement(j, element)]) : world;
-    const key = matrix.map((value) => Math.round(value * 1000)).join(",");
-    let vote = votes.get(key);
-    if (!vote) votes.set(key, (vote = { matrix, count: 0 }));
-    vote.count++;
-    if (!best || vote.count > best.count) best = vote;
-  });
-  return best ? best.matrix : null;
+interface BindFrames {
+  /** skin → the matrix that places its stored positions. */
+  skins: Map<Skin, number[]>;
+  /** joint → its world matrix at bind time. */
+  joints: Map<Node, number[]>;
 }
 
-function bindPositions(position: Accessor, m: number[]): Float64Array {
-  const out = new Float64Array(position.getCount() * 3);
-  const p: number[] = [];
-  for (let i = 0; i < position.getCount(); i++) {
-    position.getElement(i, p);
-    out[i * 3] = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
-    out[i * 3 + 1] = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
-    out[i * 3 + 2] = m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14];
+const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+function bindFrames(doc: Document, worlds: Map<Node, number[]>): BindFrames {
+  const frames: BindFrames = { skins: new Map(), joints: new Map() };
+  const element: number[] = [];
+  for (const skin of doc.getRoot().listSkins()) {
+    const joints = skin.listJoints();
+    const isJoint = new Set(joints);
+    const inverseBind = skin.getInverseBindMatrices();
+    const inverseOf = (j: number): number[] => (inverseBind ? [...inverseBind.getElement(j, element)] : IDENTITY);
+    const votes = new Map<string, { matrix: number[]; count: number }>();
+    let best: { matrix: number[]; count: number } | undefined;
+    joints.forEach((joint, j) => {
+      const parent = joint.getParentNode();
+      if (parent && isJoint.has(parent)) return;
+      const matrix = multiply(worlds.get(joint)!, inverseOf(j));
+      const key = matrix.map((value) => Math.round(value * 1000)).join(",");
+      let vote = votes.get(key);
+      if (!vote) votes.set(key, (vote = { matrix, count: 0 }));
+      vote.count++;
+      if (!best || vote.count > best.count) best = vote;
+    });
+    if (!best) continue;
+    const placed = best.matrix;
+    frames.skins.set(skin, placed);
+    joints.forEach((joint, j) => {
+      if (frames.joints.has(joint)) return;
+      const bound = invert(inverseOf(j));
+      if (bound) frames.joints.set(joint, multiply(placed, bound));
+    });
   }
-  return out;
+  return frames;
+}
+
+/** The matrix that places a mesh node's stored positions: its skin's bind placement, or its node hung from where its nearest bone stands at bind time. */
+function placement(node: Node, worlds: Map<Node, number[]>, bind: BindFrames): number[] {
+  const skin = node.getSkin();
+  if (skin) return bind.skins.get(skin) ?? worlds.get(node)!;
+  // a rigid mesh parented to a bone (a hat under the head, a prop in a hand) follows that bone: take the bone at bind, not as posed
+  let local: number[] = [...node.getMatrix()];
+  for (let parent = node.getParentNode(); parent; parent = parent.getParentNode()) {
+    const bound = bind.joints.get(parent);
+    if (bound) return multiply(bound, local);
+    local = multiply([...parent.getMatrix()], local);
+  }
+  return worlds.get(node)!;
 }
 
 /** Splits welded triangles into connected pieces and fingerprints each. */
