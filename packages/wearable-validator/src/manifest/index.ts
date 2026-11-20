@@ -16,9 +16,9 @@ export interface Manifest {
   facialCategories: string[];
   fileSize: {
     wearableBytes: number; skinBytes: number; emoteBytes: number;
-    /** A wearable's model alone must stay this far under the item ceiling. 0 means no per-model rule: only the total counts. */
+    /** A wearable's model alone would have to stay this far under the item ceiling. 0 since the curators' decision (Nov 2026): no per-model rule, only the total counts. It was 1 MB. */
     modelHeadroomBytes: number;
-    /** The same for emotes: 0, so an emote is held only to its item total, thumbnail included (curators' decision, Nov 2026). */
+    /** The same for emotes: 0 too, so every item is held only to its total, thumbnail included. */
     emoteModelHeadroomBytes: number;
     thumbnailBytes: number; thumbnailMaxSize: number;
     smartWearableVideoBytes: number; audioBytes: number; maxInputBytes: number;
