@@ -1,11 +1,13 @@
 /**
- * Linear blend skinning the way the avatar does it: the avatar's own bones drive the mesh, and the file supplies only
- * joint names, weights and inverse bind matrices. Shared by skin-deformation; the rig and the poses come from the manifest.
+ * Linear blend skinning the way the avatar does it (unity-explorer, ComputeShaderSkinning.compute): the avatar's own
+ * bones drive the mesh, and the file supplies weights, joint indices and inverse bind matrices. Bones are matched by
+ * their position in the joint list, never by name. Shared by skin-deformation; the rig and the poses come from the manifest.
  */
 import type { Document, Node } from "@gltf-transform/core";
 import { colliderNodes, multiply } from "./gltf.js";
 import { readVec4 } from "./weights.js";
 
+/** One bone of the avatar's skeleton. The rig lists them in the order the avatar indexes them (AvatarBase.prefab). */
 export interface RigBone {
   name: string;
   /** null for the root bone. */
@@ -41,15 +43,22 @@ export interface SkinnedGeometry {
   /** Vertex index triples. */
   triangles: Uint32Array;
   joints: SkinJoint[];
+  /** Where each skinned mesh node's own joint list starts in `joints`. */
+  skinStarts: number[];
   /** Mesh node name per vertex range, for messages. */
   parts: { node: string; start: number; end: number }[];
 }
 
 export interface SkinJoint {
+  /** The joint's name in the file. */
   name: string;
-  /** The rig bone that carries this joint: itself, or its nearest rig ancestor in the file (spring and helper bones). null = nothing moves it. */
+  /**
+   * The rig bone that moves this joint. The avatar matches bones by position, not by name: joint i of the file's list
+   * is moved by bone i of the rig. Joints past the rig's length (spring and helper bones) follow the nearest ancestor
+   * that is one of the first. null = nothing moves it.
+   */
   carrier: string | null;
-  /** Rig bind matrix × the file's inverse bind matrix: identity when the file was bound to the avatar's bind pose. null for joints that are not rig bones. */
+  /** Rig bind matrix × the file's inverse bind matrix: identity when the file was bound to the avatar's bind pose. null for joints past the rig's length. */
   bindOffset: number[] | null;
 }
 
@@ -57,7 +66,6 @@ const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
 /** Reads every skinned triangle mesh (colliders excluded) into one geometry. null when the model has none. */
 export function readSkinnedGeometry(doc: Document, rig: RigBone[]): SkinnedGeometry | null {
-  const rigByName = new Map(rig.map((bone) => [bone.name, bone]));
   const colliders = colliderNodes(doc);
   const joints: SkinJoint[] = [];
   const positions: number[] = [];
@@ -65,16 +73,20 @@ export function readSkinnedGeometry(doc: Document, rig: RigBone[]): SkinnedGeome
   const weights: number[] = [];
   const triangles: number[] = [];
   const parts: SkinnedGeometry["parts"] = [];
+  const skinStarts: number[] = [];
   for (const node of doc.getRoot().listNodes()) {
     const mesh = node.getMesh();
     const skin = node.getSkin();
     if (!mesh || !skin || colliders.has(node)) continue;
     const inverseBind = skin.getInverseBindMatrices();
     const jointBase = joints.length;
-    skin.listJoints().forEach((joint, index) => {
-      const bone = rigByName.get(joint.getName());
+    skinStarts.push(jointBase);
+    const skinJoints = skin.listJoints();
+    const slotOf = new Map(skinJoints.slice(0, rig.length).map((joint, index) => [joint, index]));
+    skinJoints.forEach((joint, index) => {
+      const bone = index < rig.length ? rig[index] : undefined;
       const inverse = inverseBind ? inverseBind.getElement(index, new Array<number>(16)) : IDENTITY;
-      joints.push({ name: joint.getName(), carrier: bone ? bone.name : rigAncestor(joint, rigByName), bindOffset: bone ? multiply(bone.bindMatrix, inverse) : null });
+      joints.push({ name: joint.getName(), carrier: bone ? bone.name : rigAncestor(joint, slotOf, rig), bindOffset: bone ? multiply(bone.bindMatrix, inverse) : null });
     });
     const jointCount = joints.length - jointBase;
     const start = positions.length / 3;
@@ -129,13 +141,15 @@ export function readSkinnedGeometry(doc: Document, rig: RigBone[]): SkinnedGeome
     weights: new Float32Array(weights),
     triangles: new Uint32Array(triangles),
     joints,
+    skinStarts,
     parts
   };
 }
 
-function rigAncestor(joint: Node, rigByName: Map<string, RigBone>): string | null {
+function rigAncestor(joint: Node, slotOf: Map<Node, number>, rig: RigBone[]): string | null {
   for (let parent = joint.getParentNode(); parent; parent = parent.getParentNode()) {
-    if (rigByName.has(parent.getName())) return parent.getName();
+    const slot = slotOf.get(parent);
+    if (slot !== undefined) return rig[slot].name;
   }
   return null;
 }

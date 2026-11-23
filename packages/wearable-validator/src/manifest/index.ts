@@ -124,16 +124,24 @@ export interface Manifest {
     fittedCategories: string[];
   };
   /**
-   * M-16: how a skinned mesh deforms on the avatar, measured from the file alone. Calibrated on 516 curator-approved
+   * M-17: how a skinned mesh deforms on the avatar, measured from the file alone. Calibrated on 516 curator-approved
    * models (Nov 2026); each number names how many of them it flags.
    */
   skinDeformation: {
     /**
-     * The avatar's skeleton in its bind pose (a T-pose): what every approved model is bound to, to four decimals.
-     * The avatar's own bones move the mesh, so a mesh bound to bones standing anywhere else is pulled out of shape.
+     * The avatar's skeleton in its bind pose (a T-pose), in the order the client indexes its bones (unity-explorer,
+     * AvatarBase.prefab, the SkinnedMeshRenderer's bones). The client moves joint i of a file with bone i of this
+     * list, whatever the joint is called, through the file's own inverse bind matrix. 670 of 678 skins in the
+     * calibration set list their first 62 joints in exactly this order, and every approved model is bound to these
+     * matrices to four decimals. Reordering this list changes the rule.
      */
     rig: RigBone[];
-    /** How far a vertex may sit from where its mesh's main bone would put it before the binding counts as distorted. None of 516 approved models moves a vertex by 0.0005 m; one is bound to an armature scaled as a whole, which moves everything together and is not distortion. */
+    /**
+     * How far a vertex may sit from where its mesh's main bone would put it before the mesh counts as distorted. 2 of
+     * 516 approved models are over it, both because their joints are in another order (one long-sleeve top, one token
+     * earring of 28 vertices); every other approved model moves no vertex by 0.0005 m. An armature scaled as a whole
+     * moves everything together and is not distortion.
+     */
     bindPoseToleranceMeters: number;
     /** Standard poses the skeleton is put into. `local` poses move the arms, head or torso; the others move the legs, where skirts and gowns stretch by design. */
     poses: (SkinPose & { local: boolean })[];

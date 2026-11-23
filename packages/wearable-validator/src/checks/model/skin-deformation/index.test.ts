@@ -14,7 +14,7 @@ async function run(options: RiggedOptions = {}, category = "upper_body") {
 
 const signals = (findings: { severity: string; data?: Record<string, unknown> }[]): string[] => findings.map((f) => `${f.severity}:${String(f.data?.signal)}`);
 
-describe("skin-deformation (M-16)", () => {
+describe("skin-deformation (M-17)", () => {
   it("passes a mesh bound to the avatar's bind pose with clean, mirrored weights", async () => {
     const { result, findings } = await run();
     assert.deepEqual(findings, []);
@@ -40,7 +40,7 @@ describe("skin-deformation (M-16)", () => {
       assert.equal(findings[0].where, "model.glb");
       assert.match(findings[0].message, /do not stand where the avatar's bones stand/);
       assert.match(findings[0].message, /official armature/);
-      assert.match(result.checks[0].measured ?? "", /^bind pose off by /);
+      assert.match(result.checks[0].measured ?? "", /^out of shape by .* m on the avatar$/);
     });
 
     it("says nothing else about a mesh whose binding is distorted", async () => {
@@ -54,6 +54,44 @@ describe("skin-deformation (M-16)", () => {
     it("accepts an armature scaled as a whole: the mesh lands on the avatar in one piece", async () => {
       const { findings } = await run({ scale: 2.4 });
       assert.deepEqual(findings, []);
+    });
+  });
+
+  describe("joint order", () => {
+    // what an armature rebuilt outside the official file exports: the same bones, children in alphabetical order
+    const alphabetical = (names: string[]): string[] => [...names].sort();
+
+    it("errors when the joints are listed in another order than the avatar's, although every weight names the right bone", async () => {
+      const { result, findings } = await run({ jointOrder: alphabetical });
+      assert.deepEqual(signals(findings), ["error:joint-order"]);
+      assert.equal(status(result, "skin-deformation"), "failed");
+      const [found] = findings;
+      const sorted = alphabetical(config.rig.map((bone) => bone.name));
+      const position = sorted.findIndex((name, index) => name !== config.rig[index].name);
+      assert.equal(found.data?.position, position);
+      assert.equal(found.data?.bone, sorted[position]);
+      assert.equal(found.data?.expected, config.rig[position].name);
+      assert.equal(found.limit, config.bindPoseToleranceMeters);
+      assert.ok((found.measured as number) > config.bindPoseToleranceMeters);
+      assert.match(found.message, /matched by position, not by name/);
+      assert.match(found.message, /official armature/);
+    });
+
+    it("passes a file in another order when every bone it uses is still at the avatar's position", async () => {
+      // the two last bones swapped: the band is weighted to the spine and the arms, which stay where they were
+      const swapTail = (names: string[]): string[] => [...names.slice(0, -2), names[names.length - 1], names[names.length - 2]];
+      const { findings } = await run({ jointOrder: swapTail });
+      assert.deepEqual(findings, []);
+    });
+
+    it("moves a joint by the avatar's bone at its position, whatever the joint is called", async () => {
+      // the same swap, with the band on the head: by position the file's Avatar_Head is the avatar's neck
+      const swapTail = (names: string[]): string[] => [...names.slice(0, -2), names[names.length - 1], names[names.length - 2]];
+      assert.deepEqual(config.rig.slice(-2).map((bone) => bone.name), ["Avatar_Neck", "Avatar_Head"]);
+      const { findings } = await run({ jointOrder: swapTail, weights: (x) => (x > 0 ? { Avatar_Head: 1 } : { Avatar_Spine2: 1 }) });
+      assert.deepEqual(signals(findings), ["error:joint-order"]);
+      assert.equal(findings[0].data?.bone, "Avatar_Head");
+      assert.equal(findings[0].data?.expected, "Avatar_Neck");
     });
   });
 
@@ -134,13 +172,6 @@ describe("skin-deformation (M-16)", () => {
     it("accepts a skirt split between the two legs along one seam", async () => {
       const { findings } = await run({ height: 0.6, weights: (x) => ({ [x >= 0 ? "Avatar_LeftUpLeg" : "Avatar_RightUpLeg"]: 1 }) });
       assert.deepEqual(findings, []);
-    });
-
-    it("errors when the file lists its joints in another order than the weights were written for", async () => {
-      // alphabetical instead of the rig's order: each index now names some other bone, and the two sides stop matching
-      const { result, findings } = await run({ jointOrder: (names) => [...names].sort() });
-      assert.ok(findings.some((f) => f.severity === "error"));
-      assert.equal(status(result, "skin-deformation"), "failed");
     });
 
     it("keeps quiet about clean weights blended across the shoulder", async () => {

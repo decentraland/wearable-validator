@@ -69,6 +69,25 @@ describe("skinning", () => {
     for (let i = 0; i < 3; i++) near(posed[tip * 3 + i], (stored[i] + onArm[i]) / 2, 1e-5);
   });
 
+  it("the rig is in the order the client indexes the avatar's bones", () => {
+    // unity-explorer AvatarBase.prefab: hips, legs, spine, left arm and hand, right arm and hand, neck, head
+    assert.deepEqual(rig.slice(0, 5).map((bone) => bone.name), ["Avatar_Hips", "Avatar_LeftUpLeg", "Avatar_LeftLeg", "Avatar_LeftFoot", "Avatar_LeftToeBase"]);
+    assert.deepEqual(rig.slice(9, 13).map((bone) => bone.name), ["Avatar_Spine", "Avatar_Spine1", "Avatar_Spine2", "Avatar_LeftShoulder"]);
+    assert.deepEqual(rig.slice(16, 18).map((bone) => bone.name), ["Avatar_LeftHandThumb1", "Avatar_LeftHandThumb2"]);
+    assert.deepEqual(rig.slice(36, 38).map((bone) => bone.name), ["Avatar_RightShoulder", "Avatar_RightArm"]);
+    assert.deepEqual(rig.slice(60).map((bone) => bone.name), ["Avatar_Neck", "Avatar_Head"]);
+  });
+
+  it("a joint is carried by the rig bone at its position in the joint list, not the one of its name", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ jointOrder: (names) => [...names].reverse() }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.joints[0].name, rig[rig.length - 1].name);
+    assert.equal(geometry.joints[0].carrier, rig[0].name);
+    assert.deepEqual(geometry.skinStarts, [0]);
+    // bound to its own bone's pose but moved by another: the bind offset is no longer the identity
+    assert.ok(Math.abs(geometry.joints[0].bindOffset![13]) > 0.1);
+  });
+
   it("returns null for a model without a skinned mesh", async () => {
     const doc = await new WebIO().readBinary(await syntheticGlb({ skinned: false }));
     assert.equal(readSkinnedGeometry(doc, rig), null);

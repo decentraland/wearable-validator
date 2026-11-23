@@ -121,7 +121,7 @@
   },
   "skin-deformation": {
     "file": "src/checks/model/skin-deformation/index.ts",
-    "line": 13
+    "line": 19
   },
   "spring-bones": {
     "file": "src/checks/model/spring-bones/index.ts",

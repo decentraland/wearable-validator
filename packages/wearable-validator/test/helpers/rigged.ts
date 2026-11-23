@@ -14,7 +14,10 @@ export interface RiggedOptions {
    * +x is the avatar's left.
    */
   weights?: (x: number, y: number, z: number) => BoneWeights | undefined;
-  /** Reorder the skin's joint list after the vertices were written against the rig's order: a file with the wrong bone order. */
+  /**
+   * List the skin's joints in another order than the avatar's. The file stays consistent with itself, as an exporter
+   * leaves it: every vertex still names the bone it was painted for, so it looks right wherever bones are matched by name.
+   */
   jointOrder?: (names: string[]) => string[];
   /** Where each bone stands at bind time, replacing the avatar's bind matrix: a mesh bound to another skeleton. */
   bindMatrix?: (bone: string, avatar: number[]) => number[];
@@ -66,6 +69,7 @@ export async function riggedGlb(options: RiggedOptions = {}): Promise<Uint8Array
   const rows = 9;
   const height = options.height ?? SHOULDER_HEIGHT;
   const names = RIG.map((bone) => bone.name);
+  const order = options.jointOrder?.(names) ?? names;
   const positions: number[] = [];
   const joints: number[] = [];
   const weights: number[] = [];
@@ -77,7 +81,7 @@ export async function riggedGlb(options: RiggedOptions = {}): Promise<Uint8Array
       positions.push(x * scale, y * scale, z * scale);
       const entries = Object.entries(options.weights?.(x, y, z) ?? cleanWeights(x)).slice(0, 4);
       for (let slot = 0; slot < 4; slot++) {
-        joints.push(entries[slot] ? names.indexOf(entries[slot][0]) : 0);
+        joints.push(entries[slot] ? order.indexOf(entries[slot][0]) : 0);
         weights.push(entries[slot]?.[1] ?? 0);
       }
     }
@@ -99,7 +103,6 @@ export async function riggedGlb(options: RiggedOptions = {}): Promise<Uint8Array
   const meshNode = doc.createNode("Band").setMesh(doc.createMesh("Band").addPrimitive(prim));
   scene.addChild(meshNode);
 
-  const order = options.jointOrder?.(names) ?? names;
   const skin = doc.createSkin("skin");
   const inverseBind = new Float32Array(order.length * 16);
   order.forEach((name, index) => {

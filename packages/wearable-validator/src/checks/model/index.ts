@@ -1,4 +1,4 @@
-/** P2 Model — rule-book order: materials (M-02…M-07) then geometry (M-01, M-08…M-16). */
+/** P2 Model — rule-book order: materials (M-02…M-07) then geometry (M-01, M-08…M-17). */
 import { textureCount } from "./texture-count/index.js";
 import { textureSize } from "./texture-size/index.js";
 import { textureFormat } from "./texture-format/index.js";

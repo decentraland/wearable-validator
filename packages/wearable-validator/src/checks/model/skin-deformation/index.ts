@@ -1,6 +1,12 @@
 /**
- * M-16 Skin deformation — a mesh bound to the wrong skeleton, with weights lost on one side, or with a part following
- * the wrong bone collapses, stretches or spikes once the avatar moves. Curators send these back; a still render hides them.
+ * M-17 Skin deformation — a mesh bound to the wrong skeleton, with its joints listed in another order than the avatar's,
+ * with weights lost on one side, or with a part following the wrong bone collapses, stretches or spikes once the avatar
+ * moves. Curators send these back; a still render hides them.
+ *
+ * It skins the mesh as the client does (unity-explorer, ComputeShaderSkinning.compute):
+ * vertex = Σ weight × avatar bone[i] × the file's inverse bind matrix[i] × stored position, where i is the joint's
+ * position in the file's joint list. Names play no part there, so a file that lists its joints in another order looks
+ * right in Blender and in the Builder (both match by name) and breaks in-world.
  */
 import type { Document } from "@gltf-transform/core";
 import { hasSkinnedMesh } from "../../../logic/gltf.js";
@@ -10,7 +16,7 @@ import type { Manifest } from "../../../manifest/index.js";
 import { finding, type CheckDefinition, type CheckMeta, type Finding } from "../../../types.js";
 import { WEARABLES } from "../../docs.js";
 
-const meta: CheckMeta = { name: "skin-deformation", group: "model", rule: "M-16", docs: `${WEARABLES}#skin-weighting` };
+const meta: CheckMeta = { name: "skin-deformation", group: "model", rule: "M-17", docs: `${WEARABLES}#skin-weighting` };
 
 type Config = Manifest["skinDeformation"];
 
@@ -32,6 +38,8 @@ export interface SkinMeasurement {
   vertices: number;
   /** Vertices the avatar's bones pull further than the tolerance from where the mesh's main bone puts them. */
   bind: { vertices: number; maxOffset: number; bone: string; node: string };
+  /** Joints the file lists at a position where the avatar has another bone, and the first of them. */
+  order: { misplaced: number; slot: number; name: string; expected: string };
   /** null when the binding is distorted: nothing else can be measured on a mesh that is already out of shape. */
   symmetry: { symmetric: boolean; pairs: number; differing: number; share: number; bone: string; mirrorBone: string } | null;
   stretch: PoseStretch[] | null;
@@ -85,15 +93,31 @@ function distance(points: Float32Array, a: number, b: number): number {
 }
 
 /**
- * Distortion of the binding: the joint carrying the most weight says where the mesh as a whole lands on the avatar
- * (a scaled or moved armature moves everything together, which is not distortion); every vertex is compared with
- * where that joint alone would put it.
+ * Distortion of the binding. Joints bound to the avatar's pose all carry the same bind offset (the identity, or one
+ * scale and shift when the whole armature was scaled or moved, which moves everything together and is not
+ * distortion). The offset that carries the most weight says where the mesh as a whole lands on the avatar; every
+ * vertex is compared with where that offset alone would put it.
  */
 function measureBind(geometry: SkinnedGeometry, bind: Float32Array, tolerance: number): SkinMeasurement["bind"] {
   const totals = new Float64Array(geometry.joints.length);
   for (let i = 0; i < geometry.weights.length; i++) totals[geometry.influences[i]] += geometry.weights[i];
+  // offsets equal to a tenth of a millimetre are one offset
+  const groups = new Map<string, { weight: number; joint: number }>();
+  geometry.joints.forEach((joint, index) => {
+    if (!joint.bindOffset) return;
+    const key = joint.bindOffset.map((value) => Math.round(value * 1e4)).join(",");
+    const group = groups.get(key);
+    if (group) group.weight += totals[index];
+    else groups.set(key, { weight: totals[index], joint: index });
+  });
   let main = -1;
-  for (let j = 0; j < totals.length; j++) if (geometry.joints[j].bindOffset && (main < 0 || totals[j] > totals[main])) main = j;
+  let most = -1;
+  for (const group of groups.values()) {
+    if (group.weight > most) {
+      most = group.weight;
+      main = group.joint;
+    }
+  }
   const out = { vertices: 0, maxOffset: 0, bone: "", node: "" };
   if (main < 0) return out;
   const m = geometry.joints[main].bindOffset!;
@@ -117,6 +141,22 @@ function measureBind(geometry: SkinnedGeometry, bind: Float32Array, tolerance: n
       out.node = nodeOf(geometry, v);
     }
   }
+  return out;
+}
+
+/** The avatar's bone i moves the file's joint i: every joint whose name is not the bone's at that position is moved by another bone than the one it was painted for. */
+function measureOrder(geometry: SkinnedGeometry, skinStarts: number[]): SkinMeasurement["order"] {
+  const out = { misplaced: 0, slot: -1, name: "", expected: "" };
+  geometry.joints.forEach((joint, index) => {
+    if (!joint.bindOffset || joint.carrier === joint.name) return;
+    out.misplaced++;
+    if (out.slot >= 0) return;
+    let start = 0;
+    for (const skinStart of skinStarts) if (skinStart <= index) start = skinStart;
+    out.slot = index - start;
+    out.name = joint.name;
+    out.expected = joint.carrier ?? "";
+  });
   return out;
 }
 
@@ -233,7 +273,8 @@ export function measureSkinDeformation(doc: Document, config: Config): SkinMeasu
 export function measureGeometry(geometry: SkinnedGeometry, config: Config): SkinMeasurement {
   const bind = skinPositions(geometry);
   const bindMeasure = measureBind(geometry, bind, config.bindPoseToleranceMeters);
-  if (bindMeasure.vertices > 0) return { vertices: geometry.vertexCount, bind: bindMeasure, symmetry: null, stretch: null, headShare: null };
+  const order = measureOrder(geometry, geometry.skinStarts);
+  if (bindMeasure.vertices > 0) return { vertices: geometry.vertexCount, bind: bindMeasure, order, symmetry: null, stretch: null, headShare: null };
   const weights = carrierWeights(geometry);
   const headBones = new Set<string>();
   for (const bone of config.rig) if (bone.name === config.headFollow.bone || (bone.parent !== null && headBones.has(bone.parent))) headBones.add(bone.name);
@@ -246,6 +287,7 @@ export function measureGeometry(geometry: SkinnedGeometry, config: Config): Skin
   return {
     vertices: geometry.vertexCount,
     bind: bindMeasure,
+    order,
     symmetry: measureSymmetry(bind, weights, config.symmetry),
     stretch: measureStretch(geometry, bind, weights, config),
     headShare: total > 0 ? head / total : null
@@ -255,7 +297,16 @@ export function measureGeometry(geometry: SkinnedGeometry, config: Config): Skin
 /** The findings one model's measurements amount to under the manifest's limits. */
 export function skinDeformationFindings(file: string, measured: SkinMeasurement, config: Config, category: string | undefined): Finding[] {
   const findings: Finding[] = [];
-  const { bind, symmetry, stretch, headShare } = measured;
+  const { bind, order, symmetry, stretch, headShare } = measured;
+  if (bind.vertices > 0 && order.misplaced > 0) {
+    const tolerance = config.bindPoseToleranceMeters;
+    findings.push(
+      finding(meta, "error",
+        `"${file}": the skin lists its joints in another order than the avatar's skeleton: ${order.misplaced} joints are out of place, starting at position ${order.slot}, where the file has "${order.name}" and the avatar has "${order.expected}". In-world, bones are matched by position, not by name, so ${bind.vertices} of ${measured.vertices} vertices follow the wrong bone and land up to ${round(bind.maxOffset)} m out of place (allowed ${tolerance} m), worst on mesh "${bind.node}". It looks right in Blender and in the Builder preview, which match by name. Skin the mesh to the official armature (Avatar_File.blend) instead of a rebuilt or re-imported one, and export again.`,
+        { where: file, measured: round(bind.maxOffset), limit: tolerance, data: { signal: "joint-order", vertices: bind.vertices, joints: order.misplaced, position: order.slot, bone: order.name, expected: order.expected, mesh: bind.node } })
+    );
+    return findings;
+  }
   if (bind.vertices > 0) {
     const tolerance = config.bindPoseToleranceMeters;
     findings.push(
@@ -309,10 +360,10 @@ export function skinDeformationFindings(file: string, measured: SkinMeasurement,
 export const skinDeformation: CheckDefinition = {
   ...meta,
   title: "Skin deformation",
-  describe: "A skinned mesh keeps its shape on the avatar: bound to the avatar's bind pose, weighted the same on both sides, and without parts that stretch or stay behind in standard poses.",
-  explanation: "The avatar moves your mesh with its own bones. If the mesh was bound to a different skeleton pose, lost its weights on one side, or has a part weighted to the wrong bone, it collapses, stretches or spikes as soon as the avatar moves, even when it looks right in Blender.",
+  describe: "A skinned mesh keeps its shape on the avatar: joints in the avatar's order, bound to the avatar's bind pose, weighted the same on both sides, and without parts that stretch or stay behind in standard poses.",
+  explanation: "The avatar moves your mesh with its own bones. If the file lists its joints in another order than the avatar's skeleton, was bound to a different skeleton pose, lost its weights on one side, or has a part weighted to the wrong bone, it collapses, stretches or spikes as soon as the avatar moves, even when it looks right in Blender.",
   fix: "Rig on the official armature from the Blender toolkit (Avatar_File.blend) without moving, scaling or re-orienting its bones, and apply the armature's transforms before export. In Weight Paint, check both sides are painted (Weights → Mirror), that small hanging parts follow the bone of the piece they hang from, and that head items are weighted to Avatar_Head. Then pose the armature (arms down, arms up, head turned) and look for spikes.",
-  details: "Reads joints, weights and inverse bind matrices from the file and skins the mesh with the avatar's own skeleton, as the avatar does. It measures four things: vertices the avatar's bind pose moves away from the rest of the mesh (more than 0.01 m fails); mirrored vertex pairs with different weights on a mesh that is the same on both sides (5% warns, 25% fails); edges that stretch by 0.15 m or more in standard poses (3 edges with the arms, head or torso moved warn; 2% of all edges fails there, and warns with the legs moved, where skirts stretch by design); and, for head items, the share of weight on the head bone (under 50% warns).",
+  details: "Reads joints, weights and inverse bind matrices from the file and skins the mesh as the client does: each vertex is moved by the avatar's bone at the position its joint has in the file's joint list (bones are matched by position, not by name), through the file's inverse bind matrix for that position. It measures four things: vertices that this moves away from the rest of the mesh in the bind pose, because the joints are in another order or were bound to other bones (more than 0.01 m fails); mirrored vertex pairs with different weights on a mesh that is the same on both sides (5% warns, 25% fails); edges that stretch by 0.15 m or more in standard poses (3 edges with the arms, head or torso moved warn; 2% of all edges fails there, and warns with the legs moved, where skirts stretch by design); and, for head items, the share of weight on the head bone (under 50% warns).",
   appliesTo: (ctx) => {
     const base = wearableGeometryOnly(ctx);
     if (base !== true) return base;
@@ -332,7 +383,7 @@ export const skinDeformation: CheckDefinition = {
       for (const pose of measured.stretch ?? []) if (pose.local) growth = Math.max(growth, pose.maxGrowth);
     }
     if (!any) return "not skinned";
-    return offset > 0 ? `bind pose off by ${round(offset)} m` : `largest stretch ${round(growth)} m`;
+    return offset > 0 ? `out of shape by ${round(offset)} m on the avatar` : `largest stretch ${round(growth)} m`;
   },
   run: (ctx) => {
     const findings: Finding[] = [];
