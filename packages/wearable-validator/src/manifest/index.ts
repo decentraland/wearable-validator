@@ -174,7 +174,7 @@ export interface Manifest {
     maxNameLength: number;
     /** Proportions are compared on a grid of ratioTolerance / ratioSteps: parts up to ratioSteps steps apart on both axes have the same proportions. */
     ratioSteps: number;
-    /** What one lookup may spend, one unit per catalog entry or proportion cell it looks at, before it stops with an error: a real model spends a few thousand. */
+    /** What one lookup may spend comparing shapes, one unit per proportion cell it looks at, before it stops with an error. A model spends about its parts times the items that share a signature with it; walking the catalog's cells is not counted. */
     maxLookupWork: number;
     /** Published items a lookup reports per uploaded model, for similar items and again for items only contained: the earliest of each creator first, then the earliest of the rest. */
     maxMatches: number;

@@ -162,7 +162,11 @@ function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: 
   return { cells: cells.length >= rules.minCells ? cells : [], parts: comparable ? parts : new Map(), triangles: comparable ? triangles : 0 };
 }
 
-/** What a lookup may spend: one unit per catalog entry or grid cell it looks at. Past rules.maxLookupWork it stops with an error. */
+/**
+ * What a lookup may spend comparing shapes: one unit per proportion cell it looks at. Past rules.maxLookupWork it stops
+ * with an error. Only work an upload can inflate is on the budget (many proportions of one signature); walking the
+ * catalog's own postings is not, and only counts toward the next pause.
+ */
 interface Work {
   left: number;
   sinceYield: number;
@@ -171,7 +175,7 @@ interface Work {
 function spend(work: Work, units: number): void {
   work.left -= units;
   work.sinceYield += units;
-  if (work.left < 0) throw new Error("This model takes too much work to compare with published items: it repeats one part in too many different proportions, or shares too much with too many items.");
+  if (work.left < 0) throw new Error("This model takes too much work to compare with published items: it repeats one part in too many different proportions.");
 }
 
 /** Triangles of `a` in parts that `b` also has: same signature, same proportions (see ratioCell). Walks whichever has fewer signatures. */
@@ -300,13 +304,15 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
           let i = firstAt(cell);
           const from = i;
           for (; i < sortedCells.length && sortedCells[i] === cell; i++) sharedCells.set(sortedModels[i], (sharedCells.get(sortedModels[i]) ?? 0) + 1);
-          spend(work, 1 + i - from);
+          // not on the budget: this pass is bounded by the upload's cells times the models that hold each, which grows with
+          // the catalog (a template with hundreds of copies, a creator's own recolours), not with anything the upload does
+          work.sinceYield += 1 + i - from;
           await breathe();
         }
         const sameShape = new Set<number>();
         for (const signature of upload.parts.keys()) for (const m of bySignature.get(signature) ?? []) sameShape.add(m);
         for (const m of new Set([...sharedCells.keys(), ...sameShape])) {
-          spend(work, 1);
+          work.sinceYield++;
           await breathe();
           const other = models[m].own;
           const cells = sharedCells.get(m) ?? 0;

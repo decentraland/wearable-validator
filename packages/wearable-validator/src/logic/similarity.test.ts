@@ -206,6 +206,20 @@ describe("catalog comparison", () => {
     assert.equal(answer.matches[0].publishedAt, t + 1_000);
   });
 
+  it("answers however many copies of a mesh the catalog holds, the uploader's own included", async () => {
+    const sheet = await print(bumpySheet());
+    const big = { cells: Array.from({ length: 10_000 }, (_, c) => 2e9 + c), parts: sheet.parts };
+    // one creator with 650 recolours of their own item (both body shapes), uploading the next one
+    const recolours = Array.from({ length: 650 }, (_, n) => entry(n + 1, "0xabc", [big, big]));
+    const catalog = createCatalog({ fingerprint, entries: recolours, common: none }, { rules });
+    assert.deepEqual(await catalog.match([big, big], { ownCreators: [wallet("0xabc")] }), { compared: true, matches: [] });
+    // and a template that many creators published many times is still answered
+    const template = Array.from({ length: 49 * 25 }, (_, n) => entry(n + 1, `0x${n % 49}`, [big]));
+    const answer = await createCatalog({ fingerprint, entries: template, common: none }, { rules }).match([big, big]);
+    assert.equal(answer.matches.length, 2 * rules.maxMatches);
+    assert.equal(new Set(answer.matches.map((match) => match.creator)).size, 49);
+  });
+
   it("refuses an index built under other numbers", () => {
     for (const change of [{ commonCreators: rules.commonCreators + 1 }, { minPartTriangles: 1 }, { minPartKinds: 1 }, { weldMillimeters: 1 }]) {
       assert.throws(() => createCatalog({ fingerprint, entries: [], common: none }, { rules: { ...rules, ...change } }), /Rebuild the index/, JSON.stringify(change));
