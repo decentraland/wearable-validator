@@ -20,6 +20,7 @@ export async function validate(input: Input, options: Options = {}): Promise<Res
   }
   const ctx = loaded.ctx!;
   ctx.services = options.services;
+  ctx.ownCreators = options.ownCreators;
   ctx.signal = options.signal;
   ctx.captures = options.captures ? structuredClone(options.captures) : [];
 
@@ -116,7 +117,7 @@ export async function validate(input: Input, options: Options = {}): Promise<Res
 
 function validateOptions(options: Options): void {
   for (const group of options.groups ?? []) {
-    if (![...CORE_GROUPS, "rendering", "code"].includes(group)) throw new Error(`Unknown group "${group}". Valid: files, model, emote, content, rendering, code.`);
+    if (![...CORE_GROUPS, "rendering", "code", "catalog"].includes(group)) throw new Error(`Unknown group "${group}". Valid: files, model, emote, content, rendering, code, catalog.`);
   }
   for (const name of options.checks ?? []) {
     if (!resolveCheck(name)) throw new Error(`Unknown check "${name}". Run \`wearable-validator checks\` to list them.`);
@@ -133,7 +134,7 @@ function selectChecks(options: Options): CheckDefinition[] {
 }
 
 function needsParsedModel(check: CheckDefinition): boolean {
-  return check.group === "model" || check.group === "emote";
+  return check.group === "model" || check.group === "emote" || check.group === "catalog";
 }
 
 function computePassed(ctx: CheckContext, options: Options, results: CheckResult[], errors: number): boolean | null {

@@ -4,7 +4,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { registry, checks, explanations, fixes, details, DOCS_LINKS } from "../src/registry.js";
 
-const GROUP_ORDER = ["files", "model", "emote", "content", "rendering", "code"];
+const GROUP_ORDER = ["files", "model", "emote", "content", "rendering", "code", "catalog"];
 
 describe("the registry", () => {
   it("lists every check in group order, each once", () => {

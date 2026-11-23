@@ -139,6 +139,50 @@ export interface Manifest {
   emoteQuality: { promptVersion: number; maxFindings: number };
   /** S-12: one model call reads a smart wearable's code; its own input budget, since a bundle carries the SDK. Minified JS runs near 1.7 characters a token (DJ Cat: 372 KB, 219k tokens), so 1.5 MB fills most of the model's 1M-token context. */
   smartWearableCode: { promptVersion: number; maxFindings: number; maxCodeBytes: number; maxInputTokens: number };
+  /**
+   * D-01: an upload against the published catalog, calibrated on the 11,231 approved items of Nov 2026 (10,594 comparable):
+   * at warnShare 0.85, 795 match an earlier item by another creator, 46 of them from the last 12 months.
+   */
+  similarItems: {
+    /** Position signal: the grid a vertex is snapped to. 2 and 4 mm found nothing 1 mm missed. */
+    gridMillimeters: number;
+    /** Own cells a model needs for the position signal: fewer match by accident. */
+    minCells: number;
+    /** A connected part needs this many triangles and this many different corner-valence triples for its shape to mean anything (a UV sphere has 4). */
+    minPartTriangles: number; minPartKinds: number;
+    /** Triangles in such parts a model needs for the shape signal. */
+    minTriangles: number;
+    /** Two parts with the same signature are the same shape when both axis ratios agree within about this (see ratioSteps). */
+    ratioTolerance: number;
+    /** Geometry in the items of this many creators is nobody's (the reference body): removed before comparing. */
+    commonCreators: number;
+    /** Warn when this share of the upload's own geometry is in a published item. */
+    warnShare: number;
+    /** Warn when this share of a published item sits inside the upload. */
+    containsShare: number;
+    /** Geometry already published by this many creators is a shared template: no warning (decided Nov 2026). */
+    templateCreators: number;
+    /** Warnings one item can get from this check, in all. */
+    maxFindings: number;
+    /** Vertices closer than this are one vertex when a mesh's parts are found: exporters split a vertex per UV seam and per normal. */
+    weldMillimeters: number;
+    /** Indices (vertices, without indices) plus nodes and skin joints a model may make the fingerprint read (a mesh reused by several nodes counts each time) before the check declines: about 10 times the largest model in the approved catalog (14,698 vertices). */
+    maxElements: number;
+    /** Models compared per lookup: an item has one per body shape. */
+    maxModels: number;
+    /** Characters of a published item's name a warning quotes. */
+    maxNameLength: number;
+    /** Proportions are compared on a grid of ratioTolerance / ratioSteps: parts up to ratioSteps steps apart on both axes have the same proportions. */
+    ratioSteps: number;
+    /** What one lookup may spend comparing shapes, one unit per proportion cell it looks at, before it stops with an error. A model spends about its parts times the items that share a signature with it; walking the catalog's cells is not counted. */
+    maxLookupWork: number;
+    /** Published items a lookup reports per uploaded model, for similar items and again for items only contained: the earliest of each creator first, then the earliest of the rest. */
+    maxMatches: number;
+    /** A published item's date (unix seconds) is believed from here on: 2020-01-01, before the first Polygon collection. The catalog holds Polygon collections only; an index builder leaves the 2019 Ethereum ones out. */
+    earliestPublishedAt: number;
+    /** How far past now a published item's date may be: clocks differ. */
+    clockSkewSeconds: number;
+  };
   receipts: Record<string, string>;
 }
 
