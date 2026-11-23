@@ -74,7 +74,7 @@ export interface SyntheticOptions {
   /** Moves the cube by this much, in rest-pose world space (metres). */
   offset?: [number, number, number];
   /**
-   * Stand the canonical bones at avatar heights (feet 0.08 m, hips 0.95 m, head 1.6 m) with matching inverse bind
+   * Stand the canonical bones at avatar heights (feet 0.08 m, hips 0.95 m, head 1.6 m, hands out to the sides at 1.35 m) with matching inverse bind
    * matrices, so the cube's positions are its rest-pose world positions (representation tests). With
    * `skinned: false` the bones still stand, and the unskinned cube is drawn where its node puts it.
    */
@@ -101,6 +101,8 @@ export interface SyntheticOptions {
   skinData?: {
     /** 4 joint indices into the bones list (default [0,0,0,0]). */
     joints?: [number, number, number, number];
+    /** Joints chosen per vertex (wins over `joints`): e.g. half of the vertices on each hand. */
+    jointsByVertex?: (vertex: number) => [number, number, number, number];
     /** 4 weights (default [1,0,0,0]). */
     weights?: [number, number, number, number];
     /** Store WEIGHTS_0 as normalized uint8 instead of float32. */
@@ -123,7 +125,10 @@ export interface SyntheticOptions {
 /** Bone heights on the standing test skeleton (`standing`); any other bone stands at 1 m. */
 const STANDING: Record<string, [number, number, number]> = {
   Avatar_Hips: [0, 0.95, 0], Avatar_Head: [0, 1.6, 0], Avatar_Neck: [0, 1.5, 0],
-  Avatar_LeftFoot: [0.1, 0.08, 0], Avatar_RightFoot: [-0.1, 0.08, 0]
+  Avatar_LeftFoot: [0.1, 0.08, 0], Avatar_RightFoot: [-0.1, 0.08, 0],
+  // arms out to the sides: each wrist 0.7 m from the centre, its middle knuckle 0.08 m further
+  Avatar_LeftHand: [0.7, 1.35, 0], Avatar_LeftHandMiddle1: [0.78, 1.35, 0],
+  Avatar_RightHand: [-0.7, 1.35, 0], Avatar_RightHandMiddle1: [-0.78, 1.35, 0]
 };
 
 /**
@@ -242,7 +247,10 @@ export async function syntheticGlb(options: SyntheticOptions = {}): Promise<Uint
     const weightVals = sd?.weights ?? [1, 0, 0, 0];
     const zeroCount = sd?.zeroWeightVertices ?? 0;
     const joints = new Uint16Array(vertexCount * 4);
-    for (let v = 0; v < vertexCount; v++) for (let c = 0; c < 4; c++) joints[v * 4 + c] = jointVals[c];
+    for (let v = 0; v < vertexCount; v++) {
+      const chosen = sd?.jointsByVertex?.(v) ?? jointVals;
+      for (let c = 0; c < 4; c++) joints[v * 4 + c] = chosen[c];
+    }
     const weightsAccessor = doc.createAccessor("WEIGHTS_0").setType("VEC4").setBuffer(buffer);
     if (sd?.normalizedWeights) {
       const weights = new Uint8Array(vertexCount * 4);
