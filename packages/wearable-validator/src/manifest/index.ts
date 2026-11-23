@@ -67,6 +67,40 @@ export interface Manifest {
     maxUnpackedBytes: number;
   };
   hands: { minHandWeightRatio: number };
+  /**
+   * M-12 and M-16: what an item's hides list (Overrides in the Builder) has to agree with. Heights are shares of the
+   * model's own skeleton, feet 0 and head bone 1 (the neck is near 0.85, the knees near 0.25).
+   */
+  hides: {
+    /**
+     * The slots a skin must hide: the ones the engine leaves visible on top of a skin. It hides head, hands, hands_wear,
+     * hair, facial_hair, eyes, eyebrows, mouth, upper_body, lower_body and feet under every skin by itself
+     * (unity-explorer WearableCategories.SKIN_IMPLICIT_CATEGORIES), so those are not required. A warning, not an error:
+     * of the 400 most recent approved skins 337 miss at least one, and so do 7 of the 22 approved since curators
+     * started asking for it (23 Oct 2026).
+     */
+    skinMustHide: string[];
+    /**
+     * An item that hides the head must span this height: lowest point at or below it, highest point above it. Approved
+     * items that hide the head start at 0.93 or lower and end at 1.07 or higher (none of 143 breaks it); the top-head
+     * item curators sent back for a headless avatar started at 1.06.
+     */
+    headCoverLine: number;
+    /**
+     * An item that hides the hands needs minVertices vertices per hand, by the larger of two counts: vertices past the
+     * wrist (at least pastWrist of the way from the hand bone to the middle knuckle, within radius of body height of
+     * that knuckle), and vertices with more than half of their weight on that hand's bones. Approved items that hide
+     * the hands have 26 or more per hand by place and 48 or more by weight (the base hand has 176); the tops and pants
+     * curators sent back have 0, and a sleeve cuff reaches 9. One approved item of 107 fails: a costume with no hands.
+     */
+    hand: { minVertices: number; pastWrist: number; radius: number };
+    /**
+     * An upper_body whose lowest point is below this height and that does not hide lower_body warns. Of 397 approved
+     * upper bodies, the 141 that reach the ankles (below 0.05) all hide the lower body and 252 stop at 0.25 or higher;
+     * 4 reach 0.09–0.13 without hiding it (two cloaks, a robe and a long coat), which is why this is only a warning.
+     */
+    longUpperBodyLine: number;
+  };
   thumbnail: { minTransparentBorderRatio: number; alphaThreshold: number };
   /** The renderer, shared by every visual rule — read by /native and captures.ts. */
   rendering: {

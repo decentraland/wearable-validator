@@ -1,5 +1,5 @@
 {
-  "version": "0.8.6",
+  "version": "0.8.8",
   "triangles": {
     "default": 1500,
     "perCategory": {
@@ -153,6 +153,12 @@
   },
   "hands": {
     "minHandWeightRatio": 0.5
+  },
+  "hides": {
+    "skinMustHide": ["mask", "eyewear", "earring", "tiara", "top_head", "hat", "helmet"],
+    "headCoverLine": 1,
+    "hand": { "minVertices": 12, "pastWrist": 0.5, "radius": 0.15 },
+    "longUpperBodyLine": 0.2
   },
   "thumbnail": {
     "minTransparentBorderRatio": 0.9,
@@ -369,6 +375,10 @@
     {
       "topic": "self hide/replace (M-12)",
       "note": "Downgraded to warning 2026-09-09: committee-approved items (e.g. 0xae473ded\u2026:0) carry self-referencing hides/replaces and work in-world \u2014 the engine ignores them (replaces deprecated by ADR-239)."
+    },
+    {
+      "topic": "skin hides (M-12)",
+      "note": "A warning since 2026-11-23: curators ask every skin to hide all accessory slots, but 7 of the 22 skins approved since they started asking (23 Oct 2026) hide none or miss one, and 337 of the 400 most recent approved skins do."
     },
     {
       "topic": "animations/shape keys in wearable GLBs (M-13)",

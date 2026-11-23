@@ -99,9 +99,13 @@
     "file": "src/checks/model/hands-geometry/index.ts",
     "line": 9
   },
+  "hides-coverage": {
+    "file": "src/checks/model/hides-coverage/index.ts",
+    "line": 15
+  },
   "hides-replaces": {
     "file": "src/checks/model/hides-replaces/index.ts",
-    "line": 6
+    "line": 10
   },
   "material-count": {
     "file": "src/checks/model/material-count/index.ts",
@@ -113,7 +117,7 @@
   },
   "representations-match": {
     "file": "src/checks/model/representations-match/index.ts",
-    "line": 13
+    "line": 14
   },
   "skeleton": {
     "file": "src/checks/model/skeleton/index.ts",
