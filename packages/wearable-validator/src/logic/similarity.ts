@@ -15,7 +15,7 @@ import { fingerprintVersion, type ModelFingerprint, type PartFingerprint } from 
 
 type Rules = Manifest["similarItems"];
 
-const YIELD_EVERY = 512; // candidates compared between two turns of the event loop
+const YIELD_EVERY = 1 << 16; // units of lookup work between two turns of the event loop
 
 export interface CatalogEntry {
   urn: string;
@@ -111,40 +111,38 @@ function counts(part: PartFingerprint, rules: Rules): boolean {
   return part.triangles >= rules.minPartTriangles && part.kinds >= rules.minPartKinds;
 }
 
-/** The parts of one signature that have the same proportions, as one: its proportions and the triangles of all of them. */
-interface Shape {
-  ratios: [number, number];
-  triangles: number;
-}
+/**
+ * Proportions on a grid. Each of a part's two ratios is snapped to steps of ratioTolerance / ratioSteps, and two parts
+ * have the same proportions when their snapped ratios are at most ratioSteps steps apart on both axes. So parts within
+ * (1 - 1/ratioSteps) of the tolerance always agree and parts beyond (1 + 1/ratioSteps) of it never do, whatever order
+ * the file lists them in and whatever noise a float carries in its last digits.
+ */
+const RATIO_SPAN = 1 << 20; // a snapped ratio stays far below this (ratios are 0 to 1), so two fit one number
+const ratioCell = (ratios: [number, number], rules: Rules): number => {
+  const step = rules.ratioTolerance / rules.ratioSteps;
+  const snap = (ratio: number) => Math.min(RATIO_SPAN - 1, Math.max(0, Math.round(ratio / step)));
+  return snap(ratios[0]) * RATIO_SPAN + snap(ratios[1]);
+};
 
 interface Own {
   /** Sorted cells left after removing common ones; empty when fewer than rules.minCells are left. */
   cells: number[];
-  /** signature → the shapes that count, largest first. */
-  parts: Map<string, Shape[]>;
-  /** Triangles in those shapes; 0 when the model's parts that count have fewer than rules.minTriangles in all. */
+  /** signature → proportions on the grid → triangles of every part that sits there. Copies of a part fold into one entry and keep their weight. */
+  parts: Map<string, Map<number, number>>;
+  /** Triangles in those parts; 0 when fewer than rules.minTriangles. */
   triangles: number;
 }
-
-const sameRatios = (a: [number, number], b: [number, number], tolerance: number): boolean => Math.abs(a[0] - b[0]) <= tolerance && Math.abs(a[1] - b[1]) <= tolerance;
 
 /**
  * A fingerprint may come from anyone (a server answering lookups receives them from browsers), so it is read as data:
  * anything that is not the expected shape is left out, cells are deduplicated and must be finite, parts must carry
  * finite numbers, and neither list may be longer than what a model within the work budget can produce.
- *
- * A model can repeat one part hundreds of times (sequins, chain mail, studs). Comparing each copy with each copy would
- * make a lookup as slow as the upload wants, and dropping copies would change the score. So copies are folded: parts of
- * one signature with the same proportions become one shape that carries the triangles of all of them, and a signature
- * keeps its maxPartsPerShape largest shapes, which is what the model is then measured on (a signature with more
- * different proportions than that is compared on its largest ones, on both sides alike). The fold sorts first, so the
- * order of the parts in the file never matters.
  */
 function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: Set<string> }, rules: Rules): Own {
   const sentCells = Array.isArray(model?.cells) ? model.cells.slice(0, rules.maxElements) : [];
   const sentParts = Array.isArray(model?.parts) ? model.parts.slice(0, rules.maxElements) : [];
   const cells = [...new Set(sentCells)].filter((cell) => typeof cell === "number" && Number.isFinite(cell) && !common.cells.has(cell)).sort((a, b) => a - b);
-  const sent = new Map<string, Shape[]>();
+  const parts = new Map<string, Map<number, number>>();
   // a part that counts has minPartTriangles triangles, so a model within the work budget cannot have more of them than this
   let room = Math.floor(rules.maxElements / (3 * rules.minPartTriangles));
   let triangles = 0;
@@ -154,44 +152,61 @@ function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: 
     if (!Number.isFinite(part.triangles) || !Number.isFinite(part.kinds) || !Number.isFinite(part.ratios[0]) || !Number.isFinite(part.ratios[1])) continue;
     if (!counts(part, rules) || common.signatures.has(part.signature)) continue;
     room--;
-    const shape: Shape = { ratios: [part.ratios[0], part.ratios[1]], triangles: part.triangles };
-    const list = sent.get(part.signature);
-    if (list) list.push(shape);
-    else sent.set(part.signature, [shape]);
+    let shapes = parts.get(part.signature);
+    if (!shapes) parts.set(part.signature, (shapes = new Map()));
+    const cell = ratioCell([part.ratios[0], part.ratios[1]], rules);
+    shapes.set(cell, (shapes.get(cell) ?? 0) + part.triangles);
     triangles += part.triangles;
   }
   const comparable = triangles >= rules.minTriangles;
-  const parts = new Map<string, Shape[]>();
-  let kept = 0;
-  if (comparable) {
-    for (const [signature, list] of sent) {
-      list.sort((a, b) => a.ratios[0] - b.ratios[0] || a.ratios[1] - b.ratios[1] || b.triangles - a.triangles);
-      const shapes: Shape[] = [];
-      for (const shape of list) {
-        const last = shapes[shapes.length - 1];
-        if (last && sameRatios(last.ratios, shape.ratios, rules.ratioTolerance)) last.triangles += shape.triangles;
-        else shapes.push({ ratios: shape.ratios, triangles: shape.triangles });
-      }
-      shapes.sort((a, b) => b.triangles - a.triangles || a.ratios[0] - b.ratios[0] || a.ratios[1] - b.ratios[1]);
-      parts.set(signature, shapes.slice(0, rules.maxPartsPerShape));
-      for (const shape of parts.get(signature)!) kept += shape.triangles;
-    }
-  }
-  return { cells: cells.length >= rules.minCells ? cells : [], parts, triangles: kept };
+  return { cells: cells.length >= rules.minCells ? cells : [], parts: comparable ? parts : new Map(), triangles: comparable ? triangles : 0 };
 }
 
-/** Triangles of `a` in shapes that `b` also has: same signature, same proportions. Walks whichever has fewer signatures. */
-function sharedTriangles(a: Own, b: Own, tolerance: number): number {
+/** What a lookup may spend: one unit per catalog entry or grid cell it looks at. Past rules.maxLookupWork it stops with an error. */
+interface Work {
+  left: number;
+  sinceYield: number;
+}
+
+function spend(work: Work, units: number): void {
+  work.left -= units;
+  work.sinceYield += units;
+  if (work.left < 0) throw new Error("This model takes too much work to compare with published items: it repeats one part in too many different proportions, or shares too much with too many items.");
+}
+
+/** Triangles of `a` in parts that `b` also has: same signature, same proportions (see ratioCell). Walks whichever has fewer signatures. */
+function sharedTriangles(a: Own, b: Own, rules: Rules, work: Work): number {
   let shared = 0;
   const [few, many] = a.parts.size <= b.parts.size ? [a.parts, b.parts] : [b.parts, a.parts];
+  const reach = rules.ratioSteps;
   for (const signature of few.keys()) {
     if (!many.has(signature)) continue;
     const others = b.parts.get(signature)!;
-    for (const shape of a.parts.get(signature)!) {
-      if (others.some((other) => sameRatios(shape.ratios, other.ratios, tolerance))) shared += shape.triangles;
+    for (const [cell, triangles] of a.parts.get(signature)!) {
+      if (others.has(cell)) { spend(work, 1); shared += triangles; continue; } // the usual case: a copy has the same proportions
+      spend(work, (2 * reach + 1) ** 2);
+      const first = Math.floor(cell / RATIO_SPAN), second = cell % RATIO_SPAN;
+      search: for (let i = first - reach; i <= first + reach; i++) {
+        for (let j = second - reach; j <= second + reach; j++) {
+          if (i >= 0 && j >= 0 && j < RATIO_SPAN && others.has(i * RATIO_SPAN + j)) { shared += triangles; break search; }
+        }
+      }
     }
   }
   return shared;
+}
+
+/** The earliest of each creator first, then the earliest of what is left, up to `limit`: a template is counted by creators, so one prolific creator must not fill the answer. */
+function earliest(matches: CatalogMatch[], limit: number): CatalogMatch[] {
+  const byDate = [...matches].sort((a, b) => a.publishedAt - b.publishedAt);
+  const creators = new Set<string>();
+  const first: CatalogMatch[] = [], rest: CatalogMatch[] = [];
+  for (const match of byDate) {
+    const creator = match.creator.toLowerCase();
+    if (creators.has(creator)) rest.push(match);
+    else { creators.add(creator); first.push(match); }
+  }
+  return [...first, ...rest].slice(0, limit);
 }
 
 export interface CatalogOptions {
@@ -260,31 +275,39 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
         throw new Error(`The lookup was fingerprinted with version "${request.fingerprint}" and this catalog's index with "${index.fingerprint}": nothing would match. Rebuild the index or update the validator.`);
       }
       const mine = new Set((Array.isArray(request.ownCreators) ? request.ownCreators : []).filter((creator) => typeof creator === "string").map((creator) => creator.toLowerCase()));
-      const signal = request.signal instanceof AbortSignal ? request.signal : undefined; // parsed JSON can carry anything under "signal"
+      // anything with throwIfAborted is a signal (another realm's, a polyfill's); parsed JSON cannot carry a function
+      const signal = typeof (request.signal as AbortSignal | undefined)?.throwIfAborted === "function" ? request.signal : undefined;
+      const work: Work = { left: rules.maxLookupWork, sinceYield: 0 };
+      // a long lookup lets the host's timers run, so a timeout can stop it
+      const breathe = async (): Promise<void> => {
+        if (work.sinceYield < YIELD_EVERY) return;
+        work.sinceYield = 0;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        signal?.throwIfAborted();
+      };
       const matches: CatalogMatch[] = [];
       let compared = false;
-      let sinceYield = 0;
-      const models_ = (Array.isArray(uploaded) ? uploaded : []).slice(0, rules.maxModels);
-      for (let modelIndex = 0; modelIndex < models_.length; modelIndex++) {
+      const uploads = (Array.isArray(uploaded) ? uploaded : []).slice(0, rules.maxModels);
+      for (let modelIndex = 0; modelIndex < uploads.length; modelIndex++) {
         signal?.throwIfAborted();
         // per uploaded model: what one model matched must not hide what another did
         const best = new Map<number, CatalogMatch>();
-        const upload = own(models_[modelIndex], common, rules);
+        const upload = own(uploads[modelIndex], common, rules);
         if (upload.cells.length === 0 && upload.triangles === 0) continue;
         compared = true;
         const sharedCells = new Map<number, number>();
         for (const cell of upload.cells) {
-          for (let i = firstAt(cell); i < sortedCells.length && sortedCells[i] === cell; i++) sharedCells.set(sortedModels[i], (sharedCells.get(sortedModels[i]) ?? 0) + 1);
+          let i = firstAt(cell);
+          const from = i;
+          for (; i < sortedCells.length && sortedCells[i] === cell; i++) sharedCells.set(sortedModels[i], (sharedCells.get(sortedModels[i]) ?? 0) + 1);
+          spend(work, 1 + i - from);
+          await breathe();
         }
         const sameShape = new Set<number>();
         for (const signature of upload.parts.keys()) for (const m of bySignature.get(signature) ?? []) sameShape.add(m);
         for (const m of new Set([...sharedCells.keys(), ...sameShape])) {
-          // a long lookup lets the host's timers run, so a timeout can stop it
-          if (++sinceYield >= YIELD_EVERY) {
-            sinceYield = 0;
-            await new Promise((resolve) => setTimeout(resolve, 0));
-            signal?.throwIfAborted();
-          }
+          spend(work, 1);
+          await breathe();
           const other = models[m].own;
           const cells = sharedCells.get(m) ?? 0;
           const position = upload.cells.length ? cells / upload.cells.length : 0;
@@ -295,8 +318,8 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
           if (!shaped && position < rules.warnShare && inside < rules.containsShare) continue;
           const entry = entries[models[m].entry]!;
           if (mine.has(entry.creator.toLowerCase())) continue;
-          const shape = shaped && upload.triangles ? sharedTriangles(upload, other, rules.ratioTolerance) / upload.triangles : 0;
-          const contains = Math.max(inside, shaped && other.triangles ? sharedTriangles(other, upload, rules.ratioTolerance) / other.triangles : 0);
+          const shape = shaped && upload.triangles ? sharedTriangles(upload, other, rules, work) / upload.triangles : 0;
+          const contains = Math.max(inside, shaped && other.triangles ? sharedTriangles(other, upload, rules, work) / other.triangles : 0);
           const share = Math.max(position, shape);
           if (share < rules.warnShare && contains < rules.containsShare) continue;
           // an item with several models: its strongest similarity and its strongest containment, whichever model gave each
@@ -308,8 +331,10 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
           }
           best.set(models[m].entry, { urn: entry.urn, name: entry.name, creator: entry.creator, publishedAt: entry.publishedAt, url: entry.url, model: modelIndex, share, position, shape, contains });
         }
-        // the earliest are the ones a warning names and a template is counted from; an answer is never the whole catalog
-        for (const match of [...best.values()].sort((x, y) => x.publishedAt - y.publishedAt).slice(0, rules.maxMatches)) matches.push(match);
+        // an answer is never the whole catalog. Similar items and items only contained are capped apart, so neither crowds out the other.
+        const found = [...best.values()];
+        matches.push(...earliest(found.filter((match) => match.share >= rules.warnShare), rules.maxMatches));
+        matches.push(...earliest(found.filter((match) => match.share < rules.warnShare), rules.maxMatches));
       }
       return { compared, matches: matches.sort((a, b) => a.publishedAt - b.publishedAt || a.model - b.model) };
     }

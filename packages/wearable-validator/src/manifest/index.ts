@@ -152,7 +152,7 @@ export interface Manifest {
     minPartTriangles: number; minPartKinds: number;
     /** Triangles in such parts a model needs for the shape signal. */
     minTriangles: number;
-    /** Two parts with the same signature are the same shape when both axis ratios agree within this. */
+    /** Two parts with the same signature are the same shape when both axis ratios agree within about this (see ratioSteps). */
     ratioTolerance: number;
     /** Geometry in the items of this many creators is nobody's (the reference body): removed before comparing. */
     commonCreators: number;
@@ -172,9 +172,11 @@ export interface Manifest {
     maxModels: number;
     /** Characters of a published item's name a warning quotes. */
     maxNameLength: number;
-    /** Different proportions kept per part signature in a model, largest first; copies with the same proportions are folded into one and keep their triangles. */
-    maxPartsPerShape: number;
-    /** Published items a lookup reports per uploaded model, earliest first: enough to count a template (templateCreators) many times over. */
+    /** Proportions are compared on a grid of ratioTolerance / ratioSteps: parts up to ratioSteps steps apart on both axes have the same proportions. */
+    ratioSteps: number;
+    /** What one lookup may spend, one unit per catalog entry or proportion cell it looks at, before it stops with an error: a real model spends a few thousand. */
+    maxLookupWork: number;
+    /** Published items a lookup reports per uploaded model, for similar items and again for items only contained: the earliest of each creator first, then the earliest of the rest. */
     maxMatches: number;
     /** A published item's date (unix seconds) is believed from here on: 2020-01-01, before the first Polygon collection. The catalog holds Polygon collections only; an index builder leaves the 2019 Ethereum ones out. */
     earliestPublishedAt: number;

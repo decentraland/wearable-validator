@@ -159,32 +159,51 @@ describe("catalog comparison", () => {
     assert.equal(matches[0].share, 1);
     assert.equal(matches[0].contains, 1);
     // and a spike with other proportions is still another spike
-    ({ matches } = await catalog.match([{ cells: [], parts: spikes.map((spike) => ({ ...spike, ratios: [spike.ratios[0] + 0.025, spike.ratios[1]] as [number, number] })) }]));
+    ({ matches } = await catalog.match([{ cells: [], parts: spikes.map((spike) => ({ ...spike, ratios: [spike.ratios[0] + 2 * rules.ratioTolerance, spike.ratios[1]] as [number, number] })) }]));
     assert.deepEqual(matches, []);
+    // two kinds of sequin that differ on the second ratio, each copy with the noise a float carries: still the same sequins
+    const noisy = (seed: number) => Array.from({ length: 500 }, (_, i) => part("sequin", 60, [0.3 + (((i * 7919 + seed) % 11) - 5) * 1e-13, i % 2 ? 0.1 : 0.2]));
+    catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [{ cells: [], parts: [part("body", 2000, [0.5, 0.2]), ...noisy(1)] }])], common: none }, { rules });
+    ({ matches } = await catalog.match([{ cells: [], parts: [part("other-body", 2000, [0.6, 0.3]), ...noisy(4).reverse()] }]));
+    assert.equal(matches[0].share, 30_000 / 32_000);
+    // parts that each drifted a little (well inside the tolerance) are still the same parts
+    const drifted = spikes.map((spike, i) => ({ ...spike, ratios: [spike.ratios[0] + (i % 3 - 1) * rules.ratioTolerance * 0.3, spike.ratios[1] - (i % 2) * rules.ratioTolerance * 0.3] as [number, number] }));
+    catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [{ cells: [], parts: spikes }])], common: none }, { rules });
+    assert.equal((await catalog.match([{ cells: [], parts: drifted }])).matches[0].share, 1);
   });
 
-  it("keeps a lookup short, cancellable and its answer bounded", async () => {
+  it("keeps a lookup's work and its answer bounded, and lets the host stop it", async () => {
     const sheet = await print(bumpySheet());
-    const repeated = (n: number, ratios: [number, number]) => ({ cells: [], parts: Array.from({ length: n }, (_, i) => ({ ...sheet.parts[0], ratios: [ratios[0] + i, ratios[1]] as [number, number] })) });
-    // many catalog models and an upload that shares a signature with all of them but no proportions, plus one stray cell each
-    const crowd = Array.from({ length: 3_000 }, (_, n) => entry(n + 1, `0x${n}`, [{ cells: Array.from({ length: rules.minCells }, (_, c) => 1e9 + n * 100 + c), parts: repeated(40, [9, 9]).parts }]));
+    const fan = (n: number, base: number) => ({ cells: [], parts: Array.from({ length: n }, (_, i) => ({ ...sheet.parts[0], ratios: [base + i * 0.1, 0.5] as [number, number] })) });
+    // many catalog models that share a signature with the upload but none of its proportions, plus one stray cell each
+    const crowd = Array.from({ length: 3_000 }, (_, n) => entry(n + 1, `0x${n}`, [{ cells: Array.from({ length: rules.minCells }, (_, c) => 1e9 + n * 100 + c), parts: fan(40, 500).parts }]));
     const catalog = createCatalog({ fingerprint, entries: crowd, common: none }, { rules });
-    const probe = { cells: crowd.map((_, n) => 1e9 + n * 100), parts: repeated(4_000, [5, 5]).parts };
-    const started = Date.now();
-    assert.deepEqual((await catalog.match(Array.from({ length: rules.maxModels }, () => probe), null)).matches, []);
+    const stray = crowd.map((_, n) => 1e9 + n * 100);
+    // an upload built to be expensive (4,000 proportions of that signature) is refused, quickly, with a reason
+    let started = Date.now();
+    await assert.rejects(catalog.match([{ cells: stray, parts: fan(4_000, 0).parts }], null), /too much work to compare/);
     assert.ok(Date.now() - started < 3_000, `took ${Date.now() - started} ms`);
-    // a timeout set by the host fires while the lookup runs
-    await assert.rejects(catalog.match(Array.from({ length: rules.maxModels }, () => probe), { signal: AbortSignal.timeout(1) }), /abort|timeout/i);
+    // one within the budget is answered, and a timeout set by the host fires while it runs
+    const probe = { cells: stray, parts: fan(20, 0).parts };
+    started = Date.now();
+    assert.deepEqual((await catalog.match([probe])).matches, []);
+    assert.ok(Date.now() - started < 3_000, `took ${Date.now() - started} ms`);
+    await assert.rejects(catalog.match([probe], { signal: AbortSignal.timeout(1) }), /abort|timeout/i);
     await assert.rejects(catalog.match([probe], { signal: AbortSignal.abort() }), /abort/i);
-    // anything else under "signal" is not a signal
+    // a signal from elsewhere is a signal; anything else under "signal" is not
+    let asked = 0;
+    await catalog.match([probe], { signal: { throwIfAborted: () => { asked++; } } as unknown as AbortSignal });
+    assert.ok(asked > 0);
     assert.deepEqual((await catalog.match([sheet], { signal: {} } as unknown as { signal: AbortSignal })).matches, []);
     const invalid = { cells: [], parts: Array.from({ length: 50_000 }, () => null) } as unknown as ModelFingerprint;
     assert.deepEqual(await catalog.match([invalid], null), { compared: false, matches: [] });
-    // an upload that matches more items than maxMatches gets the earliest ones
-    const same = createCatalog({ fingerprint, entries: Array.from({ length: rules.maxMatches + 50 }, (_, n) => entry(n + 1, `0x${n}`, [sheet], t + 10_000 - n)), common: none }, { rules });
-    const answer = await same.match([sheet]);
+    // an upload that matches more items than maxMatches gets the earliest ones, and every creator before any creator's second item
+    const prolific = Array.from({ length: rules.maxMatches }, (_, n) => entry(n + 1, "0xabc", [sheet], t + 1_000 + n));
+    const others = Array.from({ length: rules.templateCreators }, (_, n) => entry(1_000 + n, `0x${n + 1}`, [sheet], t + 50_000 + n));
+    const answer = await createCatalog({ fingerprint, entries: [...prolific, ...others], common: none }, { rules }).match([sheet]);
     assert.equal(answer.matches.length, rules.maxMatches);
-    assert.equal(answer.matches[0].publishedAt, t + 10_000 - (rules.maxMatches + 49));
+    assert.equal(new Set(answer.matches.map((match) => match.creator)).size, rules.templateCreators + 1);
+    assert.equal(answer.matches[0].publishedAt, t + 1_000);
   });
 
   it("refuses an index built under other numbers", () => {
