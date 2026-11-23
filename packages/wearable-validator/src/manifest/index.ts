@@ -1,3 +1,4 @@
+import type { RigBone, SkinPose } from "../logic/skinning.js";
 import manifestJson from "./manifest.json" with { type: "json" };
 
 export interface Manifest {
@@ -121,6 +122,49 @@ export interface Manifest {
      * coats and costumes curators accepted. Listing categories here turns it on; nothing else changes.
      */
     fittedCategories: string[];
+  };
+  /**
+   * M-16: how a skinned mesh deforms on the avatar, measured from the file alone. Calibrated on 516 curator-approved
+   * models (Nov 2026); each number names how many of them it flags.
+   */
+  skinDeformation: {
+    /**
+     * The avatar's skeleton in its bind pose (a T-pose): what every approved model is bound to, to four decimals.
+     * The avatar's own bones move the mesh, so a mesh bound to bones standing anywhere else is pulled out of shape.
+     */
+    rig: RigBone[];
+    /** How far a vertex may sit from where its mesh's main bone would put it before the binding counts as distorted. None of 516 approved models moves a vertex by 0.0005 m; one is bound to an armature scaled as a whole, which moves everything together and is not distortion. */
+    bindPoseToleranceMeters: number;
+    /** Standard poses the skeleton is put into. `local` poses move the arms, head or torso; the others move the legs, where skirts and gowns stretch by design. */
+    poses: (SkinPose & { local: boolean })[];
+    stretch: {
+      /** An edge counts as stretched only when it also grows to at least this many times its bind-pose length. */
+      minRatio: number;
+      /** In a local pose, this many edges (localMinEdges) growing by at least localGrowthMeters warn: 3 of 516 approved models, three skins built on one body mesh, one of which a curator had sent back for it. */
+      localGrowthMeters: number;
+      localMinEdges: number;
+      /**
+       * This share of all edges (grossEdgeShare) growing by at least grossGrowthMeters fails in a local pose (the most on
+       * 516 approved models is 1.05%, and only 3 are above 0) and warns in a leg pose (the most is 1.75%: gowns and
+       * strapped trousers in a running stride).
+       */
+      grossGrowthMeters: number;
+      grossEdgeShare: number;
+    };
+    /**
+     * Weights on a mirror-symmetric mesh. A vertex has a mirror when another sits within mirrorToleranceMeters of its
+     * reflection; vertices within centreBandMeters of the centre plane are their own mirror and are left out. A mesh
+     * is symmetric when it has at least minVertices off-centre vertices and minMirroredShare of them have a mirror.
+     * A pair differs when their weights, bone for mirrored bone, differ by at least minWeightDifference in total (2 =
+     * nothing in common). 320 of 516 approved models are symmetric: 1 has more than warnShare of pairs differing
+     * (14.7%, the next is 0.4%), so errorShare is never reached.
+     */
+    symmetry: {
+      mirrorToleranceMeters: number; centreBandMeters: number; minVertices: number; minMirroredShare: number;
+      minWeightDifference: number; warnShare: number; errorShare: number;
+    };
+    /** Items worn on the head: less than minWeightShare of their weight on the head bone (or bones under it) warns. Approved items in these categories carry at least 57%, except 3 of 145 that are not head pieces at all. */
+    headFollow: { bone: string; categories: string[]; minWeightShare: number };
   };
   /** V-01: how much of a capture must be something drawn. */
   renderValid: {
