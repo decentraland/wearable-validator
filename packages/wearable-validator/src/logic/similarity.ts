@@ -15,6 +15,8 @@ import { fingerprintVersion, type ModelFingerprint, type PartFingerprint } from 
 
 type Rules = Manifest["similarItems"];
 
+const YIELD_EVERY = 512; // candidates compared between two turns of the event loop
+
 export interface CatalogEntry {
   urn: string;
   name: string;
@@ -109,25 +111,40 @@ function counts(part: PartFingerprint, rules: Rules): boolean {
   return part.triangles >= rules.minPartTriangles && part.kinds >= rules.minPartKinds;
 }
 
+/** The parts of one signature that have the same proportions, as one: its proportions and the triangles of all of them. */
+interface Shape {
+  ratios: [number, number];
+  triangles: number;
+}
+
 interface Own {
   /** Sorted cells left after removing common ones; empty when fewer than rules.minCells are left. */
   cells: number[];
-  /** signature → the parts that count. */
-  parts: Map<string, PartFingerprint[]>;
-  /** Triangles in those parts; 0 when fewer than rules.minTriangles. */
+  /** signature → the shapes that count, largest first. */
+  parts: Map<string, Shape[]>;
+  /** Triangles in those shapes; 0 when the model's parts that count have fewer than rules.minTriangles in all. */
   triangles: number;
 }
+
+const sameRatios = (a: [number, number], b: [number, number], tolerance: number): boolean => Math.abs(a[0] - b[0]) <= tolerance && Math.abs(a[1] - b[1]) <= tolerance;
 
 /**
  * A fingerprint may come from anyone (a server answering lookups receives them from browsers), so it is read as data:
  * anything that is not the expected shape is left out, cells are deduplicated and must be finite, parts must carry
  * finite numbers, and neither list may be longer than what a model within the work budget can produce.
+ *
+ * A model can repeat one part hundreds of times (sequins, chain mail, studs). Comparing each copy with each copy would
+ * make a lookup as slow as the upload wants, and dropping copies would change the score. So copies are folded: parts of
+ * one signature with the same proportions become one shape that carries the triangles of all of them, and a signature
+ * keeps its maxPartsPerShape largest shapes, which is what the model is then measured on (a signature with more
+ * different proportions than that is compared on its largest ones, on both sides alike). The fold sorts first, so the
+ * order of the parts in the file never matters.
  */
 function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: Set<string> }, rules: Rules): Own {
   const sentCells = Array.isArray(model?.cells) ? model.cells.slice(0, rules.maxElements) : [];
   const sentParts = Array.isArray(model?.parts) ? model.parts.slice(0, rules.maxElements) : [];
   const cells = [...new Set(sentCells)].filter((cell) => typeof cell === "number" && Number.isFinite(cell) && !common.cells.has(cell)).sort((a, b) => a - b);
-  const parts = new Map<string, PartFingerprint[]>();
+  const sent = new Map<string, Shape[]>();
   // a part that counts has minPartTriangles triangles, so a model within the work budget cannot have more of them than this
   let room = Math.floor(rules.maxElements / (3 * rules.minPartTriangles));
   let triangles = 0;
@@ -137,25 +154,41 @@ function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: 
     if (!Number.isFinite(part.triangles) || !Number.isFinite(part.kinds) || !Number.isFinite(part.ratios[0]) || !Number.isFinite(part.ratios[1])) continue;
     if (!counts(part, rules) || common.signatures.has(part.signature)) continue;
     room--;
-    const list = parts.get(part.signature);
-    // a model repeats a part (a spike, a button) a handful of times; past maxPartsPerShape more copies only cost comparisons
-    if (list && list.length >= rules.maxPartsPerShape) continue;
-    if (list) list.push(part);
-    else parts.set(part.signature, [part]);
+    const shape: Shape = { ratios: [part.ratios[0], part.ratios[1]], triangles: part.triangles };
+    const list = sent.get(part.signature);
+    if (list) list.push(shape);
+    else sent.set(part.signature, [shape]);
     triangles += part.triangles;
   }
   const comparable = triangles >= rules.minTriangles;
-  return { cells: cells.length >= rules.minCells ? cells : [], parts: comparable ? parts : new Map(), triangles: comparable ? triangles : 0 };
+  const parts = new Map<string, Shape[]>();
+  let kept = 0;
+  if (comparable) {
+    for (const [signature, list] of sent) {
+      list.sort((a, b) => a.ratios[0] - b.ratios[0] || a.ratios[1] - b.ratios[1] || b.triangles - a.triangles);
+      const shapes: Shape[] = [];
+      for (const shape of list) {
+        const last = shapes[shapes.length - 1];
+        if (last && sameRatios(last.ratios, shape.ratios, rules.ratioTolerance)) last.triangles += shape.triangles;
+        else shapes.push({ ratios: shape.ratios, triangles: shape.triangles });
+      }
+      shapes.sort((a, b) => b.triangles - a.triangles || a.ratios[0] - b.ratios[0] || a.ratios[1] - b.ratios[1]);
+      parts.set(signature, shapes.slice(0, rules.maxPartsPerShape));
+      for (const shape of parts.get(signature)!) kept += shape.triangles;
+    }
+  }
+  return { cells: cells.length >= rules.minCells ? cells : [], parts, triangles: kept };
 }
 
-/** Triangles of `a` in parts that `b` also has, with the same proportions. */
+/** Triangles of `a` in shapes that `b` also has: same signature, same proportions. Walks whichever has fewer signatures. */
 function sharedTriangles(a: Own, b: Own, tolerance: number): number {
   let shared = 0;
-  for (const [signature, parts] of a.parts) {
-    const others = b.parts.get(signature);
-    if (!others) continue;
-    for (const part of parts) {
-      if (others.some((other) => Math.abs(part.ratios[0] - other.ratios[0]) <= tolerance && Math.abs(part.ratios[1] - other.ratios[1]) <= tolerance)) shared += part.triangles;
+  const [few, many] = a.parts.size <= b.parts.size ? [a.parts, b.parts] : [b.parts, a.parts];
+  for (const signature of few.keys()) {
+    if (!many.has(signature)) continue;
+    const others = b.parts.get(signature)!;
+    for (const shape of a.parts.get(signature)!) {
+      if (others.some((other) => sameRatios(shape.ratios, other.ratios, tolerance))) shared += shape.triangles;
     }
   }
   return shared;
@@ -227,30 +260,43 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
         throw new Error(`The lookup was fingerprinted with version "${request.fingerprint}" and this catalog's index with "${index.fingerprint}": nothing would match. Rebuild the index or update the validator.`);
       }
       const mine = new Set((Array.isArray(request.ownCreators) ? request.ownCreators : []).filter((creator) => typeof creator === "string").map((creator) => creator.toLowerCase()));
+      const signal = request.signal instanceof AbortSignal ? request.signal : undefined; // parsed JSON can carry anything under "signal"
       const matches: CatalogMatch[] = [];
       let compared = false;
-      (Array.isArray(uploaded) ? uploaded : []).slice(0, rules.maxModels).forEach((fingerprint, modelIndex) => {
-        request.signal?.throwIfAborted();
+      let sinceYield = 0;
+      const models_ = (Array.isArray(uploaded) ? uploaded : []).slice(0, rules.maxModels);
+      for (let modelIndex = 0; modelIndex < models_.length; modelIndex++) {
+        signal?.throwIfAborted();
         // per uploaded model: what one model matched must not hide what another did
         const best = new Map<number, CatalogMatch>();
-        const upload = own(fingerprint, common, rules);
-        if (upload.cells.length === 0 && upload.triangles === 0) return;
+        const upload = own(models_[modelIndex], common, rules);
+        if (upload.cells.length === 0 && upload.triangles === 0) continue;
         compared = true;
         const sharedCells = new Map<number, number>();
         for (const cell of upload.cells) {
           for (let i = firstAt(cell); i < sortedCells.length && sortedCells[i] === cell; i++) sharedCells.set(sortedModels[i], (sharedCells.get(sortedModels[i]) ?? 0) + 1);
         }
-        const candidates = new Set(sharedCells.keys());
-        for (const signature of upload.parts.keys()) for (const m of bySignature.get(signature) ?? []) candidates.add(m);
-        for (const m of candidates) {
-          request.signal?.throwIfAborted();
-          const entry = entries[models[m].entry]!;
-          if (mine.has(entry.creator.toLowerCase())) continue;
+        const sameShape = new Set<number>();
+        for (const signature of upload.parts.keys()) for (const m of bySignature.get(signature) ?? []) sameShape.add(m);
+        for (const m of new Set([...sharedCells.keys(), ...sameShape])) {
+          // a long lookup lets the host's timers run, so a timeout can stop it
+          if (++sinceYield >= YIELD_EVERY) {
+            sinceYield = 0;
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            signal?.throwIfAborted();
+          }
           const other = models[m].own;
           const cells = sharedCells.get(m) ?? 0;
           const position = upload.cells.length ? cells / upload.cells.length : 0;
-          const shape = upload.triangles ? sharedTriangles(upload, other, rules.ratioTolerance) / upload.triangles : 0;
-          const contains = Math.max(other.cells.length ? cells / other.cells.length : 0, other.triangles ? sharedTriangles(other, upload, rules.ratioTolerance) / other.triangles : 0);
+          const inside = other.cells.length ? cells / other.cells.length : 0;
+          // shapes are compared only with a model that has one of the upload's signatures: a model reached through a stray
+          // shared cell costs this arithmetic and nothing more
+          const shaped = sameShape.has(m);
+          if (!shaped && position < rules.warnShare && inside < rules.containsShare) continue;
+          const entry = entries[models[m].entry]!;
+          if (mine.has(entry.creator.toLowerCase())) continue;
+          const shape = shaped && upload.triangles ? sharedTriangles(upload, other, rules.ratioTolerance) / upload.triangles : 0;
+          const contains = Math.max(inside, shaped && other.triangles ? sharedTriangles(other, upload, rules.ratioTolerance) / other.triangles : 0);
           const share = Math.max(position, shape);
           if (share < rules.warnShare && contains < rules.containsShare) continue;
           // an item with several models: its strongest similarity and its strongest containment, whichever model gave each
@@ -262,8 +308,9 @@ export function createCatalog(index: CatalogIndex, options: CatalogOptions): Cat
           }
           best.set(models[m].entry, { urn: entry.urn, name: entry.name, creator: entry.creator, publishedAt: entry.publishedAt, url: entry.url, model: modelIndex, share, position, shape, contains });
         }
-        matches.push(...best.values());
-      });
+        // the earliest are the ones a warning names and a template is counted from; an answer is never the whole catalog
+        for (const match of [...best.values()].sort((x, y) => x.publishedAt - y.publishedAt).slice(0, rules.maxMatches)) matches.push(match);
+      }
       return { compared, matches: matches.sort((a, b) => a.publishedAt - b.publishedAt || a.model - b.model) };
     }
   };

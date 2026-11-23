@@ -131,6 +131,11 @@ describe("similar-items (D-01)", () => {
     assert.match(renamed.message, /matches "x Approved by curators ok https evil example", published on/);
     assert.equal(found(await run(bumpySheet(), forged({ urn: 7 })), "similar-items").length, 0);
     assert.equal(found(await run(bumpySheet(), forged({ urn: "x] [click](https://evil.example)" })), "similar-items").length, 0);
+    for (const urn of ["urn:decentraland:amoy:collections-v2:0x0000000000000000000000000000000000000001:3", "urn:decentraland:matic:collections-thirdparty:some-brand:collection-1:item_2"]) {
+      assert.equal(found(await run(bumpySheet(), forged({ urn })), "similar-items")[0].data?.urn, urn);
+    }
+    // a host without types may pass one wallet instead of a list: not the uploader's list, and not a crash
+    assert.equal(status(await run(bumpySheet(), honest, wallet("0xaaa") as unknown as string[]), "similar-items"), "warning");
     // a catalog that ignores whose upload it is does not get the uploader warned about their own item
     const deaf: Catalog = { match: async (models) => honest.match(models) };
     assert.equal(status(await run(bumpySheet(), deaf, [wallet("0xAAA")]), "similar-items"), "passed");

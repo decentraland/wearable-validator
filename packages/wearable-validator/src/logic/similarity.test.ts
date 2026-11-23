@@ -141,16 +141,50 @@ describe("catalog comparison", () => {
     await assert.rejects(catalog.match([sheet], { fingerprint: "0:grid1" }), /nothing would match/);
   });
 
-  it("compares a bounded number of parts per shape, stops when cancelled, and takes null for no request", async () => {
+  it("weighs repeated parts in full, whatever order the file lists them in", async () => {
+    const part = (signature: string, triangles: number, ratios: [number, number]) => ({ signature, triangles, kinds: 40, ratios });
+    // a body plus 500 identical sequins; the upload keeps the sequins and swaps the body
+    const sequins = Array.from({ length: 500 }, () => part("sequin", 60, [0.3, 0.1]));
+    const published = { cells: [], parts: [part("body", 2000, [0.5, 0.2]), ...sequins] };
+    const upload = { cells: [], parts: [part("other-body", 2000, [0.6, 0.3]), ...sequins] };
+    let catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [published])], common: none }, { rules });
+    let { matches } = await catalog.match([upload]);
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].share, 30_000 / 32_000);
+    assert.equal(matches[0].contains, 30_000 / 32_000);
+    // 80 spikes of one signature, each bent a little differently; the copy lists them backwards
+    const spikes = Array.from({ length: 80 }, (_, i) => part("spike", 60 + i, [0.1 + i * 0.05, 0.05 + i * 0.03]));
+    catalog = createCatalog({ fingerprint, entries: [entry(1, "0xa", [{ cells: [], parts: spikes }])], common: none }, { rules });
+    ({ matches } = await catalog.match([{ cells: [], parts: [...spikes].reverse() }]));
+    assert.equal(matches[0].share, 1);
+    assert.equal(matches[0].contains, 1);
+    // and a spike with other proportions is still another spike
+    ({ matches } = await catalog.match([{ cells: [], parts: spikes.map((spike) => ({ ...spike, ratios: [spike.ratios[0] + 0.025, spike.ratios[1]] as [number, number] })) }]));
+    assert.deepEqual(matches, []);
+  });
+
+  it("keeps a lookup short, cancellable and its answer bounded", async () => {
     const sheet = await print(bumpySheet());
-    const repeated = (n: number) => ({ cells: [], parts: Array.from({ length: n }, () => ({ ...sheet.parts[0], ratios: [9, 9] as [number, number] })) });
-    const catalog = createCatalog({ fingerprint, entries: Array.from({ length: 200 }, (_, n) => entry(n + 1, `0x${n}`, [repeated(200)])), common: none }, { rules });
+    const repeated = (n: number, ratios: [number, number]) => ({ cells: [], parts: Array.from({ length: n }, (_, i) => ({ ...sheet.parts[0], ratios: [ratios[0] + i, ratios[1]] as [number, number] })) });
+    // many catalog models and an upload that shares a signature with all of them but no proportions, plus one stray cell each
+    const crowd = Array.from({ length: 3_000 }, (_, n) => entry(n + 1, `0x${n}`, [{ cells: Array.from({ length: rules.minCells }, (_, c) => 1e9 + n * 100 + c), parts: repeated(40, [9, 9]).parts }]));
+    const catalog = createCatalog({ fingerprint, entries: crowd, common: none }, { rules });
+    const probe = { cells: crowd.map((_, n) => 1e9 + n * 100), parts: repeated(4_000, [5, 5]).parts };
     const started = Date.now();
-    assert.deepEqual((await catalog.match(Array.from({ length: rules.maxModels }, () => ({ ...repeated(4_000), parts: repeated(4_000).parts.map((part) => ({ ...part, ratios: [5, 5] as [number, number] })) })), null)).matches, []);
-    assert.ok(Date.now() - started < 2_000, `took ${Date.now() - started} ms`);
-    await assert.rejects(catalog.match([repeated(10)], { signal: AbortSignal.abort() }), /abort/i);
+    assert.deepEqual((await catalog.match(Array.from({ length: rules.maxModels }, () => probe), null)).matches, []);
+    assert.ok(Date.now() - started < 3_000, `took ${Date.now() - started} ms`);
+    // a timeout set by the host fires while the lookup runs
+    await assert.rejects(catalog.match(Array.from({ length: rules.maxModels }, () => probe), { signal: AbortSignal.timeout(1) }), /abort|timeout/i);
+    await assert.rejects(catalog.match([probe], { signal: AbortSignal.abort() }), /abort/i);
+    // anything else under "signal" is not a signal
+    assert.deepEqual((await catalog.match([sheet], { signal: {} } as unknown as { signal: AbortSignal })).matches, []);
     const invalid = { cells: [], parts: Array.from({ length: 50_000 }, () => null) } as unknown as ModelFingerprint;
     assert.deepEqual(await catalog.match([invalid], null), { compared: false, matches: [] });
+    // an upload that matches more items than maxMatches gets the earliest ones
+    const same = createCatalog({ fingerprint, entries: Array.from({ length: rules.maxMatches + 50 }, (_, n) => entry(n + 1, `0x${n}`, [sheet], t + 10_000 - n)), common: none }, { rules });
+    const answer = await same.match([sheet]);
+    assert.equal(answer.matches.length, rules.maxMatches);
+    assert.equal(answer.matches[0].publishedAt, t + 10_000 - (rules.maxMatches + 49));
   });
 
   it("refuses an index built under other numbers", () => {

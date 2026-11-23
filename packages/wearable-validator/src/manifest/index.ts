@@ -172,8 +172,10 @@ export interface Manifest {
     maxModels: number;
     /** Characters of a published item's name a warning quotes. */
     maxNameLength: number;
-    /** Parts with one signature compared per model: a real model repeats a part a handful of times. */
+    /** Different proportions kept per part signature in a model, largest first; copies with the same proportions are folded into one and keep their triangles. */
     maxPartsPerShape: number;
+    /** Published items a lookup reports per uploaded model, earliest first: enough to count a template (templateCreators) many times over. */
+    maxMatches: number;
     /** A published item's date (unix seconds) is believed from here on: 2020-01-01, before the first Polygon collection. The catalog holds Polygon collections only; an index builder leaves the 2019 Ethereum ones out. */
     earliestPublishedAt: number;
     /** How far past now a published item's date may be: clocks differ. */
