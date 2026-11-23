@@ -163,9 +163,10 @@ function own(model: ModelFingerprint, common: { cells: Set<number>; signatures: 
 }
 
 /**
- * What a lookup may spend comparing shapes: one unit per proportion cell it looks at. Past rules.maxLookupWork it stops
- * with an error. Only work an upload can inflate is on the budget (many proportions of one signature); walking the
- * catalog's own postings is not, and only counts toward the next pause.
+ * What a lookup may spend comparing shapes: one unit per proportion cell it looks at, so about the upload's parts times
+ * the catalog models that share a signature with it (many times more on near misses). Past rules.maxLookupWork it
+ * stops with an error. Walking the catalog's cell postings is not on the budget and only counts toward the next pause:
+ * its ceiling is the host's timeout.
  */
 interface Work {
   left: number;
@@ -175,7 +176,7 @@ interface Work {
 function spend(work: Work, units: number): void {
   work.left -= units;
   work.sinceYield += units;
-  if (work.left < 0) throw new Error("This model takes too much work to compare with published items: it repeats one part in too many different proportions.");
+  if (work.left < 0) throw new Error("This model takes too much work to compare with published items: it has too many parts, in too many proportions, that too many published items also have.");
 }
 
 /** Triangles of `a` in parts that `b` also has: same signature, same proportions (see ratioCell). Walks whichever has fewer signatures. */

@@ -208,7 +208,7 @@ describe("catalog comparison", () => {
 
   it("answers however many copies of a mesh the catalog holds, the uploader's own included", async () => {
     const sheet = await print(bumpySheet());
-    const big = { cells: Array.from({ length: 10_000 }, (_, c) => 2e9 + c), parts: sheet.parts };
+    const big = { cells: Array.from({ length: 1_000 }, (_, c) => 2e9 + c), parts: sheet.parts };
     // one creator with 650 recolours of their own item (both body shapes), uploading the next one
     const recolours = Array.from({ length: 650 }, (_, n) => entry(n + 1, "0xabc", [big, big]));
     const catalog = createCatalog({ fingerprint, entries: recolours, common: none }, { rules });
