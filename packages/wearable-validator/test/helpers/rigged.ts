@@ -29,8 +29,12 @@ export interface RiggedOptions {
   scale?: number;
   /** Extra joints past the avatar's 62, by name, each under the bone named (a spring or helper bone standing on its parent). `weights` can name them. */
   helpers?: Record<string, string>;
-  /** A second mesh node, "Band2", drawing the same band with the same skin: what Blender exports for two objects on one armature. */
-  secondMesh?: boolean;
+  /** More mesh nodes ("Band2", "Band3", …) that reuse the same mesh and skin: the same vertices drawn again. */
+  copies?: number;
+  /** A second mesh node, "Lining", with its own mesh (the same band, 1 cm behind) and, with "own-skin", its own skin listing the same joints: one skin per mesh, as some exporters write. */
+  secondMesh?: "shared-skin" | "own-skin";
+  /** Store the inverse bind matrices in an accessor of another type than MAT4: a damaged export. */
+  inverseBindType?: "VEC4";
   /** Keep only this many matrices in the inverse bind accessor: a skin with fewer matrices than joints. */
   inverseBindCount?: number;
   /** The joint number written for a vertex's first influence, replacing the one its weights name: -1 or a number past the joint list. */
@@ -143,8 +147,19 @@ export async function riggedGlb(options: RiggedOptions = {}): Promise<Uint8Array
     inverseBind.set(invert(bind.get(name)!)!, index * 16);
   });
   const kept = options.inverseBindCount === undefined ? inverseBind : inverseBind.slice(0, options.inverseBindCount * 16);
-  skin.setInverseBindMatrices(doc.createAccessor("inverse_bind").setType("MAT4").setArray(kept).setBuffer(buffer));
+  const inverseBindAccessor = doc.createAccessor("inverse_bind").setType(options.inverseBindType ?? "MAT4").setArray(kept).setBuffer(buffer);
+  skin.setInverseBindMatrices(inverseBindAccessor);
   meshNode.setSkin(skin);
-  if (options.secondMesh) scene.addChild(doc.createNode("Band2").setMesh(mesh).setSkin(skin));
+  for (let copy = 2; copy <= (options.copies ?? 1); copy++) scene.addChild(doc.createNode(`Band${copy}`).setMesh(mesh).setSkin(skin));
+  if (options.secondMesh) {
+    const behind = Float32Array.from(positions, (value, i) => (i % 3 === 2 ? value - 0.01 * scale : value));
+    const lining = prim.clone().setAttribute("POSITION", doc.createAccessor("POSITION_lining").setType("VEC3").setArray(behind).setBuffer(buffer));
+    let liningSkin = skin;
+    if (options.secondMesh === "own-skin") {
+      liningSkin = doc.createSkin("skin_lining").setInverseBindMatrices(inverseBindAccessor);
+      for (const name of order) liningSkin.addJoint(nodes.get(name)!);
+    }
+    scene.addChild(doc.createNode("Lining").setMesh(doc.createMesh("Lining").addPrimitive(lining)).setSkin(liningSkin));
+  }
   return io.writeBinary(doc);
 }

@@ -3,33 +3,10 @@
  * bones drive the mesh, and the file supplies weights, joint indices and inverse bind matrices. Bones are matched by
  * their position in the joint list, never by name. Shared by skin-deformation; the rig and the poses come from the manifest.
  */
-import type { Accessor, Document, Node, Skin } from "@gltf-transform/core";
+import type { Accessor, Document, Node, Primitive, Skin } from "@gltf-transform/core";
+import type { RigBone, SkinPose } from "../manifest/index.js";
 import { colliderNodes, IDENTITY, multiply } from "./gltf.js";
 import { readVec4 } from "./weights.js";
-
-/** One bone of the avatar's skeleton. The rig lists them in the order the avatar indexes them (AvatarBase.prefab). */
-export interface RigBone {
-  name: string;
-  /** null for the root bone. */
-  parent: string | null;
-  /** Column-major world matrix of the bone in the avatar's bind pose (a T-pose, metres, +Y up, facing +Z). */
-  bindMatrix: number[];
-}
-
-export interface PoseRotation {
-  bone: string;
-  /** Avatar-space axis the bone turns around, at its own joint. */
-  axis: "x" | "y" | "z";
-  degrees: number;
-}
-
-export interface SkinPose {
-  name: string;
-  /** Creator-facing words for the pose: "with the arms down". */
-  label: string;
-  /** Applied in order; a bone listed twice turns twice. */
-  rotations: PoseRotation[];
-}
 
 /** Every skinned vertex of a model in one soup, with the matrices that move it. */
 export interface SkinnedGeometry {
@@ -71,103 +48,144 @@ export interface SkinJoint {
   bindOffset: number[] | null;
 }
 
-/** Reads every skinned triangle mesh (colliders excluded) into one geometry. null when the model has no skinned mesh. */
-export function readSkinnedGeometry(doc: Document, rig: RigBone[]): SkinnedGeometry | null {
+/** One drawn piece of skinned geometry: a primitive under a skin. */
+interface SkinnedPrimitive {
+  node: string;
+  skin: Skin;
+  prim: Primitive;
+  weighted: boolean;
+}
+
+/**
+ * The skinned primitives a model draws (colliders excluded), each once. A skinned mesh ignores its node, so the same
+ * mesh and skin on another node, or another primitive made of the same accessors, draws the same vertices again:
+ * it is read once however many times the file repeats it.
+ */
+function skinnedPrimitives(doc: Document): SkinnedPrimitive[] | null {
   const colliders = colliderNodes(doc);
-  const joints: SkinJoint[] = [];
-  const positions: number[] = [];
-  const influences: number[] = [];
-  const weights: number[] = [];
-  const triangles: number[] = [];
-  const parts: SkinnedGeometry["parts"] = [];
-  const unweighted: string[] = [];
-  const ranges = new Map<Skin, { base: number; count: number }>();
-  let invalidInfluences = 0;
+  const ids = new Map<object, number>();
+  const idOf = (thing: object | null): number => {
+    if (thing === null) return -1;
+    let id = ids.get(thing);
+    if (id === undefined) {
+      id = ids.size;
+      ids.set(thing, id);
+    }
+    return id;
+  };
+  const seen = new Set<string>();
+  const out: SkinnedPrimitive[] = [];
   let skinned = false;
   for (const node of doc.getRoot().listNodes()) {
     const mesh = node.getMesh();
     const skin = node.getSkin();
     if (!mesh || !skin || colliders.has(node)) continue;
     skinned = true;
-    const range = ranges.get(skin) ?? readJoints(skin, rig, joints);
-    ranges.set(skin, range);
     const name = node.getName() || mesh.getName() || "mesh";
-    const start = positions.length / 3;
     for (const prim of mesh.listPrimitives()) {
       const position = prim.getAttribute("POSITION");
-      const j0 = prim.getAttribute("JOINTS_0");
-      const w0 = prim.getAttribute("WEIGHTS_0");
       if (!position) continue;
-      if (!j0 || !w0) {
-        if (!unweighted.includes(name)) unweighted.push(name);
-        continue;
-      }
-      const j1 = prim.getAttribute("JOINTS_1");
-      const w1 = prim.getAttribute("WEIGHTS_1");
-      const base = positions.length / 3;
-      const count = position.getCount();
-      const element = [0, 0, 0];
-      const jointElement = [0, 0, 0, 0];
-      for (let v = 0; v < count; v++) {
-        position.getElement(v, element);
-        positions.push(element[0], element[1], element[2]);
-        const pairs: [number, number][] = [];
-        let invalid = false;
-        const collect = (jointsAccessor: Accessor, weightsAccessor: Accessor): void => {
-          jointsAccessor.getElement(v, jointElement);
-          const w = readVec4(weightsAccessor, v);
-          for (let c = 0; c < 4; c++) {
-            if (!(w[c] > 0)) continue;
-            const joint = jointElement[c];
-            if (Number.isInteger(joint) && joint >= 0 && joint < range.count) pairs.push([range.base + joint, w[c]]);
-            else invalid = true;
-          }
-        };
-        collect(j0, w0);
-        if (j1 && w1) collect(j1, w1);
-        if (invalid) invalidInfluences++;
-        pairs.sort((a, b) => b[1] - a[1]);
-        const kept = pairs.slice(0, 4);
-        const sum = kept.reduce((total, pair) => total + pair[1], 0);
+      const attributes = ["JOINTS_0", "WEIGHTS_0", "JOINTS_1", "WEIGHTS_1"].map((semantic) => prim.getAttribute(semantic));
+      const key = [skin, position, ...attributes, prim.getIndices()].map(idOf).concat(prim.getMode()).join(",");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ node: name, skin, prim, weighted: attributes[0] !== null && attributes[1] !== null });
+    }
+  }
+  return skinned ? out : null;
+}
+
+/** How many skinned vertices the model draws, without reading them: what the check compares with its limit before measuring. null when the model has no skinned mesh. */
+export function countSkinnedVertices(doc: Document): number | null {
+  const primitives = skinnedPrimitives(doc);
+  if (!primitives) return null;
+  let count = 0;
+  for (const { prim, weighted } of primitives) if (weighted) count += prim.getAttribute("POSITION")!.getCount();
+  return count;
+}
+
+/** Reads every skinned triangle mesh (colliders excluded) into one geometry. null when the model has no skinned mesh. */
+export function readSkinnedGeometry(doc: Document, rig: RigBone[]): SkinnedGeometry | null {
+  const primitives = skinnedPrimitives(doc);
+  if (!primitives) return null;
+  let total = 0;
+  for (const { prim, weighted } of primitives) if (weighted) total += prim.getAttribute("POSITION")!.getCount();
+  const positions = new Float32Array(total * 3);
+  const influences = new Uint32Array(total * 4);
+  const weights = new Float32Array(total * 4);
+  const triangles: number[] = [];
+  const joints: SkinJoint[] = [];
+  const parts: SkinnedGeometry["parts"] = [];
+  const unweighted = new Set<string>();
+  const ranges = new Map<Skin, { base: number; count: number }>();
+  let invalidInfluences = 0;
+  let next = 0;
+  const element = [0, 0, 0];
+  const jointElement = [0, 0, 0, 0];
+  for (const { node, skin, prim, weighted } of primitives) {
+    if (!weighted) {
+      unweighted.add(node);
+      continue;
+    }
+    const range = ranges.get(skin) ?? readJoints(skin, rig, joints);
+    ranges.set(skin, range);
+    const position = prim.getAttribute("POSITION")!;
+    const sets: [Accessor, Accessor][] = [[prim.getAttribute("JOINTS_0")!, prim.getAttribute("WEIGHTS_0")!]];
+    const j1 = prim.getAttribute("JOINTS_1");
+    const w1 = prim.getAttribute("WEIGHTS_1");
+    if (j1 && w1) sets.push([j1, w1]);
+    const base = next;
+    const count = position.getCount();
+    for (let v = 0; v < count; v++) {
+      position.getElement(v, element);
+      positions.set(element, next * 3);
+      const pairs: [number, number][] = [];
+      let invalid = false;
+      for (const [jointsAccessor, weightsAccessor] of sets) {
+        jointsAccessor.getElement(v, jointElement);
+        const w = readVec4(weightsAccessor, v);
         for (let c = 0; c < 4; c++) {
-          influences.push(kept[c]?.[0] ?? range.base);
-          weights.push(kept[c] && sum > 0 ? kept[c][1] / sum : 0);
+          if (!(w[c] > 0)) continue;
+          const joint = jointElement[c];
+          if (Number.isInteger(joint) && joint >= 0 && joint < range.count) pairs.push([range.base + joint, w[c]]);
+          else invalid = true;
         }
       }
-      if (prim.getMode() !== 4) continue;
-      const indices = prim.getIndices();
-      const indexCount = indices ? indices.getCount() : count;
-      for (let i = 0; i + 2 < indexCount; i += 3) {
-        const a = indices ? indices.getScalar(i) : i;
-        const b = indices ? indices.getScalar(i + 1) : i + 1;
-        const c = indices ? indices.getScalar(i + 2) : i + 2;
-        if (a >= 0 && b >= 0 && c >= 0 && a < count && b < count && c < count) triangles.push(base + a, base + b, base + c);
+      if (invalid) invalidInfluences++;
+      pairs.sort((a, b) => b[1] - a[1]);
+      let sum = 0;
+      for (let c = 0; c < 4 && c < pairs.length; c++) sum += pairs[c][1];
+      for (let c = 0; c < 4; c++) {
+        influences[next * 4 + c] = pairs[c]?.[0] ?? range.base;
+        weights[next * 4 + c] = pairs[c] && sum > 0 ? pairs[c][1] / sum : 0;
       }
+      next++;
     }
-    const end = positions.length / 3;
-    if (end > start) parts.push({ node: name, start, end });
+    const last = parts[parts.length - 1];
+    if (last && last.node === node && last.end === base) last.end = next;
+    else if (next > base) parts.push({ node, start: base, end: next });
+    if (prim.getMode() !== 4) continue;
+    const indices = prim.getIndices();
+    const indexCount = indices ? indices.getCount() : count;
+    for (let i = 0; i + 2 < indexCount; i += 3) {
+      const a = indices ? indices.getScalar(i) : i;
+      const b = indices ? indices.getScalar(i + 1) : i + 1;
+      const c = indices ? indices.getScalar(i + 2) : i + 2;
+      if (a >= 0 && b >= 0 && c >= 0 && a < count && b < count && c < count) triangles.push(base + a, base + b, base + c);
+    }
   }
-  if (!skinned) return null;
-  return {
-    vertexCount: positions.length / 3,
-    positions: new Float32Array(positions),
-    influences: new Uint32Array(influences),
-    weights: new Float32Array(weights),
-    triangles: new Uint32Array(triangles),
-    joints,
-    parts,
-    invalidInfluences,
-    unweighted
-  };
+  return { vertexCount: total, positions, influences, weights, triangles: new Uint32Array(triangles), joints, parts, invalidInfluences, unweighted: [...unweighted] };
 }
 
 /** Appends one skin's joints and returns where they sit. */
 function readJoints(skin: Skin, rig: RigBone[], joints: SkinJoint[]): { base: number; count: number } {
   const base = joints.length;
   const inverseBind = skin.getInverseBindMatrices();
-  const stored = inverseBind ? inverseBind.getCount() : 0;
+  // an accessor of another type holds no matrices to read
+  const stored = inverseBind && inverseBind.getType() === "MAT4" ? inverseBind.getCount() : 0;
   const skinJoints = skin.listJoints();
-  const slotOf = new Map(skinJoints.slice(0, rig.length).map((joint, index) => [joint, index]));
+  // the rig slot that carries each node; helper chains ask their parent, so every node is answered once
+  const slotOf = new Map<Node, number | null>(skinJoints.slice(0, rig.length).map((joint, index) => [joint, index]));
   skinJoints.forEach((joint, index) => {
     if (index >= rig.length) {
       const slot = rigAncestor(joint, slotOf);
@@ -176,19 +194,28 @@ function readJoints(skin: Skin, rig: RigBone[], joints: SkinJoint[]): { base: nu
       return;
     }
     // a joint the accessor has no matrix for, or an unreadable one, is bound at the origin, as glTF reads a skin without matrices
-    const read = index < stored ? inverseBind!.getElement(index, new Array<number>(16)) : IDENTITY;
+    const read = index < stored ? inverseBind!.getElement(index, new Array<number>(16).fill(NaN)) : IDENTITY;
     const inverse = read.every((value) => Number.isFinite(value)) ? read : IDENTITY;
     joints.push({ name: joint.getName(), carrier: rig[index].name, slot: index, bindOffset: multiply(rig[index].bindMatrix, inverse) });
   });
   return { base, count: skinJoints.length };
 }
 
-function rigAncestor(joint: Node, slotOf: Map<Node, number>): number | null {
+/** The rig slot of the nearest ancestor that has one. Every node on the way up remembers the answer. */
+function rigAncestor(joint: Node, slotOf: Map<Node, number | null>): number | null {
+  const walked: Node[] = [];
+  let slot: number | null = null;
   for (let parent = joint.getParentNode(); parent; parent = parent.getParentNode()) {
-    const slot = slotOf.get(parent);
-    if (slot !== undefined) return slot;
+    const known = slotOf.get(parent);
+    if (known !== undefined) {
+      slot = known;
+      break;
+    }
+    walked.push(parent);
   }
-  return null;
+  for (const node of walked) slotOf.set(node, slot);
+  slotOf.set(joint, slot);
+  return slot;
 }
 
 /**

@@ -5,7 +5,7 @@ import { cleanWeights, riggedGlb } from "#test/helpers/rigged.js";
 import { syntheticGlb } from "#test/helpers/synthetic.js";
 import { transformPoint } from "./gltf.js";
 import { manifest } from "../manifest/index.js";
-import { poseDeltas, readSkinnedGeometry, skinPositions } from "./skinning.js";
+import { countSkinnedVertices, poseDeltas, readSkinnedGeometry, skinPositions } from "./skinning.js";
 
 const { rig, poses } = manifest.skinDeformation;
 const pose = (name: string) => poses.find((p) => p.name === name)!;
@@ -89,11 +89,38 @@ describe("skinning", () => {
   });
 
   it("reads a skin's joints once when two meshes share it", async () => {
-    const doc = await new WebIO().readBinary(await riggedGlb({ secondMesh: true }));
+    const doc = await new WebIO().readBinary(await riggedGlb({ secondMesh: "shared-skin" }));
     const geometry = readSkinnedGeometry(doc, rig)!;
     assert.equal(geometry.joints.length, rig.length);
     assert.equal(geometry.vertexCount, 2 * 49 * 9);
-    assert.deepEqual(geometry.parts.map((part) => part.node), ["Band", "Band2"]);
+    assert.deepEqual(geometry.parts.map((part) => part.node), ["Band", "Lining"]);
+  });
+
+  it("reads a mesh once however many nodes draw it with the same skin", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ copies: 300 }));
+    assert.equal(countSkinnedVertices(doc), 49 * 9);
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.vertexCount, 49 * 9);
+    assert.equal(geometry.triangles.length, 48 * 8 * 2 * 3);
+    assert.deepEqual(geometry.parts, [{ node: "Band", start: 0, end: 49 * 9 }]);
+  });
+
+  it("binds every joint at the origin when the inverse bind accessor does not hold matrices", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ inverseBindType: "VEC4" }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    for (const joint of geometry.joints) assert.ok(joint.bindOffset!.every((value) => Number.isFinite(value)), joint.name);
+    assert.deepEqual(geometry.joints[0].bindOffset, rig[0].bindMatrix);
+  });
+
+  it("answers a long chain of helper joints without walking it once per joint", async () => {
+    const helpers: Record<string, string> = {};
+    for (let i = 0; i < 4000; i++) helpers[`Chain_${i}`] = i === 0 ? "Avatar_Spine2" : `Chain_${i - 1}`;
+    const doc = await new WebIO().readBinary(await riggedGlb({ helpers }));
+    const started = performance.now();
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.ok(performance.now() - started < 5000, "reading the joints took over 5 s");
+    assert.equal(geometry.joints.length, rig.length + 4000);
+    assert.equal(geometry.joints[geometry.joints.length - 1].carrier, "Avatar_Spine2");
   });
 
   it("a joint past the rig's length is carried by the rig bone above it, with that bone's bind offset", async () => {

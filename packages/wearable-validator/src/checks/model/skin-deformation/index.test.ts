@@ -1,7 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { validate, manifest } from "../../../index.js";
-import { measureGeometry } from "./index.js";
+import { parseModel } from "../../../logic/gltf.js";
+import type { CheckContext } from "../../../types.js";
+import { measureGeometry, skinDeformation } from "./index.js";
 import { found, status } from "#test/helpers/findings.js";
 import { cleanWeights, riggedGlb, type RiggedOptions } from "#test/helpers/rigged.js";
 import { syntheticGlb, syntheticZip } from "#test/helpers/synthetic.js";
@@ -67,11 +69,13 @@ describe("skin-deformation (M-17)", () => {
       assert.deepEqual(signals(findings), ["error:joint-order"]);
       assert.equal(status(result, "skin-deformation"), "failed");
       const [found] = findings;
+      // it names the misplaced joint that carries the most weight: one of the arms the band is painted to
       const sorted = alphabetical(config.rig.map((bone) => bone.name));
-      const position = sorted.findIndex((name, index) => name !== config.rig[index].name);
-      assert.equal(found.data?.position, position);
-      assert.equal(found.data?.bone, sorted[position]);
+      const position = found.data?.position as number;
+      assert.ok(["Avatar_LeftArm", "Avatar_RightArm"].includes(found.data?.bone as string));
+      assert.equal(sorted[position], found.data?.bone);
       assert.equal(found.data?.expected, config.rig[position].name);
+      assert.notEqual(found.data?.expected, found.data?.bone);
       assert.equal(found.limit, config.jointOrder.errorShare);
       assert.ok((found.measured as number) >= config.jointOrder.errorShare);
       assert.ok((found.data?.offsetMeters as number) > config.bindPoseToleranceMeters);
@@ -119,6 +123,44 @@ describe("skin-deformation (M-17)", () => {
       assert.ok((findings[0].measured as number) >= config.jointOrder.errorShare);
     });
 
+    it("errors on a rigid item that is all on one misplaced joint, and gives no head advice", async () => {
+      // a hat painted entirely to Avatar_Head, in a file that lists its joints alphabetically: in-world another bone carries it
+      const { findings } = await run({ jointOrder: (names) => [...names].sort(), weights: () => ({ Avatar_Head: 1 }) }, "hat");
+      assert.deepEqual(signals(findings), ["error:joint-order"]);
+      assert.equal(findings[0].measured, 1);
+      assert.equal(findings[0].data?.bone, "Avatar_Head");
+      assert.equal(findings[0].data?.vertices, 441);
+    });
+
+    it("errors when two neighbouring bones are swapped and the mesh is all on one of them", async () => {
+      const swapSpine = (names: string[]): string[] => names.map((name) => (name === "Avatar_Spine1" ? "Avatar_Spine2" : name === "Avatar_Spine2" ? "Avatar_Spine1" : name));
+      const { findings } = await run({ jointOrder: swapSpine, weights: () => ({ Avatar_Spine2: 1 }) });
+      assert.deepEqual(signals(findings), ["error:joint-order"]);
+      assert.equal(findings[0].data?.joints, 2);
+      assert.equal(findings[0].data?.expected, "Avatar_Spine1");
+    });
+
+    it("leaves misplaced joints that carry no weight out of it: a bind-pose error stays a bind-pose error", async () => {
+      // the left hand is bound 0.1 m off and carries 6% of the vertices; two fingertips nothing is painted to are swapped
+      const swapTips = (names: string[]): string[] => names.map((name) => (name === "Avatar_LeftHandPinky4" ? "Avatar_LeftHandRing4" : name === "Avatar_LeftHandRing4" ? "Avatar_LeftHandPinky4" : name));
+      const { findings } = await run({
+        jointOrder: swapTips,
+        bindMatrix: (bone, avatar) => (bone === "Avatar_LeftHand" ? avatar.map((value, i) => (i === 13 ? value + 0.1 : value)) : avatar),
+        weights: (x) => (x > 0.54 ? { Avatar_LeftHand: 1 } : undefined)
+      });
+      assert.deepEqual(signals(findings), ["error:bind-pose"]);
+      assert.equal(findings[0].data?.vertices, 27);
+    });
+
+    it("reports both when a file has misplaced joints and, apart from them, another skeleton", async () => {
+      const { findings } = await run({
+        jointOrder: swapTail,
+        bindMatrix: (bone, avatar) => (bone === "Avatar_LeftArm" ? avatar.map((value, i) => (i === 13 ? value + 0.2 : value)) : avatar),
+        weights: (x) => (x < -0.4 ? { Avatar_Head: 1 } : undefined)
+      });
+      assert.deepEqual(signals(findings), ["error:joint-order", "error:bind-pose"]);
+    });
+
     it("does not call it joint order when the names are another rig's: skeleton (M-09) reports those", async () => {
       // the right order, other names, other proportions: bind pose is the cause, not order
       const { findings } = await run({
@@ -131,9 +173,11 @@ describe("skin-deformation (M-17)", () => {
     it("counts a skin once however many meshes use it", async () => {
       const sorted = [...config.rig.map((bone) => bone.name)].sort();
       const out = sorted.filter((name, index) => name !== config.rig[index].name).length;
-      const { findings } = await run({ jointOrder: (names) => [...names].sort(), secondMesh: true });
-      assert.deepEqual(signals(findings), ["error:joint-order"]);
-      assert.equal(findings[0].data?.joints, out);
+      for (const secondMesh of ["shared-skin", "own-skin"] as const) {
+        const { findings } = await run({ jointOrder: (names) => [...names].sort(), secondMesh });
+        assert.deepEqual(signals(findings), ["error:joint-order"], secondMesh);
+        assert.equal(findings[0].data?.joints, out, secondMesh);
+      }
     });
   });
 
@@ -168,6 +212,11 @@ describe("skin-deformation (M-17)", () => {
       assert.equal(status(result, "skin-deformation"), "failed");
     });
 
+    it("errors when the inverse bind accessor does not hold matrices, instead of passing on NaN", async () => {
+      const { findings } = await run({ inverseBindType: "VEC4" });
+      assert.deepEqual(signals(findings), ["error:bind-pose"]);
+    });
+
     it("errors when the skin has fewer inverse bind matrices than joints", async () => {
       // the arms' joints have no matrix: they are bound at the origin, far from where the avatar's arms stand
       const { findings } = await run({ inverseBindCount: 12 });
@@ -180,6 +229,31 @@ describe("skin-deformation (M-17)", () => {
       assert.deepEqual(findings[0].data?.meshes, ["Band"]);
       assert.match(findings[0].message, /"Band" is a skinned mesh without joints or weights/);
       assert.equal(status(result, "skin-deformation"), "warning");
+    });
+  });
+
+  describe("the vertex limit", () => {
+    const small = { ...manifest, skinDeformation: { ...config, maxVertices: 100 } };
+
+    it("skips a model over the limit with a reason, without measuring it", async () => {
+      const { doc } = await parseModel(await riggedGlb());
+      const context = { models: [{ doc, mainFile: "model.glb" }], manifest: small, category: "upper_body" } as unknown as CheckContext;
+      const execution = await skinDeformation.run(context);
+      assert.ok(!Array.isArray(execution));
+      assert.equal(execution.status, "skipped");
+      assert.equal(execution.coverage, "missing");
+      assert.deepEqual(execution.findings, []);
+      assert.match(execution.reason ?? "", /"model.glb" has 441 skinned vertices — skin deformation is measured up to 100\./);
+      assert.equal(skinDeformation.measure?.(context), "441 skinned vertices, not measured");
+    });
+
+    it("does not count a mesh drawn by many nodes more than once", async () => {
+      const result = await validate(await syntheticZip({ glb: await riggedGlb({ copies: 1000 }), category: "upper_body" }), { checks: ["skin-deformation"] });
+      assert.equal(status(result, "skin-deformation"), "passed");
+    });
+
+    it("the limit leaves room for every real item", () => {
+      assert.ok(config.maxVertices >= 10 * 9942, "the largest skin of the calibration set has 9,942 vertices");
     });
   });
 

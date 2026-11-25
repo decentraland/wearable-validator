@@ -1,5 +1,28 @@
-import type { RigBone, SkinPose } from "../logic/skinning.js";
 import manifestJson from "./manifest.json" with { type: "json" };
+
+/** One bone of the avatar's skeleton. The rig lists them in the order the avatar indexes them (AvatarBase.prefab). */
+export interface RigBone {
+  name: string;
+  /** null for the root bone. */
+  parent: string | null;
+  /** Column-major world matrix of the bone in the avatar's bind pose (a T-pose, metres, +Y up, facing +Z). */
+  bindMatrix: number[];
+}
+
+export interface PoseRotation {
+  bone: string;
+  /** Avatar-space axis the bone turns around, at its own joint. */
+  axis: "x" | "y" | "z";
+  degrees: number;
+}
+
+export interface SkinPose {
+  name: string;
+  /** Creator-facing words for the pose: "with the arms down". */
+  label: string;
+  /** Applied in order; a bone listed twice turns twice. */
+  rotations: PoseRotation[];
+}
 
 export interface Manifest {
   version: string;
@@ -137,19 +160,26 @@ export interface Manifest {
      */
     rig: RigBone[];
     /**
-     * How far a vertex may sit from where its mesh's main bone would put it before the mesh counts as distorted. 2 of
-     * 516 approved models are over it, both because their joints are in another order (one long-sleeve top, one token
-     * earring of 28 vertices); every other approved model moves no vertex by 0.0005 m. An armature scaled as a whole
-     * moves everything together and is not distortion.
+     * Skinned vertices the rule measures, each drawn piece counted once. Above it the check is skipped with a reason
+     * instead of measured: the work grows with the vertex count, and the largest skin of the calibration set has
+     * 9,942. A model this large is far over every triangle limit and fails triangle-count on its own.
+     */
+    maxVertices: number;
+    /**
+     * How far a vertex on joints that are in place may sit from where the mesh as a whole lands before the binding
+     * counts as distorted. No approved model moves such a vertex by 0.0005 m. An armature scaled as a whole moves
+     * everything together and is not distortion.
      */
     bindPoseToleranceMeters: number;
+    /** Two joints carry the same bind offset when every entry of their offset matrices agrees to this (matrix units, metres for the position). */
+    offsetMatchMeters: number;
     /**
-     * A file whose joints are in another order moves only the vertices weighted to the misplaced joints. At
+     * A file whose joints are in another order moves the vertices weighted to the misplaced joints, and those are
+     * the ones counted, whatever share of the weight they carry (a rigid item all on one misplaced joint is 100%). At
      * errorShare of the mesh's vertices or more it fails; under it, it warns. In the calibration set the four real
-     * cases are at 2.4% (a 28-vertex token earring beside a 1,131-vertex staff that is fine), 43%, 57% and 71%, the
-     * last three all visibly deformed in the client. Giving 506 clean approved models that other order moves vertices
-     * on 385 of them: 365 (95%) are at 10% or more, 20 are under it (14 under 5%), mostly a small part beside a
-     * larger one that keeps its place.
+     * cases are at 2.4% (a 28-vertex token earring beside a 1,131-vertex staff that is fine), 44%, 55% and 57%, the
+     * last three all visibly deformed in the client. Giving 506 clean approved models that other order puts vertices
+     * on misplaced joints in 501 of them: 499 are at 10% or more (three quarters at 100%), 2 are under it.
      */
     jointOrder: { errorShare: number };
     /** Standard poses the skeleton is put into. `local` poses move the arms, head or torso; the others move the legs, where skirts and gowns stretch by design. */
