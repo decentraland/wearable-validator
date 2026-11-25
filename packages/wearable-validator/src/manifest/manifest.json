@@ -334,8 +334,9 @@
   },
   "skinDeformation": {
     "bindPoseToleranceMeters": 0.01,
+    "jointOrder": { "errorShare": 0.1 },
     "stretch": { "minRatio": 2, "localGrowthMeters": 0.15, "localMinEdges": 3, "grossGrowthMeters": 0.15, "grossEdgeShare": 0.02 },
-    "symmetry": { "mirrorToleranceMeters": 0.004, "centreBandMeters": 0.01, "minVertices": 50, "minMirroredShare": 0.8, "minWeightDifference": 0.99, "warnShare": 0.05, "errorShare": 0.25 },
+    "symmetry": { "mirrorToleranceMeters": 0.004, "centreBandMeters": 0.01, "minVertices": 50, "minMirroredShare": 0.8, "minWeightDifference": 0.99, "maxCellVertices": 16, "warnShare": 0.05, "errorShare": 0.25 },
     "headFollow": { "bone": "Avatar_Head", "categories": ["hat", "helmet", "mask", "eyewear", "hair", "facial_hair"], "minWeightShare": 0.5 },
     "poses": [
       { "name": "arms-down", "label": "with the arms down at the sides", "local": true, "rotations": [{ "bone": "Avatar_LeftArm", "axis": "z", "degrees": -75 }, { "bone": "Avatar_RightArm", "axis": "z", "degrees": 75 }] },

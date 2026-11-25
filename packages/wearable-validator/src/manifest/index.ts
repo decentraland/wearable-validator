@@ -143,6 +143,15 @@ export interface Manifest {
      * moves everything together and is not distortion.
      */
     bindPoseToleranceMeters: number;
+    /**
+     * A file whose joints are in another order moves only the vertices weighted to the misplaced joints. At
+     * errorShare of the mesh's vertices or more it fails; under it, it warns. In the calibration set the four real
+     * cases are at 2.4% (a 28-vertex token earring beside a 1,131-vertex staff that is fine), 43%, 57% and 71%, the
+     * last three all visibly deformed in the client. Giving 506 clean approved models that other order moves vertices
+     * on 385 of them: 365 (95%) are at 10% or more, 20 are under it (14 under 5%), mostly a small part beside a
+     * larger one that keeps its place.
+     */
+    jointOrder: { errorShare: number };
     /** Standard poses the skeleton is put into. `local` poses move the arms, head or torso; the others move the legs, where skirts and gowns stretch by design. */
     poses: (SkinPose & { local: boolean })[];
     stretch: {
@@ -170,8 +179,15 @@ export interface Manifest {
     symmetry: {
       mirrorToleranceMeters: number; centreBandMeters: number; minVertices: number; minMirroredShare: number;
       minWeightDifference: number; warnShare: number; errorShare: number;
+      /** Vertices one cell of the mirror search keeps (cells are mirrorToleranceMeters wide). It bounds the search on a file with thousands of vertices stacked on one point; no model of the calibration set changes its result at 16. */
+      maxCellVertices: number;
     };
-    /** Items worn on the head: less than minWeightShare of their weight on the head bone (or bones under it) warns. Approved items in these categories carry at least 57%, except 3 of 145 that are not head pieces at all. */
+    /**
+     * Items worn on the head: less than minWeightShare of their weight on the head bone (or bones under it) warns.
+     * Approved items in these categories carry at least 57%, except 3 of 145 that are not head pieces at all.
+     * earring, tiara and top_head are left out on purpose: approved items there are often worn elsewhere (wings,
+     * tails, staffs, halos), with as little as 0% on the head.
+     */
     headFollow: { bone: string; categories: string[]; minWeightShare: number };
   };
   /** V-01: how much of a capture must be something drawn. */

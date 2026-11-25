@@ -83,9 +83,43 @@ describe("skinning", () => {
     const geometry = readSkinnedGeometry(doc, rig)!;
     assert.equal(geometry.joints[0].name, rig[rig.length - 1].name);
     assert.equal(geometry.joints[0].carrier, rig[0].name);
-    assert.deepEqual(geometry.skinStarts, [0]);
+    assert.equal(geometry.joints[0].slot, 0);
     // bound to its own bone's pose but moved by another: the bind offset is no longer the identity
     assert.ok(Math.abs(geometry.joints[0].bindOffset![13]) > 0.1);
+  });
+
+  it("reads a skin's joints once when two meshes share it", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ secondMesh: true }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.joints.length, rig.length);
+    assert.equal(geometry.vertexCount, 2 * 49 * 9);
+    assert.deepEqual(geometry.parts.map((part) => part.node), ["Band", "Band2"]);
+  });
+
+  it("a joint past the rig's length is carried by the rig bone above it, with that bone's bind offset", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ helpers: { Tail_springbone: "Avatar_LeftArm" }, scale: 2 }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    const helper = geometry.joints[rig.length];
+    const arm = geometry.joints.find((joint) => joint.name === "Avatar_LeftArm")!;
+    assert.equal(helper.name, "Tail_springbone");
+    assert.equal(helper.slot, null);
+    assert.equal(helper.carrier, "Avatar_LeftArm");
+    assert.equal(helper.bindOffset, arm.bindOffset);
+    near(arm.bindOffset![0], 0.5);
+  });
+
+  it("counts vertices weighted to a joint number the skin does not have, and drops that weight", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ rawJoint: (x) => (x === 0 ? -1 : x === 0.6 ? 999 : undefined) }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.invalidInfluences, 18);
+    assert.doesNotThrow(() => skinPositions(geometry, poseDeltas(rig, pose("arms-down"))));
+  });
+
+  it("names skinned meshes that carry no joints or weights", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ noWeights: true }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.vertexCount, 0);
+    assert.deepEqual(geometry.unweighted, ["Band"]);
   });
 
   it("returns null for a model without a skinned mesh", async () => {
