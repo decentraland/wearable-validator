@@ -1,5 +1,29 @@
 import manifestJson from "./manifest.json" with { type: "json" };
 
+/** One bone of the avatar's skeleton. The rig lists them in the order the avatar indexes them (AvatarBase.prefab). */
+export interface RigBone {
+  name: string;
+  /** null for the root bone. */
+  parent: string | null;
+  /** Column-major world matrix of the bone in the avatar's bind pose (a T-pose, metres, +Y up, facing +Z). */
+  bindMatrix: number[];
+}
+
+export interface PoseRotation {
+  bone: string;
+  /** Avatar-space axis the bone turns around, at its own joint. */
+  axis: "x" | "y" | "z";
+  degrees: number;
+}
+
+export interface SkinPose {
+  name: string;
+  /** Creator-facing words for the pose: "with the arms down". */
+  label: string;
+  /** Applied in order; a bone listed twice turns twice. */
+  rotations: PoseRotation[];
+}
+
 export interface Manifest {
   version: string;
   triangles: {
@@ -121,6 +145,80 @@ export interface Manifest {
      * coats and costumes curators accepted. Listing categories here turns it on; nothing else changes.
      */
     fittedCategories: string[];
+  };
+  /**
+   * M-17: how a skinned mesh deforms on the avatar, measured from the file alone. Calibrated on 516 curator-approved
+   * models (Nov 2026); each number names how many of them it flags.
+   */
+  skinDeformation: {
+    /**
+     * The avatar's skeleton in its bind pose (a T-pose), in the order the client indexes its bones (unity-explorer,
+     * AvatarBase.prefab, the SkinnedMeshRenderer's bones). The client moves joint i of a file with bone i of this
+     * list, whatever the joint is called, through the file's own inverse bind matrix. 670 of 678 skins in the
+     * calibration set list their first 62 joints in exactly this order, and every approved model is bound to these
+     * matrices to four decimals. Reordering this list changes the rule.
+     */
+    rig: RigBone[];
+    /**
+     * Skinned vertices the rule measures, each drawn piece counted once. Above it the check is skipped with a reason
+     * instead of measured: the work grows with the vertex count, and the largest skin of the calibration set has
+     * 9,942. A model this large is far over every triangle limit and fails triangle-count on its own.
+     */
+    maxVertices: number;
+    /**
+     * How far a vertex on joints that are in place may sit from where the mesh as a whole lands before the binding
+     * counts as distorted. No approved model moves such a vertex by 0.0005 m. An armature scaled as a whole moves
+     * everything together and is not distortion.
+     */
+    bindPoseToleranceMeters: number;
+    /** Two joints carry the same bind offset when every entry of their offset matrices agrees to this (matrix units, metres for the position). */
+    offsetMatchMeters: number;
+    /**
+     * A file whose joints are in another order moves the vertices weighted to the misplaced joints, and those are
+     * the ones counted, whatever share of the weight they carry (a rigid item all on one misplaced joint is 100%). At
+     * errorShare of the mesh's vertices or more it fails; under it, it warns. In the calibration set the four real
+     * cases are at 2.4% (a 28-vertex token earring beside a 1,131-vertex staff that is fine), 44%, 55% and 57%, the
+     * last three all visibly deformed in the client. Giving 506 clean approved models that other order puts vertices
+     * on misplaced joints in 501 of them: 499 are at 10% or more (three quarters at 100%), 2 are under it.
+     */
+    jointOrder: { errorShare: number };
+    /** Standard poses the skeleton is put into. `local` poses move the arms, head or torso; the others move the legs, where skirts and gowns stretch by design. */
+    poses: (SkinPose & { local: boolean })[];
+    stretch: {
+      /** An edge counts as stretched only when it also grows to at least this many times its bind-pose length. */
+      minRatio: number;
+      /** In a local pose, this many edges (localMinEdges) growing by at least localGrowthMeters warn: 3 of 516 approved models, three skins built on one body mesh, one of which a curator had sent back for it. */
+      localGrowthMeters: number;
+      localMinEdges: number;
+      /**
+       * This share of all edges (grossEdgeShare) growing by at least grossGrowthMeters fails in a local pose (the most on
+       * 516 approved models is 1.05%, and only 3 are above 0) and warns in a leg pose (the most is 1.75%: gowns and
+       * strapped trousers in a running stride).
+       */
+      grossGrowthMeters: number;
+      grossEdgeShare: number;
+    };
+    /**
+     * Weights on a mirror-symmetric mesh. A vertex has a mirror when another sits within mirrorToleranceMeters of its
+     * reflection; vertices within centreBandMeters of the centre plane are their own mirror and are left out. A mesh
+     * is symmetric when it has at least minVertices off-centre vertices and minMirroredShare of them have a mirror.
+     * A pair differs when their weights, bone for mirrored bone, differ by at least minWeightDifference in total (2 =
+     * nothing in common). 320 of 516 approved models are symmetric: 1 has more than warnShare of pairs differing
+     * (14.7%, the next is 0.4%), so errorShare is never reached.
+     */
+    symmetry: {
+      mirrorToleranceMeters: number; centreBandMeters: number; minVertices: number; minMirroredShare: number;
+      minWeightDifference: number; warnShare: number; errorShare: number;
+      /** Vertices one cell of the mirror search keeps (cells are mirrorToleranceMeters wide). It bounds the search on a file with thousands of vertices stacked on one point; no model of the calibration set changes its result at 16. */
+      maxCellVertices: number;
+    };
+    /**
+     * Items worn on the head: less than minWeightShare of their weight on the head bone (or bones under it) warns.
+     * Approved items in these categories carry at least 57%, except 3 of 145 that are not head pieces at all.
+     * earring, tiara and top_head are left out on purpose: approved items there are often worn elsewhere (wings,
+     * tails, staffs, halos), with as little as 0% on the head.
+     */
+    headFollow: { bone: string; categories: string[]; minWeightShare: number };
   };
   /** V-01: how much of a capture must be something drawn. */
   renderValid: {

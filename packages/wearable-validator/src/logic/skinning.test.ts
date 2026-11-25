@@ -1,0 +1,156 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { WebIO } from "@gltf-transform/core";
+import { cleanWeights, riggedGlb } from "#test/helpers/rigged.js";
+import { syntheticGlb } from "#test/helpers/synthetic.js";
+import { transformPoint } from "./gltf.js";
+import { manifest } from "../manifest/index.js";
+import { countSkinnedVertices, poseDeltas, readSkinnedGeometry, skinPositions } from "./skinning.js";
+
+const { rig, poses } = manifest.skinDeformation;
+const pose = (name: string) => poses.find((p) => p.name === name)!;
+const bindPosition = (bone: string): [number, number, number] => {
+  const m = rig.find((b) => b.name === bone)!.bindMatrix;
+  return [m[12], m[13], m[14]];
+};
+const near = (actual: number, expected: number, tolerance = 1e-4): void => assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} is not within ${tolerance} of ${expected}`);
+
+describe("skinning", () => {
+  it("the rig is the 62-bone avatar skeleton, each parent listed before its children", () => {
+    assert.equal(rig.length, 62);
+    const seen = new Set<string>();
+    for (const bone of rig) {
+      assert.equal(bone.bindMatrix.length, 16, bone.name);
+      if (bone.parent !== null) assert.ok(seen.has(bone.parent), `${bone.name} comes before its parent ${bone.parent}`);
+      seen.add(bone.name);
+    }
+    assert.deepEqual(rig.filter((bone) => bone.parent === null).map((bone) => bone.name), ["Avatar_Hips"]);
+  });
+
+  it("every pose turns bones the rig has", () => {
+    const names = new Set(rig.map((bone) => bone.name));
+    for (const p of poses) for (const rotation of p.rotations) assert.ok(names.has(rotation.bone), `${p.name}: ${rotation.bone}`);
+  });
+
+  it("arms down swings the left hand under the shoulder and leaves the spine alone", () => {
+    const deltas = poseDeltas(rig, pose("arms-down"));
+    const shoulder = bindPosition("Avatar_LeftArm");
+    const hand = transformPoint(deltas.get("Avatar_LeftHand")!, bindPosition("Avatar_LeftHand"));
+    const reach = Math.hypot(...bindPosition("Avatar_LeftHand").map((value, i) => value - shoulder[i]));
+    near(Math.hypot(...hand.map((value, i) => value - shoulder[i])), reach);
+    assert.ok(hand[1] < shoulder[1] - 0.4, "the hand hangs well below the shoulder");
+    assert.ok(hand[0] > 0, "and stays on the avatar's left");
+    assert.deepEqual(transformPoint(deltas.get("Avatar_Spine2")!, [0.1, 1.3, 0.1]), [0.1, 1.3, 0.1]);
+  });
+
+  it("a child bone is carried by its parent's turn", () => {
+    const deltas = poseDeltas(rig, pose("head-turn"));
+    assert.deepEqual(deltas.get("Avatar_LeftHand"), deltas.get("Avatar_Hips"));
+    assert.notDeepEqual(deltas.get("Avatar_Head"), deltas.get("Avatar_Neck"));
+  });
+
+  it("the bind pose of a mesh bound to the rig is its stored positions", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb());
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.vertexCount, 49 * 9);
+    assert.equal(geometry.triangles.length, 48 * 8 * 2 * 3);
+    const bind = skinPositions(geometry);
+    for (let i = 0; i < bind.length; i++) near(bind[i], geometry.positions[i], 1e-5);
+  });
+
+  it("skinning blends the bones by weight", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ weights: (x) => (x === 0.6 ? { Avatar_LeftArm: 0.5, Avatar_Spine2: 0.5 } : cleanWeights(x)) }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    const deltas = poseDeltas(rig, pose("arms-down"));
+    const posed = skinPositions(geometry, deltas);
+    const tip = 48; // last vertex of the first row: x = 0.6
+    const stored: [number, number, number] = [geometry.positions[tip * 3], geometry.positions[tip * 3 + 1], geometry.positions[tip * 3 + 2]];
+    const onArm = transformPoint(deltas.get("Avatar_LeftArm")!, stored);
+    for (let i = 0; i < 3; i++) near(posed[tip * 3 + i], (stored[i] + onArm[i]) / 2, 1e-5);
+  });
+
+  it("the rig is in the order the client indexes the avatar's bones", () => {
+    // unity-explorer AvatarBase.prefab: hips, legs, spine, left arm and hand, right arm and hand, neck, head
+    assert.deepEqual(rig.slice(0, 5).map((bone) => bone.name), ["Avatar_Hips", "Avatar_LeftUpLeg", "Avatar_LeftLeg", "Avatar_LeftFoot", "Avatar_LeftToeBase"]);
+    assert.deepEqual(rig.slice(9, 13).map((bone) => bone.name), ["Avatar_Spine", "Avatar_Spine1", "Avatar_Spine2", "Avatar_LeftShoulder"]);
+    assert.deepEqual(rig.slice(16, 18).map((bone) => bone.name), ["Avatar_LeftHandThumb1", "Avatar_LeftHandThumb2"]);
+    assert.deepEqual(rig.slice(36, 38).map((bone) => bone.name), ["Avatar_RightShoulder", "Avatar_RightArm"]);
+    assert.deepEqual(rig.slice(60).map((bone) => bone.name), ["Avatar_Neck", "Avatar_Head"]);
+  });
+
+  it("a joint is carried by the rig bone at its position in the joint list, not the one of its name", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ jointOrder: (names) => [...names].reverse() }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.joints[0].name, rig[rig.length - 1].name);
+    assert.equal(geometry.joints[0].carrier, rig[0].name);
+    assert.equal(geometry.joints[0].slot, 0);
+    // bound to its own bone's pose but moved by another: the bind offset is no longer the identity
+    assert.ok(Math.abs(geometry.joints[0].bindOffset![13]) > 0.1);
+  });
+
+  it("reads a skin's joints once when two meshes share it", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ secondMesh: "shared-skin" }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.joints.length, rig.length);
+    assert.equal(geometry.vertexCount, 2 * 49 * 9);
+    assert.deepEqual(geometry.parts.map((part) => part.node), ["Band", "Lining"]);
+  });
+
+  it("reads a mesh once however many nodes draw it with the same skin", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ copies: 300 }));
+    assert.equal(countSkinnedVertices(doc), 49 * 9);
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.vertexCount, 49 * 9);
+    assert.equal(geometry.triangles.length, 48 * 8 * 2 * 3);
+    assert.deepEqual(geometry.parts, [{ node: "Band", start: 0, end: 49 * 9 }]);
+  });
+
+  it("binds every joint at the origin when the inverse bind accessor does not hold matrices", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ inverseBindType: "VEC4" }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    for (const joint of geometry.joints) assert.ok(joint.bindOffset!.every((value) => Number.isFinite(value)), joint.name);
+    assert.deepEqual(geometry.joints[0].bindOffset, rig[0].bindMatrix);
+  });
+
+  it("answers a long chain of helper joints without walking it once per joint", async () => {
+    const helpers: Record<string, string> = {};
+    for (let i = 0; i < 4000; i++) helpers[`Chain_${i}`] = i === 0 ? "Avatar_Spine2" : `Chain_${i - 1}`;
+    const doc = await new WebIO().readBinary(await riggedGlb({ helpers }));
+    const started = performance.now();
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.ok(performance.now() - started < 5000, "reading the joints took over 5 s");
+    assert.equal(geometry.joints.length, rig.length + 4000);
+    assert.equal(geometry.joints[geometry.joints.length - 1].carrier, "Avatar_Spine2");
+  });
+
+  it("a joint past the rig's length is carried by the rig bone above it, with that bone's bind offset", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ helpers: { Tail_springbone: "Avatar_LeftArm" }, scale: 2 }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    const helper = geometry.joints[rig.length];
+    const arm = geometry.joints.find((joint) => joint.name === "Avatar_LeftArm")!;
+    assert.equal(helper.name, "Tail_springbone");
+    assert.equal(helper.slot, null);
+    assert.equal(helper.carrier, "Avatar_LeftArm");
+    assert.equal(helper.bindOffset, arm.bindOffset);
+    near(arm.bindOffset![0], 0.5);
+  });
+
+  it("counts vertices weighted to a joint number the skin does not have, and drops that weight", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ rawJoint: (x) => (x === 0 ? -1 : x === 0.6 ? 999 : undefined) }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.invalidInfluences, 18);
+    assert.doesNotThrow(() => skinPositions(geometry, poseDeltas(rig, pose("arms-down"))));
+  });
+
+  it("names skinned meshes that carry no joints or weights", async () => {
+    const doc = await new WebIO().readBinary(await riggedGlb({ noWeights: true }));
+    const geometry = readSkinnedGeometry(doc, rig)!;
+    assert.equal(geometry.vertexCount, 0);
+    assert.deepEqual(geometry.unweighted, ["Band"]);
+  });
+
+  it("returns null for a model without a skinned mesh", async () => {
+    const doc = await new WebIO().readBinary(await syntheticGlb({ skinned: false }));
+    assert.equal(readSkinnedGeometry(doc, rig), null);
+  });
+});
